@@ -1,0 +1,54 @@
+name: Build and Publish Docker Images
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+env:
+  REGISTRY: docker.io
+
+jobs:
+  build-and-push:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        service:
+          - name: backend
+            context: backend
+            dockerfile: backend/Dockerfile
+          - name: frontend
+            context: frontend
+            dockerfile: frontend/Dockerfile
+          - name: candidate-portal
+            context: candidate-portal
+            dockerfile: candidate-portal/Dockerfile
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Build and push ${{ matrix.service.name }} image
+        run: |
+          IMAGE=${{ secrets.DOCKERHUB_USERNAME }}/tas-${{ matrix.service.name }}
+          docker buildx build \
+            --platform linux/amd64,linux/arm64 \
+            --file ${{ matrix.service.dockerfile }} \
+            --tag $IMAGE:latest \
+            --tag $IMAGE:${{ github.sha }} \
+            ${{ matrix.service.context }} \
+            --push
+

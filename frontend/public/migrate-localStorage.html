@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Export LocalStorage Data</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 50px auto;
+            padding: 20px;
+        }
+        textarea {
+            width: 100%;
+            height: 300px;
+            font-family: monospace;
+            padding: 10px;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+        }
+        button {
+            background-color: #4CAF50;
+            color: white;
+            padding: 10px 20px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            margin: 10px 5px;
+        }
+        button:hover {
+            background-color: #45a049;
+        }
+        .info {
+            background-color: #f0f0f0;
+            padding: 15px;
+            border-radius: 4px;
+            margin: 20px 0;
+        }
+    </style>
+</head>
+<body>
+    <h1>Export LocalStorage Data for Migration</h1>
+    <div class="info">
+        <p>This page exports localStorage data to JSON format for database migration.</p>
+        <p>Click "Export All Data" to generate the JSON file, then copy it to <code>backend/data/localStorage-export.json</code></p>
+    </div>
+    
+    <button onclick="exportData()">Export All Data</button>
+    <button onclick="downloadData()">Download JSON File</button>
+    
+    <h3>Exported Data:</h3>
+    <textarea id="output" readonly></textarea>
+    
+    <script>
+        function exportData() {
+            const keys = [
+                'candidates',
+                'jobPostings',
+                'masterDivisions',
+                'masterOfficeLocations',
+                'teamMembers',
+                'applications',
+                'openPositionLogs',
+                'menuAccess'
+            ];
+            
+            const data = {};
+            keys.forEach(key => {
+                const value = localStorage.getItem(key);
+                if (value) {
+                    try {
+                        data[key] = JSON.parse(value);
+                    } catch (e) {
+                        data[key] = value;
+                    }
+                }
+            });
+            
+            const json = JSON.stringify(data, null, 2);
+            document.getElementById('output').value = json;
+            
+            // Store in a global variable for download
+            window.exportedData = json;
+        }
+        
+        function downloadData() {
+            if (!window.exportedData) {
+                exportData();
+            }
+            
+            const blob = new Blob([window.exportedData], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = 'localStorage-export.json';
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+        }
+        
+        // Auto-export on load
+        window.onload = exportData;
+    </script>
+</body>
+</html>
+

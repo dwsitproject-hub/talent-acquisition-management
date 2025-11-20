@@ -1,0 +1,52 @@
+2025-11-04 06:48:47 [ERROR]: Redis connection error: connect ECONNREFUSED 172.18.0.2:6379
+Error: connect ECONNREFUSED 172.18.0.2:6379
+    at TCPConnectWrap.afterConnect [as oncomplete] (node:net:1637:16)
+2025-11-04 06:48:51 [ERROR]: Prisma Error: Error in PostgreSQL connection: Error { kind: Db, cause: Some(DbError { severity: "FATAL", parsed_severity: Some(Fatal), code: SqlState(E57P01), message: "terminating connection due to administrator command", detail: None, hint: None, position: None, where_: None, schema: None, table: None, column: None, datatype: None, constraint: None, file: Some("postgres.c"), line: Some(3211), routine: Some("ProcessInterrupts") }) }
+2025-11-04 06:49:57 [ERROR]: Authentication error: Invalid or expired token
+Error: Invalid or expired token
+    at verifyAccessToken (/app/src/utils/token.js:37:11)
+    at authenticate (/app/src/middleware/auth.js:23:21)
+    at Layer.handle [as handle_request] (/app/node_modules/express/lib/router/layer.js:95:5)
+    at next (/app/node_modules/express/lib/router/route.js:149:13)
+    at Route.dispatch (/app/node_modules/express/lib/router/route.js:119:3)
+    at Layer.handle [as handle_request] (/app/node_modules/express/lib/router/layer.js:95:5)
+    at /app/node_modules/express/lib/router/index.js:284:15
+    at Function.process_params (/app/node_modules/express/lib/router/index.js:346:12)
+    at next (/app/node_modules/express/lib/router/index.js:280:10)
+    at Function.handle (/app/node_modules/express/lib/router/index.js:175:3)
+2025-11-04 07:46:39 [ERROR]: Authentication error: Invalid or expired token
+Error: Invalid or expired token
+    at verifyAccessToken (/app/src/utils/token.js:37:11)
+    at authenticate (/app/src/middleware/auth.js:23:21)
+    at Layer.handle [as handle_request] (/app/node_modules/express/lib/router/layer.js:95:5)
+    at next (/app/node_modules/express/lib/router/route.js:149:13)
+    at Route.dispatch (/app/node_modules/express/lib/router/route.js:119:3)
+    at Layer.handle [as handle_request] (/app/node_modules/express/lib/router/layer.js:95:5)
+    at /app/node_modules/express/lib/router/index.js:284:15
+    at Function.process_params (/app/node_modules/express/lib/router/index.js:346:12)
+    at next (/app/node_modules/express/lib/router/index.js:280:10)
+    at Function.handle (/app/node_modules/express/lib/router/index.js:175:3)
+2025-11-04 09:07:52 [ERROR]: Authentication error: Invalid or expired token
+Error: Invalid or expired token
+    at verifyAccessToken (/app/src/utils/token.js:37:11)
+    at authenticate (/app/src/middleware/auth.js:23:21)
+    at Layer.handle [as handle_request] (/app/node_modules/express/lib/router/layer.js:95:5)
+    at next (/app/node_modules/express/lib/router/route.js:149:13)
+    at Route.dispatch (/app/node_modules/express/lib/router/route.js:119:3)
+    at Layer.handle [as handle_request] (/app/node_modules/express/lib/router/layer.js:95:5)
+    at /app/node_modules/express/lib/router/index.js:284:15
+    at Function.process_params (/app/node_modules/express/lib/router/index.js:346:12)
+    at next (/app/node_modules/express/lib/router/index.js:280:10)
+    at Function.handle (/app/node_modules/express/lib/router/index.js:175:3)
+2025-11-04 09:38:42 [ERROR]: Authentication error: Invalid or expired token
+Error: Invalid or expired token
+    at verifyAccessToken (/app/src/utils/token.js:37:11)
+    at authenticate (/app/src/middleware/auth.js:23:21)
+    at Layer.handle [as handle_request] (/app/node_modules/express/lib/router/layer.js:95:5)
+    at next (/app/node_modules/express/lib/router/route.js:149:13)
+    at Route.dispatch (/app/node_modules/express/lib/router/route.js:119:3)
+    at Layer.handle [as handle_request] (/app/node_modules/express/lib/router/layer.js:95:5)
+    at /app/node_modules/express/lib/router/index.js:284:15
+    at Function.process_params (/app/node_modules/express/lib/router/index.js:346:12)
+    at next (/app/node_modules/express/lib/router/index.js:280:10)
+    at Function.handle (/app/node_modules/express/lib/router/index.js:175:3)

@@ -1,0 +1,1385 @@
+2025-11-07 01:39:00 [INFO]: Redis connected successfully
+2025-11-07 01:39:00 [INFO]: PostgreSQL connected successfully
+2025-11-07 01:39:00 [INFO]: Redis connected successfully
+2025-11-07 01:39:00 [INFO]: Server running on port 4000 in production mode
+2025-11-07 01:39:00 [INFO]: API available at: http://localhost:4000/api
+2025-11-07 01:39:03 [INFO]: ::1 - - [07/Nov/2025:01:39:03 +0000] "GET /health HTTP/1.1" 200 120 "-" "-"
+2025-11-07 01:39:27 [ERROR]: Authentication error: Invalid or expired token
+Error: Invalid or expired token
+    at verifyAccessToken (/app/src/utils/token.js:37:11)
+    at authenticate (/app/src/middleware/auth.js:23:21)
+    at Layer.handle [as handle_request] (/app/node_modules/express/lib/router/layer.js:95:5)
+    at next (/app/node_modules/express/lib/router/route.js:149:13)
+    at Route.dispatch (/app/node_modules/express/lib/router/route.js:119:3)
+    at Layer.handle [as handle_request] (/app/node_modules/express/lib/router/layer.js:95:5)
+    at /app/node_modules/express/lib/router/index.js:284:15
+    at Function.process_params (/app/node_modules/express/lib/router/index.js:346:12)
+    at next (/app/node_modules/express/lib/router/index.js:280:10)
+    at Function.handle (/app/node_modules/express/lib/router/index.js:175:3)
+2025-11-07 01:39:27 [INFO]: ::ffff:172.18.0.1 - - [07/Nov/2025:01:39:27 +0000] "GET /api/auth/me HTTP/1.1" 401 54 "http://localhost:4001/" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36"
+2025-11-07 01:39:33 [INFO]: ::1 - - [07/Nov/2025:01:39:33 +0000] "GET /health HTTP/1.1" 200 121 "-" "-"
+2025-11-07 01:40:03 [INFO]: ::1 - - [07/Nov/2025:01:40:03 +0000] "GET /health HTTP/1.1" 200 121 "-" "-"
+2025-11-07 01:40:33 [INFO]: ::1 - - [07/Nov/2025:01:40:33 +0000] "GET /health HTTP/1.1" 200 121 "-" "-"
+2025-11-07 01:40:35 [INFO]: User logged in: jerry.hakim@energi-up.com
+2025-11-07 01:40:35 [INFO]: ::ffff:172.18.0.1 - - [07/Nov/2025:01:40:35 +0000] "POST /api/auth/login HTTP/1.1" 200 505 "http://localhost:4001/" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36"
+2025-11-07 01:40:35 [INFO]: ::ffff:172.18.0.1 - - [07/Nov/2025:01:40:35 +0000] "GET /api/dashboard/stats HTTP/1.1" 304 - "http://localhost:4001/" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36"
+2025-11-07 01:40:37 [INFO]: ::ffff:172.18.0.1 - - [07/Nov/2025:01:40:37 +0000] "GET /api/candidates?page=1&limit=100 HTTP/1.1" 304 - "http://localhost:4001/" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36"
+2025-11-07 01:40:38 [INFO]: ::ffff:172.18.0.1 - - [07/Nov/2025:01:40:38 +0000] "GET /api/candidates?page=1&limit=100 HTTP/1.1" 304 - "http://localhost:4001/" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36"
+2025-11-07 01:40:40 [INFO]: ::ffff:172.18.0.1 - - [07/Nov/2025:01:40:40 +0000] "GET /api/fptk?search=&page=1&limit=100 HTTP/1.1" 304 - "http://localhost:4001/" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36"
+2025-11-07 01:40:40 [INFO]: ::ffff:172.18.0.1 - - [07/Nov/2025:01:40:40 +0000] "GET /api/fptk?search=&page=1&limit=100 HTTP/1.1" 304 - "http://localhost:4001/" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36"
+2025-11-07 01:41:03 [INFO]: ::ffff:172.18.0.1 - - [07/Nov/2025:01:41:03 +0000] "GET /api/candidates?page=1&limit=100 HTTP/1.1" 304 - "http://localhost:4001/" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36"
+2025-11-07 01:41:03 [INFO]: ::1 - - [07/Nov/2025:01:41:03 +0000] "GET /health HTTP/1.1" 200 122 "-" "-"
+2025-11-07 01:41:04 [INFO]: ::ffff:172.18.0.1 - - [07/Nov/2025:01:41:04 +0000] "GET /api/candidates?page=1&limit=100 HTTP/1.1" 304 - "http://localhost:4001/" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36"
+2025-11-07 01:41:33 [INFO]: ::1 - - [07/Nov/2025:01:41:33 +0000] "GET /health HTTP/1.1" 200 122 "-" "-"
+2025-11-07 01:42:04 [INFO]: ::1 - - [07/Nov/2025:01:42:04 +0000] "GET /health HTTP/1.1" 200 122 "-" "-"
+2025-11-07 01:42:34 [INFO]: ::1 - - [07/Nov/2025:01:42:34 +0000] "GET /health HTTP/1.1" 200 122 "-" "-"
+2025-11-07 01:43:04 [INFO]: ::1 - - [07/Nov/2025:01:43:04 +0000] "GET /health HTTP/1.1" 200 122 "-" "-"
+2025-11-07 01:43:34 [INFO]: ::1 - - [07/Nov/2025:01:43:34 +0000] "GET /health HTTP/1.1" 200 122 "-" "-"
+2025-11-07 01:44:04 [INFO]: ::1 - - [07/Nov/2025:01:44:04 +0000] "GET /health HTTP/1.1" 200 122 "-" "-"
+2025-11-07 01:44:34 [INFO]: ::1 - - [07/Nov/2025:01:44:34 +0000] "GET /health HTTP/1.1" 200 122 "-" "-"
+2025-11-07 01:45:04 [INFO]: ::1 - - [07/Nov/2025:01:45:04 +0000] "GET /health HTTP/1.1" 200 122 "-" "-"
+2025-11-07 01:45:34 [INFO]: ::1 - - [07/Nov/2025:01:45:34 +0000] "GET /health HTTP/1.1" 200 122 "-" "-"
+2025-11-07 01:46:04 [INFO]: ::1 - - [07/Nov/2025:01:46:04 +0000] "GET /health HTTP/1.1" 200 121 "-" "-"
+2025-11-07 01:46:34 [INFO]: ::1 - - [07/Nov/2025:01:46:34 +0000] "GET /health HTTP/1.1" 200 122 "-" "-"
+2025-11-07 01:47:05 [INFO]: ::1 - - [07/Nov/2025:01:47:05 +0000] "GET /health HTTP/1.1" 200 122 "-" "-"
+2025-11-07 01:47:35 [INFO]: ::1 - - [07/Nov/2025:01:47:35 +0000] "GET /health HTTP/1.1" 200 122 "-" "-"
+2025-11-07 01:48:05 [INFO]: ::1 - - [07/Nov/2025:01:48:05 +0000] "GET /health HTTP/1.1" 200 122 "-" "-"
+2025-11-07 01:48:35 [INFO]: ::1 - - [07/Nov/2025:01:48:35 +0000] "GET /health HTTP/1.1" 200 122 "-" "-"
+2025-11-07 01:49:05 [INFO]: ::1 - - [07/Nov/2025:01:49:05 +0000] "GET /health HTTP/1.1" 200 122 "-" "-"
+2025-11-07 01:49:35 [INFO]: ::1 - - [07/Nov/2025:01:49:35 +0000] "GET /health HTTP/1.1" 200 122 "-" "-"
+2025-11-07 01:57:01 [ERROR]: Authentication error: Invalid or expired token
+Error: Invalid or expired token
+    at verifyAccessToken (/app/src/utils/token.js:37:11)
+    at authenticate (/app/src/middleware/auth.js:23:21)
+    at Layer.handle [as handle_request] (/app/node_modules/express/lib/router/layer.js:95:5)
+    at next (/app/node_modules/express/lib/router/route.js:149:13)
+    at Route.dispatch (/app/node_modules/express/lib/router/route.js:119:3)
+    at Layer.handle [as handle_request] (/app/node_modules/express/lib/router/layer.js:95:5)
+    at /app/node_modules/express/lib/router/index.js:284:15
+    at Function.process_params (/app/node_modules/express/lib/router/index.js:346:12)
+    at next (/app/node_modules/express/lib/router/index.js:280:10)
+    at Function.handle (/app/node_modules/express/lib/router/index.js:175:3)
+2025-11-07 01:57:01 [INFO]: ::ffff:172.18.0.1 - - [07/Nov/2025:01:57:01 +0000] "GET /api/candidates?page=1&limit=100 HTTP/1.1" 401 54 "http://localhost:4001/" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36"
+2025-11-07 01:57:01 [ERROR]: Authentication error: Invalid or expired token
+Error: Invalid or expired token
+    at verifyAccessToken (/app/src/utils/token.js:37:11)
+    at authenticate (/app/src/middleware/auth.js:23:21)
+    at Layer.handle [as handle_request] (/app/node_modules/express/lib/router/layer.js:95:5)
+    at next (/app/node_modules/express/lib/router/route.js:149:13)
+    at Route.dispatch (/app/node_modules/express/lib/router/route.js:119:3)
+    at Layer.handle [as handle_request] (/app/node_modules/express/lib/router/layer.js:95:5)
+    at /app/node_modules/express/lib/router/index.js:284:15
+    at Function.process_params (/app/node_modules/express/lib/router/index.js:346:12)
+    at next (/app/node_modules/express/lib/router/index.js:280:10)
+    at Function.handle (/app/node_modules/express/lib/router/index.js:175:3)
+2025-11-07 01:57:01 [INFO]: ::ffff:172.18.0.1 - - [07/Nov/2025:01:57:01 +0000] "GET /api/auth/me HTTP/1.1" 401 54 "http://localhost:4001/" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36"
+2025-11-07 01:57:01 [INFO]: ::1 - - [07/Nov/2025:01:57:01 +0000] "GET /health HTTP/1.1" 200 122 "-" "-"
+2025-11-07 01:57:03 [INFO]: User logged in: jerry.hakim@energi-up.com
+2025-11-07 01:57:03 [INFO]: ::ffff:172.18.0.1 - - [07/Nov/2025:01:57:03 +0000] "POST /api/auth/login HTTP/1.1" 200 505 "http://localhost:4001/" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36"
+2025-11-07 01:57:03 [INFO]: ::ffff:172.18.0.1 - - [07/Nov/2025:01:57:03 +0000] "GET /api/dashboard/stats HTTP/1.1" 304 - "http://localhost:4001/" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36"
+2025-11-07 01:57:04 [INFO]: ::ffff:172.18.0.1 - - [07/Nov/2025:01:57:04 +0000] "GET /api/candidates?page=1&limit=100 HTTP/1.1" 304 - "http://localhost:4001/" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36"
+2025-11-07 01:57:04 [INFO]: ::ffff:172.18.0.1 - - [07/Nov/2025:01:57:04 +0000] "GET /api/candidates?page=1&limit=100 HTTP/1.1" 304 - "http://localhost:4001/" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36"
+2025-11-07 01:57:32 [INFO]: ::1 - - [07/Nov/2025:01:57:32 +0000] "GET /health HTTP/1.1" 200 122 "-" "-"
+2025-11-07 01:58:02 [INFO]: ::1 - - [07/Nov/2025:01:58:02 +0000] "GET /health HTTP/1.1" 200 122 "-" "-"
+2025-11-07 01:58:32 [INFO]: ::1 - - [07/Nov/2025:01:58:32 +0000] "GET /health HTTP/1.1" 200 122 "-" "-"
+2025-11-07 01:59:02 [INFO]: ::1 - - [07/Nov/2025:01:59:02 +0000] "GET /health HTTP/1.1" 200 121 "-" "-"
+2025-11-07 01:59:32 [INFO]: ::1 - - [07/Nov/2025:01:59:32 +0000] "GET /health HTTP/1.1" 200 122 "-" "-"
+2025-11-07 02:00:01 [INFO]: ::ffff:172.18.0.1 - - [07/Nov/2025:02:00:01 +0000] "GET /api/auth/me HTTP/1.1" 304 - "http://localhost:4001/" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36"
+2025-11-07 02:00:01 [INFO]: ::ffff:172.18.0.1 - - [07/Nov/2025:02:00:01 +0000] "GET /api/candidates?page=1&limit=100 HTTP/1.1" 304 - "http://localhost:4001/" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36"
+2025-11-07 02:00:02 [INFO]: ::1 - - [07/Nov/2025:02:00:02 +0000] "GET /health HTTP/1.1" 200 122 "-" "-"
+2025-11-07 02:00:03 [INFO]: User logged in: jerry.hakim@energi-up.com
+2025-11-07 02:00:03 [INFO]: ::ffff:172.18.0.1 - - [07/Nov/2025:02:00:03 +0000] "POST /api/auth/login HTTP/1.1" 200 505 "http://localhost:4001/" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36"
+2025-11-07 02:00:03 [INFO]: ::ffff:172.18.0.1 - - [07/Nov/2025:02:00:03 +0000] "GET /api/dashboard/stats HTTP/1.1" 304 - "http://localhost:4001/" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36"
+2025-11-07 02:00:05 [INFO]: ::ffff:172.18.0.1 - - [07/Nov/2025:02:00:05 +0000] "GET /api/candidates?page=1&limit=100 HTTP/1.1" 304 - "http://localhost:4001/" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36"
+2025-11-07 02:00:05 [INFO]: ::ffff:172.18.0.1 - - [07/Nov/2025:02:00:05 +0000] "GET /api/candidates?page=1&limit=100 HTTP/1.1" 304 - "http://localhost:4001/" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36"
+2025-11-07 02:00:32 [INFO]: ::1 - - [07/Nov/2025:02:00:32 +0000] "GET /health HTTP/1.1" 200 122 "-" "-"
+2025-11-07 02:01:02 [INFO]: ::1 - - [07/Nov/2025:02:01:02 +0000] "GET /health HTTP/1.1" 200 122 "-" "-"
+2025-11-07 02:01:32 [INFO]: ::1 - - [07/Nov/2025:02:01:32 +0000] "GET /health HTTP/1.1" 200 122 "-" "-"
+2025-11-07 02:02:03 [INFO]: ::1 - - [07/Nov/2025:02:02:03 +0000] "GET /health HTTP/1.1" 200 122 "-" "-"
+2025-11-07 02:02:33 [INFO]: ::1 - - [07/Nov/2025:02:02:33 +0000] "GET /health HTTP/1.1" 200 120 "-" "-"
+2025-11-07 02:03:03 [INFO]: ::1 - - [07/Nov/2025:02:03:03 +0000] "GET /health HTTP/1.1" 200 123 "-" "-"
+2025-11-07 02:03:33 [INFO]: ::1 - - [07/Nov/2025:02:03:33 +0000] "GET /health HTTP/1.1" 200 123 "-" "-"
+2025-11-07 02:04:03 [INFO]: ::1 - - [07/Nov/2025:02:04:03 +0000] "GET /health HTTP/1.1" 200 123 "-" "-"
+2025-11-07 02:04:33 [INFO]: ::1 - - [07/Nov/2025:02:04:33 +0000] "GET /health HTTP/1.1" 200 123 "-" "-"
+2025-11-07 02:05:03 [INFO]: ::1 - - [07/Nov/2025:02:05:03 +0000] "GET /health HTTP/1.1" 200 123 "-" "-"
+2025-11-07 02:05:33 [INFO]: ::1 - - [07/Nov/2025:02:05:33 +0000] "GET /health HTTP/1.1" 200 122 "-" "-"
+2025-11-07 02:06:03 [INFO]: ::1 - - [07/Nov/2025:02:06:03 +0000] "GET /health HTTP/1.1" 200 123 "-" "-"
+2025-11-07 02:06:33 [INFO]: ::1 - - [07/Nov/2025:02:06:33 +0000] "GET /health HTTP/1.1" 200 123 "-" "-"
+2025-11-07 02:07:04 [INFO]: ::1 - - [07/Nov/2025:02:07:04 +0000] "GET /health HTTP/1.1" 200 123 "-" "-"
+2025-11-07 02:07:34 [INFO]: ::1 - - [07/Nov/2025:02:07:34 +0000] "GET /health HTTP/1.1" 200 122 "-" "-"
+2025-11-07 02:07:50 [INFO]: ::ffff:172.18.0.1 - - [07/Nov/2025:02:07:50 +0000] "GET /api/auth/me HTTP/1.1" 304 - "http://localhost:4001/" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36"
+2025-11-07 02:07:50 [INFO]: ::ffff:172.18.0.1 - - [07/Nov/2025:02:07:50 +0000] "GET /api/candidates?page=1&limit=100 HTTP/1.1" 304 - "http://localhost:4001/" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36"
+2025-11-07 02:07:51 [INFO]: User logged in: jerry.hakim@energi-up.com
+2025-11-07 02:07:51 [INFO]: ::ffff:172.18.0.1 - - [07/Nov/2025:02:07:51 +0000] "POST /api/auth/login HTTP/1.1" 200 505 "http://localhost:4001/" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36"
+2025-11-07 02:07:51 [INFO]: ::ffff:172.18.0.1 - - [07/Nov/2025:02:07:51 +0000] "GET /api/dashboard/stats HTTP/1.1" 304 - "http://localhost:4001/" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36"
+2025-11-07 02:07:52 [INFO]: ::ffff:172.18.0.1 - - [07/Nov/2025:02:07:52 +0000] "GET /api/candidates?page=1&limit=100 HTTP/1.1" 304 - "http://localhost:4001/" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36"
+2025-11-07 02:07:53 [INFO]: ::ffff:172.18.0.1 - - [07/Nov/2025:02:07:53 +0000] "GET /api/candidates?page=1&limit=100 HTTP/1.1" 304 - "http://localhost:4001/" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36"
+2025-11-07 02:08:04 [INFO]: ::1 - - [07/Nov/2025:02:08:04 +0000] "GET /health HTTP/1.1" 200 123 "-" "-"
+2025-11-07 02:08:34 [INFO]: ::1 - - [07/Nov/2025:02:08:34 +0000] "GET /health HTTP/1.1" 200 123 "-" "-"
+2025-11-07 02:09:04 [INFO]: ::1 - - [07/Nov/2025:02:09:04 +0000] "GET /health HTTP/1.1" 200 123 "-" "-"
+2025-11-07 02:09:34 [INFO]: ::1 - - [07/Nov/2025:02:09:34 +0000] "GET /health HTTP/1.1" 200 123 "-" "-"
+2025-11-07 02:10:04 [INFO]: ::1 - - [07/Nov/2025:02:10:04 +0000] "GET /health HTTP/1.1" 200 123 "-" "-"
+2025-11-07 02:10:34 [INFO]: ::1 - - [07/Nov/2025:02:10:34 +0000] "GET /health HTTP/1.1" 200 122 "-" "-"
+2025-11-07 02:11:04 [INFO]: ::1 - - [07/Nov/2025:02:11:04 +0000] "GET /health HTTP/1.1" 200 123 "-" "-"
+2025-11-07 02:11:34 [INFO]: ::1 - - [07/Nov/2025:02:11:34 +0000] "GET /health HTTP/1.1" 200 123 "-" "-"
+2025-11-07 02:12:05 [INFO]: ::1 - - [07/Nov/2025:02:12:05 +0000] "GET /health HTTP/1.1" 200 123 "-" "-"
+2025-11-07 02:12:35 [INFO]: ::1 - - [07/Nov/2025:02:12:35 +0000] "GET /health HTTP/1.1" 200 122 "-" "-"
+2025-11-07 02:13:05 [INFO]: ::1 - - [07/Nov/2025:02:13:05 +0000] "GET /health HTTP/1.1" 200 122 "-" "-"
+2025-11-07 02:13:35 [INFO]: ::1 - - [07/Nov/2025:02:13:35 +0000] "GET /health HTTP/1.1" 200 123 "-" "-"
+2025-11-07 02:14:05 [INFO]: ::1 - - [07/Nov/2025:02:14:05 +0000] "GET /health HTTP/1.1" 200 123 "-" "-"
+2025-11-07 02:14:35 [INFO]: ::1 - - [07/Nov/2025:02:14:35 +0000] "GET /health HTTP/1.1" 200 123 "-" "-"
+2025-11-07 02:15:05 [INFO]: ::1 - - [07/Nov/2025:02:15:05 +0000] "GET /health HTTP/1.1" 200 123 "-" "-"
+2025-11-07 02:15:35 [INFO]: ::1 - - [07/Nov/2025:02:15:35 +0000] "GET /health HTTP/1.1" 200 123 "-" "-"
+2025-11-07 02:16:05 [INFO]: ::1 - - [07/Nov/2025:02:16:05 +0000] "GET /health HTTP/1.1" 200 123 "-" "-"
+2025-11-07 02:16:35 [INFO]: ::1 - - [07/Nov/2025:02:16:35 +0000] "GET /health HTTP/1.1" 200 123 "-" "-"
+2025-11-07 02:17:06 [INFO]: ::1 - - [07/Nov/2025:02:17:06 +0000] "GET /health HTTP/1.1" 200 123 "-" "-"
+2025-11-07 02:17:36 [INFO]: ::1 - - [07/Nov/2025:02:17:36 +0000] "GET /health HTTP/1.1" 200 123 "-" "-"
+2025-11-07 02:18:06 [INFO]: ::1 - - [07/Nov/2025:02:18:06 +0000] "GET /health HTTP/1.1" 200 123 "-" "-"
+2025-11-07 02:18:36 [INFO]: ::1 - - [07/Nov/2025:02:18:36 +0000] "GET /health HTTP/1.1" 200 123 "-" "-"
+2025-11-07 02:19:06 [INFO]: ::1 - - [07/Nov/2025:02:19:06 +0000] "GET /health HTTP/1.1" 200 123 "-" "-"
+2025-11-07 02:19:36 [INFO]: ::1 - - [07/Nov/2025:02:19:36 +0000] "GET /health HTTP/1.1" 200 122 "-" "-"
+2025-11-07 02:20:06 [INFO]: ::1 - - [07/Nov/2025:02:20:06 +0000] "GET /health HTTP/1.1" 200 123 "-" "-"
+2025-11-07 02:20:36 [INFO]: ::1 - - [07/Nov/2025:02:20:36 +0000] "GET /health HTTP/1.1" 200 123 "-" "-"
+2025-11-07 02:21:06 [INFO]: ::1 - - [07/Nov/2025:02:21:06 +0000] "GET /health HTTP/1.1" 200 122 "-" "-"
+2025-11-07 02:21:37 [INFO]: ::1 - - [07/Nov/2025:02:21:37 +0000] "GET /health HTTP/1.1" 200 123 "-" "-"
+2025-11-07 02:22:07 [INFO]: ::1 - - [07/Nov/2025:02:22:07 +0000] "GET /health HTTP/1.1" 200 123 "-" "-"
+2025-11-07 02:22:37 [INFO]: ::1 - - [07/Nov/2025:02:22:37 +0000] "GET /health HTTP/1.1" 200 123 "-" "-"
+2025-11-07 02:23:07 [INFO]: ::1 - - [07/Nov/2025:02:23:07 +0000] "GET /health HTTP/1.1" 200 123 "-" "-"
+2025-11-07 02:23:37 [INFO]: ::1 - - [07/Nov/2025:02:23:37 +0000] "GET /health HTTP/1.1" 200 123 "-" "-"
+2025-11-07 02:24:07 [INFO]: ::1 - - [07/Nov/2025:02:24:07 +0000] "GET /health HTTP/1.1" 200 123 "-" "-"
+2025-11-07 02:24:37 [INFO]: ::1 - - [07/Nov/2025:02:24:37 +0000] "GET /health HTTP/1.1" 200 123 "-" "-"
+2025-11-07 02:25:07 [INFO]: ::1 - - [07/Nov/2025:02:25:07 +0000] "GET /health HTTP/1.1" 200 123 "-" "-"
+2025-11-07 02:25:37 [INFO]: ::1 - - [07/Nov/2025:02:25:37 +0000] "GET /health HTTP/1.1" 200 123 "-" "-"
+2025-11-07 02:26:07 [INFO]: ::1 - - [07/Nov/2025:02:26:07 +0000] "GET /health HTTP/1.1" 200 123 "-" "-"
+2025-11-07 02:26:38 [INFO]: ::1 - - [07/Nov/2025:02:26:38 +0000] "GET /health HTTP/1.1" 200 123 "-" "-"
+2025-11-07 02:27:08 [INFO]: ::1 - - [07/Nov/2025:02:27:08 +0000] "GET /health HTTP/1.1" 200 123 "-" "-"
+2025-11-07 02:27:38 [INFO]: ::1 - - [07/Nov/2025:02:27:38 +0000] "GET /health HTTP/1.1" 200 123 "-" "-"
+2025-11-07 02:29:29 [INFO]: ::1 - - [07/Nov/2025:02:29:29 +0000] "GET /health HTTP/1.1" 200 123 "-" "-"
+2025-11-07 02:29:59 [INFO]: ::1 - - [07/Nov/2025:02:29:59 +0000] "GET /health HTTP/1.1" 200 123 "-" "-"
+2025-11-07 02:30:29 [INFO]: ::1 - - [07/Nov/2025:02:30:29 +0000] "GET /health HTTP/1.1" 200 123 "-" "-"
+2025-11-07 02:30:59 [INFO]: ::1 - - [07/Nov/2025:02:30:59 +0000] "GET /health HTTP/1.1" 200 122 "-" "-"
+2025-11-07 02:31:29 [INFO]: ::1 - - [07/Nov/2025:02:31:29 +0000] "GET /health HTTP/1.1" 200 122 "-" "-"
+2025-11-07 02:31:59 [INFO]: ::1 - - [07/Nov/2025:02:31:59 +0000] "GET /health HTTP/1.1" 200 123 "-" "-"
+2025-11-07 02:32:29 [INFO]: ::1 - - [07/Nov/2025:02:32:29 +0000] "GET /health HTTP/1.1" 200 123 "-" "-"
+2025-11-07 02:33:00 [INFO]: ::1 - - [07/Nov/2025:02:33:00 +0000] "GET /health HTTP/1.1" 200 123 "-" "-"
+2025-11-07 02:33:30 [INFO]: ::1 - - [07/Nov/2025:02:33:30 +0000] "GET /health HTTP/1.1" 200 123 "-" "-"
+2025-11-07 02:34:00 [INFO]: ::1 - - [07/Nov/2025:02:34:00 +0000] "GET /health HTTP/1.1" 200 123 "-" "-"
+2025-11-07 02:34:30 [INFO]: ::1 - - [07/Nov/2025:02:34:30 +0000] "GET /health HTTP/1.1" 200 123 "-" "-"
+2025-11-07 02:35:00 [INFO]: ::1 - - [07/Nov/2025:02:35:00 +0000] "GET /health HTTP/1.1" 200 123 "-" "-"
+2025-11-07 02:35:30 [INFO]: ::1 - - [07/Nov/2025:02:35:30 +0000] "GET /health HTTP/1.1" 200 123 "-" "-"
+2025-11-07 02:36:00 [INFO]: ::1 - - [07/Nov/2025:02:36:00 +0000] "GET /health HTTP/1.1" 200 123 "-" "-"
+2025-11-07 02:36:30 [INFO]: ::1 - - [07/Nov/2025:02:36:30 +0000] "GET /health HTTP/1.1" 200 123 "-" "-"
+2025-11-07 02:37:01 [INFO]: ::1 - - [07/Nov/2025:02:37:01 +0000] "GET /health HTTP/1.1" 200 123 "-" "-"
+2025-11-07 02:37:31 [INFO]: ::1 - - [07/Nov/2025:02:37:31 +0000] "GET /health HTTP/1.1" 200 123 "-" "-"
+2025-11-07 02:38:01 [INFO]: ::1 - - [07/Nov/2025:02:38:01 +0000] "GET /health HTTP/1.1" 200 123 "-" "-"
+2025-11-07 02:38:31 [INFO]: ::1 - - [07/Nov/2025:02:38:31 +0000] "GET /health HTTP/1.1" 200 123 "-" "-"
+2025-11-07 02:39:01 [INFO]: ::1 - - [07/Nov/2025:02:39:01 +0000] "GET /health HTTP/1.1" 200 123 "-" "-"
+2025-11-07 02:39:31 [INFO]: ::1 - - [07/Nov/2025:02:39:31 +0000] "GET /health HTTP/1.1" 200 123 "-" "-"
+2025-11-07 02:40:01 [INFO]: ::1 - - [07/Nov/2025:02:40:01 +0000] "GET /health HTTP/1.1" 200 123 "-" "-"
+2025-11-07 02:40:31 [INFO]: ::1 - - [07/Nov/2025:02:40:31 +0000] "GET /health HTTP/1.1" 200 123 "-" "-"
+2025-11-07 02:41:01 [INFO]: ::1 - - [07/Nov/2025:02:41:01 +0000] "GET /health HTTP/1.1" 200 123 "-" "-"
+2025-11-07 02:41:32 [INFO]: ::1 - - [07/Nov/2025:02:41:32 +0000] "GET /health HTTP/1.1" 200 123 "-" "-"
+2025-11-07 02:42:02 [INFO]: ::1 - - [07/Nov/2025:02:42:02 +0000] "GET /health HTTP/1.1" 200 123 "-" "-"
+2025-11-07 02:42:32 [INFO]: ::1 - - [07/Nov/2025:02:42:32 +0000] "GET /health HTTP/1.1" 200 123 "-" "-"
+2025-11-07 02:43:02 [INFO]: ::1 - - [07/Nov/2025:02:43:02 +0000] "GET /health HTTP/1.1" 200 123 "-" "-"
+2025-11-07 02:43:32 [INFO]: ::1 - - [07/Nov/2025:02:43:32 +0000] "GET /health HTTP/1.1" 200 123 "-" "-"
+2025-11-07 02:44:02 [INFO]: ::1 - - [07/Nov/2025:02:44:02 +0000] "GET /health HTTP/1.1" 200 123 "-" "-"
+2025-11-07 02:44:32 [INFO]: ::1 - - [07/Nov/2025:02:44:32 +0000] "GET /health HTTP/1.1" 200 123 "-" "-"
+2025-11-07 02:45:02 [INFO]: ::1 - - [07/Nov/2025:02:45:02 +0000] "GET /health HTTP/1.1" 200 123 "-" "-"
+2025-11-07 02:45:32 [INFO]: ::1 - - [07/Nov/2025:02:45:32 +0000] "GET /health HTTP/1.1" 200 123 "-" "-"
+2025-11-07 02:46:02 [INFO]: ::1 - - [07/Nov/2025:02:46:02 +0000] "GET /health HTTP/1.1" 200 123 "-" "-"
+2025-11-07 02:46:32 [INFO]: ::1 - - [07/Nov/2025:02:46:32 +0000] "GET /health HTTP/1.1" 200 123 "-" "-"
+2025-11-07 02:47:03 [INFO]: ::1 - - [07/Nov/2025:02:47:03 +0000] "GET /health HTTP/1.1" 200 123 "-" "-"
+2025-11-07 02:47:33 [INFO]: ::1 - - [07/Nov/2025:02:47:33 +0000] "GET /health HTTP/1.1" 200 122 "-" "-"
+2025-11-07 02:48:03 [INFO]: ::1 - - [07/Nov/2025:02:48:03 +0000] "GET /health HTTP/1.1" 200 123 "-" "-"
+2025-11-07 02:48:33 [INFO]: ::1 - - [07/Nov/2025:02:48:33 +0000] "GET /health HTTP/1.1" 200 123 "-" "-"
+2025-11-07 02:49:03 [INFO]: ::1 - - [07/Nov/2025:02:49:03 +0000] "GET /health HTTP/1.1" 200 123 "-" "-"
+2025-11-07 02:49:33 [INFO]: ::1 - - [07/Nov/2025:02:49:33 +0000] "GET /health HTTP/1.1" 200 123 "-" "-"
+2025-11-07 02:50:03 [INFO]: ::1 - - [07/Nov/2025:02:50:03 +0000] "GET /health HTTP/1.1" 200 123 "-" "-"
+2025-11-07 02:50:33 [INFO]: ::1 - - [07/Nov/2025:02:50:33 +0000] "GET /health HTTP/1.1" 200 123 "-" "-"
+2025-11-07 02:55:02 [INFO]: ::1 - - [07/Nov/2025:02:55:02 +0000] "GET /health HTTP/1.1" 200 123 "-" "-"
+2025-11-07 02:55:32 [INFO]: ::1 - - [07/Nov/2025:02:55:32 +0000] "GET /health HTTP/1.1" 200 123 "-" "-"
+2025-11-07 02:56:03 [INFO]: ::1 - - [07/Nov/2025:02:56:03 +0000] "GET /health HTTP/1.1" 200 123 "-" "-"
+2025-11-07 02:56:33 [INFO]: ::1 - - [07/Nov/2025:02:56:33 +0000] "GET /health HTTP/1.1" 200 123 "-" "-"
+2025-11-07 02:57:03 [INFO]: ::1 - - [07/Nov/2025:02:57:03 +0000] "GET /health HTTP/1.1" 200 123 "-" "-"
+2025-11-07 02:57:33 [INFO]: ::1 - - [07/Nov/2025:02:57:33 +0000] "GET /health HTTP/1.1" 200 123 "-" "-"
+2025-11-07 02:58:03 [INFO]: ::1 - - [07/Nov/2025:02:58:03 +0000] "GET /health HTTP/1.1" 200 123 "-" "-"
+2025-11-07 02:58:33 [INFO]: ::1 - - [07/Nov/2025:02:58:33 +0000] "GET /health HTTP/1.1" 200 123 "-" "-"
+2025-11-07 02:59:03 [INFO]: ::1 - - [07/Nov/2025:02:59:03 +0000] "GET /health HTTP/1.1" 200 123 "-" "-"
+2025-11-07 02:59:33 [INFO]: ::1 - - [07/Nov/2025:02:59:33 +0000] "GET /health HTTP/1.1" 200 123 "-" "-"
+2025-11-07 03:00:03 [INFO]: ::1 - - [07/Nov/2025:03:00:03 +0000] "GET /health HTTP/1.1" 200 123 "-" "-"
+2025-11-07 03:00:33 [INFO]: ::1 - - [07/Nov/2025:03:00:33 +0000] "GET /health HTTP/1.1" 200 123 "-" "-"
+2025-11-07 03:01:03 [INFO]: ::1 - - [07/Nov/2025:03:01:03 +0000] "GET /health HTTP/1.1" 200 123 "-" "-"
+2025-11-07 03:01:34 [INFO]: ::1 - - [07/Nov/2025:03:01:34 +0000] "GET /health HTTP/1.1" 200 123 "-" "-"
+2025-11-07 03:02:04 [INFO]: ::1 - - [07/Nov/2025:03:02:04 +0000] "GET /health HTTP/1.1" 200 123 "-" "-"
+2025-11-07 03:02:34 [INFO]: ::1 - - [07/Nov/2025:03:02:34 +0000] "GET /health HTTP/1.1" 200 123 "-" "-"
+2025-11-07 03:03:04 [INFO]: ::1 - - [07/Nov/2025:03:03:04 +0000] "GET /health HTTP/1.1" 200 123 "-" "-"
+2025-11-07 03:03:34 [INFO]: ::1 - - [07/Nov/2025:03:03:34 +0000] "GET /health HTTP/1.1" 200 123 "-" "-"
+2025-11-07 03:04:04 [INFO]: ::1 - - [07/Nov/2025:03:04:04 +0000] "GET /health HTTP/1.1" 200 123 "-" "-"
+2025-11-07 03:04:34 [INFO]: ::1 - - [07/Nov/2025:03:04:34 +0000] "GET /health HTTP/1.1" 200 123 "-" "-"
+2025-11-07 03:05:04 [INFO]: ::1 - - [07/Nov/2025:03:05:04 +0000] "GET /health HTTP/1.1" 200 122 "-" "-"
+2025-11-07 03:05:35 [INFO]: ::1 - - [07/Nov/2025:03:05:35 +0000] "GET /health HTTP/1.1" 200 123 "-" "-"
+2025-11-07 03:06:05 [INFO]: ::1 - - [07/Nov/2025:03:06:05 +0000] "GET /health HTTP/1.1" 200 123 "-" "-"
+2025-11-07 03:06:35 [INFO]: ::1 - - [07/Nov/2025:03:06:35 +0000] "GET /health HTTP/1.1" 200 123 "-" "-"
+2025-11-07 03:12:46 [INFO]: ::1 - - [07/Nov/2025:03:12:46 +0000] "GET /health HTTP/1.1" 200 123 "-" "-"
+2025-11-07 03:13:16 [INFO]: ::1 - - [07/Nov/2025:03:13:16 +0000] "GET /health HTTP/1.1" 200 123 "-" "-"
+2025-11-07 03:13:46 [INFO]: ::1 - - [07/Nov/2025:03:13:46 +0000] "GET /health HTTP/1.1" 200 122 "-" "-"
+2025-11-07 03:14:17 [INFO]: ::1 - - [07/Nov/2025:03:14:17 +0000] "GET /health HTTP/1.1" 200 123 "-" "-"
+2025-11-07 03:14:47 [INFO]: ::1 - - [07/Nov/2025:03:14:47 +0000] "GET /health HTTP/1.1" 200 123 "-" "-"
+2025-11-07 03:15:17 [INFO]: ::1 - - [07/Nov/2025:03:15:17 +0000] "GET /health HTTP/1.1" 200 123 "-" "-"
+2025-11-07 03:15:47 [INFO]: ::1 - - [07/Nov/2025:03:15:47 +0000] "GET /health HTTP/1.1" 200 122 "-" "-"
+2025-11-07 03:16:17 [INFO]: ::1 - - [07/Nov/2025:03:16:17 +0000] "GET /health HTTP/1.1" 200 123 "-" "-"
+2025-11-07 03:16:47 [INFO]: ::1 - - [07/Nov/2025:03:16:47 +0000] "GET /health HTTP/1.1" 200 123 "-" "-"
+2025-11-07 03:17:17 [INFO]: ::1 - - [07/Nov/2025:03:17:17 +0000] "GET /health HTTP/1.1" 200 123 "-" "-"
+2025-11-07 03:47:16 [INFO]: ::1 - - [07/Nov/2025:03:47:16 +0000] "GET /health HTTP/1.1" 200 123 "-" "-"
+2025-11-07 03:47:46 [INFO]: ::1 - - [07/Nov/2025:03:47:46 +0000] "GET /health HTTP/1.1" 200 122 "-" "-"
+2025-11-07 03:48:16 [INFO]: ::1 - - [07/Nov/2025:03:48:16 +0000] "GET /health HTTP/1.1" 200 123 "-" "-"
+2025-11-07 03:48:46 [INFO]: ::1 - - [07/Nov/2025:03:48:46 +0000] "GET /health HTTP/1.1" 200 123 "-" "-"
+2025-11-07 03:49:16 [INFO]: ::1 - - [07/Nov/2025:03:49:16 +0000] "GET /health HTTP/1.1" 200 123 "-" "-"
+2025-11-07 03:49:46 [INFO]: ::1 - - [07/Nov/2025:03:49:46 +0000] "GET /health HTTP/1.1" 200 122 "-" "-"
+2025-11-07 03:49:51 [ERROR]: Authentication error: Invalid or expired token
+Error: Invalid or expired token
+    at verifyAccessToken (/app/src/utils/token.js:37:11)
+    at authenticate (/app/src/middleware/auth.js:23:21)
+    at Layer.handle [as handle_request] (/app/node_modules/express/lib/router/layer.js:95:5)
+    at next (/app/node_modules/express/lib/router/route.js:149:13)
+    at Route.dispatch (/app/node_modules/express/lib/router/route.js:119:3)
+    at Layer.handle [as handle_request] (/app/node_modules/express/lib/router/layer.js:95:5)
+    at /app/node_modules/express/lib/router/index.js:284:15
+    at Function.process_params (/app/node_modules/express/lib/router/index.js:346:12)
+    at next (/app/node_modules/express/lib/router/index.js:280:10)
+    at Function.handle (/app/node_modules/express/lib/router/index.js:175:3)
+2025-11-07 03:49:51 [INFO]: ::ffff:172.18.0.1 - - [07/Nov/2025:03:49:51 +0000] "POST /api/candidates HTTP/1.1" 401 54 "http://localhost:4001/" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36"
+2025-11-07 03:50:01 [INFO]: User logged in: jerry.hakim@energi-up.com
+2025-11-07 03:50:01 [INFO]: ::ffff:172.18.0.1 - - [07/Nov/2025:03:50:01 +0000] "POST /api/auth/login HTTP/1.1" 200 505 "http://localhost:4001/" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36"
+2025-11-07 03:50:01 [INFO]: ::ffff:172.18.0.1 - - [07/Nov/2025:03:50:01 +0000] "GET /api/dashboard/stats HTTP/1.1" 304 - "http://localhost:4001/" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36"
+2025-11-07 03:50:06 [INFO]: ::ffff:172.18.0.1 - - [07/Nov/2025:03:50:06 +0000] "GET /api/candidates?page=1&limit=100 HTTP/1.1" 304 - "http://localhost:4001/" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36"
+2025-11-07 03:50:07 [INFO]: ::ffff:172.18.0.1 - - [07/Nov/2025:03:50:07 +0000] "GET /api/candidates?page=1&limit=100 HTTP/1.1" 304 - "http://localhost:4001/" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36"
+2025-11-07 03:50:16 [INFO]: ::1 - - [07/Nov/2025:03:50:16 +0000] "GET /health HTTP/1.1" 200 123 "-" "-"
+2025-11-07 03:50:36 [INFO]: New candidate created by TA/HR: yukjin@gmail.com
+2025-11-07 03:50:36 [INFO]: ::ffff:172.18.0.1 - - [07/Nov/2025:03:50:36 +0000] "POST /api/candidates HTTP/1.1" 201 - "http://localhost:4001/" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36"
+2025-11-07 03:50:36 [INFO]: ::ffff:172.18.0.1 - - [07/Nov/2025:03:50:36 +0000] "GET /api/candidates?page=1&limit=100 HTTP/1.1" 200 - "http://localhost:4001/" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36"
+2025-11-07 03:50:46 [INFO]: ::1 - - [07/Nov/2025:03:50:46 +0000] "GET /health HTTP/1.1" 200 123 "-" "-"
+2025-11-07 03:51:16 [INFO]: ::1 - - [07/Nov/2025:03:51:16 +0000] "GET /health HTTP/1.1" 200 123 "-" "-"
+2025-11-07 03:51:47 [INFO]: ::1 - - [07/Nov/2025:03:51:47 +0000] "GET /health HTTP/1.1" 200 123 "-" "-"
+2025-11-07 03:52:17 [INFO]: ::1 - - [07/Nov/2025:03:52:17 +0000] "GET /health HTTP/1.1" 200 123 "-" "-"
+2025-11-07 03:52:47 [INFO]: ::1 - - [07/Nov/2025:03:52:47 +0000] "GET /health HTTP/1.1" 200 123 "-" "-"
+2025-11-07 03:53:17 [INFO]: ::1 - - [07/Nov/2025:03:53:17 +0000] "GET /health HTTP/1.1" 200 122 "-" "-"
+2025-11-07 03:53:47 [INFO]: ::1 - - [07/Nov/2025:03:53:47 +0000] "GET /health HTTP/1.1" 200 123 "-" "-"
+2025-11-07 03:54:17 [INFO]: ::1 - - [07/Nov/2025:03:54:17 +0000] "GET /health HTTP/1.1" 200 123 "-" "-"
+2025-11-07 03:54:47 [INFO]: ::1 - - [07/Nov/2025:03:54:47 +0000] "GET /health HTTP/1.1" 200 123 "-" "-"
+2025-11-07 03:55:17 [INFO]: ::1 - - [07/Nov/2025:03:55:17 +0000] "GET /health HTTP/1.1" 200 123 "-" "-"
+2025-11-07 03:55:47 [INFO]: ::1 - - [07/Nov/2025:03:55:47 +0000] "GET /health HTTP/1.1" 200 123 "-" "-"
+2025-11-07 03:55:52 [INFO]: ::ffff:172.18.0.1 - - [07/Nov/2025:03:55:52 +0000] "GET /api/auth/me HTTP/1.1" 304 - "http://localhost:4001/" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36"
+2025-11-07 03:55:52 [INFO]: ::ffff:172.18.0.1 - - [07/Nov/2025:03:55:52 +0000] "GET /api/candidates?page=1&limit=100 HTTP/1.1" 304 - "http://localhost:4001/" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36"
+2025-11-07 03:55:54 [INFO]: User logged in: jerry.hakim@energi-up.com
+2025-11-07 03:55:54 [INFO]: ::ffff:172.18.0.1 - - [07/Nov/2025:03:55:54 +0000] "POST /api/auth/login HTTP/1.1" 200 505 "http://localhost:4001/" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36"
+2025-11-07 03:55:54 [INFO]: ::ffff:172.18.0.1 - - [07/Nov/2025:03:55:54 +0000] "GET /api/dashboard/stats HTTP/1.1" 200 204 "http://localhost:4001/" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36"
+2025-11-07 03:55:58 [INFO]: ::ffff:172.18.0.1 - - [07/Nov/2025:03:55:58 +0000] "GET /api/candidates?page=1&limit=100 HTTP/1.1" 304 - "http://localhost:4001/" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36"
+2025-11-07 03:55:59 [INFO]: ::ffff:172.18.0.1 - - [07/Nov/2025:03:55:59 +0000] "GET /api/candidates?page=1&limit=100 HTTP/1.1" 304 - "http://localhost:4001/" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36"
+2025-11-07 03:56:17 [INFO]: ::1 - - [07/Nov/2025:03:56:17 +0000] "GET /health HTTP/1.1" 200 123 "-" "-"
+2025-11-07 03:56:47 [INFO]: ::1 - - [07/Nov/2025:03:56:47 +0000] "GET /health HTTP/1.1" 200 123 "-" "-"
+2025-11-07 03:57:17 [INFO]: ::1 - - [07/Nov/2025:03:57:17 +0000] "GET /health HTTP/1.1" 200 123 "-" "-"
+2025-11-07 03:57:19 [INFO]: New candidate created by TA/HR: jungseo@gmail.com
+2025-11-07 03:57:19 [INFO]: ::ffff:172.18.0.1 - - [07/Nov/2025:03:57:19 +0000] "POST /api/candidates HTTP/1.1" 201 - "http://localhost:4001/" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36"
+2025-11-07 03:57:19 [INFO]: ::ffff:172.18.0.1 - - [07/Nov/2025:03:57:19 +0000] "GET /api/candidates?page=1&limit=100 HTTP/1.1" 200 - "http://localhost:4001/" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36"
+2025-11-07 03:57:47 [INFO]: ::1 - - [07/Nov/2025:03:57:47 +0000] "GET /health HTTP/1.1" 200 123 "-" "-"
+2025-11-07 03:58:18 [INFO]: ::1 - - [07/Nov/2025:03:58:18 +0000] "GET /health HTTP/1.1" 200 123 "-" "-"
+2025-11-07 03:58:48 [INFO]: ::1 - - [07/Nov/2025:03:58:48 +0000] "GET /health HTTP/1.1" 200 123 "-" "-"
+2025-11-07 03:59:18 [INFO]: ::1 - - [07/Nov/2025:03:59:18 +0000] "GET /health HTTP/1.1" 200 123 "-" "-"
+2025-11-07 03:59:48 [INFO]: ::1 - - [07/Nov/2025:03:59:48 +0000] "GET /health HTTP/1.1" 200 123 "-" "-"
+2025-11-07 04:00:18 [INFO]: ::1 - - [07/Nov/2025:04:00:18 +0000] "GET /health HTTP/1.1" 200 123 "-" "-"
+2025-11-07 04:00:48 [INFO]: ::1 - - [07/Nov/2025:04:00:48 +0000] "GET /health HTTP/1.1" 200 123 "-" "-"
+2025-11-07 04:00:53 [INFO]: ::ffff:172.18.0.1 - - [07/Nov/2025:04:00:53 +0000] "GET /api/auth/me HTTP/1.1" 304 - "http://localhost:4001/" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36"
+2025-11-07 04:00:53 [INFO]: ::ffff:172.18.0.1 - - [07/Nov/2025:04:00:53 +0000] "GET /api/candidates?page=1&limit=100 HTTP/1.1" 304 - "http://localhost:4001/" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36"
+2025-11-07 04:00:55 [INFO]: User logged in: jerry.hakim@energi-up.com
+2025-11-07 04:00:55 [INFO]: ::ffff:172.18.0.1 - - [07/Nov/2025:04:00:55 +0000] "POST /api/auth/login HTTP/1.1" 200 505 "http://localhost:4001/" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36"
+2025-11-07 04:00:55 [INFO]: ::ffff:172.18.0.1 - - [07/Nov/2025:04:00:55 +0000] "GET /api/dashboard/stats HTTP/1.1" 200 204 "http://localhost:4001/" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36"
+2025-11-07 04:00:58 [INFO]: ::ffff:172.18.0.1 - - [07/Nov/2025:04:00:58 +0000] "GET /api/candidates?page=1&limit=100 HTTP/1.1" 304 - "http://localhost:4001/" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36"
+2025-11-07 04:00:58 [INFO]: ::ffff:172.18.0.1 - - [07/Nov/2025:04:00:58 +0000] "GET /api/candidates?page=1&limit=100 HTTP/1.1" 304 - "http://localhost:4001/" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36"
+2025-11-07 04:01:18 [INFO]: ::1 - - [07/Nov/2025:04:01:18 +0000] "GET /health HTTP/1.1" 200 123 "-" "-"
+2025-11-07 04:01:48 [INFO]: ::1 - - [07/Nov/2025:04:01:48 +0000] "GET /health HTTP/1.1" 200 123 "-" "-"
+2025-11-07 04:02:18 [INFO]: ::1 - - [07/Nov/2025:04:02:18 +0000] "GET /health HTTP/1.1" 200 123 "-" "-"
+2025-11-07 04:02:48 [INFO]: ::1 - - [07/Nov/2025:04:02:48 +0000] "GET /health HTTP/1.1" 200 123 "-" "-"
+2025-11-07 04:03:19 [INFO]: ::1 - - [07/Nov/2025:04:03:19 +0000] "GET /health HTTP/1.1" 200 123 "-" "-"
+2025-11-07 04:03:49 [INFO]: ::1 - - [07/Nov/2025:04:03:49 +0000] "GET /health HTTP/1.1" 200 122 "-" "-"
+2025-11-07 04:04:19 [INFO]: ::1 - - [07/Nov/2025:04:04:19 +0000] "GET /health HTTP/1.1" 200 122 "-" "-"
+2025-11-07 04:04:49 [INFO]: ::1 - - [07/Nov/2025:04:04:49 +0000] "GET /health HTTP/1.1" 200 123 "-" "-"
+2025-11-07 04:05:19 [INFO]: ::1 - - [07/Nov/2025:04:05:19 +0000] "GET /health HTTP/1.1" 200 123 "-" "-"
+2025-11-07 04:05:49 [INFO]: ::1 - - [07/Nov/2025:04:05:49 +0000] "GET /health HTTP/1.1" 200 123 "-" "-"
+2025-11-07 04:06:19 [INFO]: ::1 - - [07/Nov/2025:04:06:19 +0000] "GET /health HTTP/1.1" 200 123 "-" "-"
+2025-11-07 04:06:42 [INFO]: ::ffff:172.18.0.1 - - [07/Nov/2025:04:06:42 +0000] "GET /api/auth/me HTTP/1.1" 304 - "http://localhost:4001/" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36"
+2025-11-07 04:06:42 [INFO]: ::ffff:172.18.0.1 - - [07/Nov/2025:04:06:42 +0000] "GET /api/candidates?page=1&limit=100 HTTP/1.1" 304 - "http://localhost:4001/" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36"
+2025-11-07 04:06:43 [INFO]: User logged in: jerry.hakim@energi-up.com
+2025-11-07 04:06:43 [INFO]: ::ffff:172.18.0.1 - - [07/Nov/2025:04:06:43 +0000] "POST /api/auth/login HTTP/1.1" 200 505 "http://localhost:4001/" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36"
+2025-11-07 04:06:43 [INFO]: ::ffff:172.18.0.1 - - [07/Nov/2025:04:06:43 +0000] "GET /api/dashboard/stats HTTP/1.1" 304 - "http://localhost:4001/" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36"
+2025-11-07 04:06:46 [INFO]: ::ffff:172.18.0.1 - - [07/Nov/2025:04:06:46 +0000] "GET /api/candidates?page=1&limit=100 HTTP/1.1" 304 - "http://localhost:4001/" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36"
+2025-11-07 04:06:47 [INFO]: ::ffff:172.18.0.1 - - [07/Nov/2025:04:06:47 +0000] "GET /api/candidates?page=1&limit=100 HTTP/1.1" 304 - "http://localhost:4001/" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36"
+2025-11-07 04:06:49 [INFO]: ::1 - - [07/Nov/2025:04:06:49 +0000] "GET /health HTTP/1.1" 200 123 "-" "-"
+2025-11-07 04:07:19 [INFO]: ::1 - - [07/Nov/2025:04:07:19 +0000] "GET /health HTTP/1.1" 200 123 "-" "-"
+2025-11-07 04:07:50 [INFO]: ::1 - - [07/Nov/2025:04:07:50 +0000] "GET /health HTTP/1.1" 200 123 "-" "-"
+2025-11-07 04:08:20 [INFO]: ::1 - - [07/Nov/2025:04:08:20 +0000] "GET /health HTTP/1.1" 200 123 "-" "-"
+2025-11-07 04:08:50 [INFO]: ::1 - - [07/Nov/2025:04:08:50 +0000] "GET /health HTTP/1.1" 200 123 "-" "-"
+2025-11-07 04:09:20 [INFO]: ::1 - - [07/Nov/2025:04:09:20 +0000] "GET /health HTTP/1.1" 200 123 "-" "-"
+2025-11-07 04:09:50 [INFO]: ::1 - - [07/Nov/2025:04:09:50 +0000] "GET /health HTTP/1.1" 200 122 "-" "-"
+2025-11-07 04:10:20 [INFO]: ::1 - - [07/Nov/2025:04:10:20 +0000] "GET /health HTTP/1.1" 200 123 "-" "-"
+2025-11-07 04:10:50 [INFO]: ::1 - - [07/Nov/2025:04:10:50 +0000] "GET /health HTTP/1.1" 200 123 "-" "-"
+2025-11-07 04:11:20 [INFO]: ::1 - - [07/Nov/2025:04:11:20 +0000] "GET /health HTTP/1.1" 200 123 "-" "-"
+2025-11-07 04:11:50 [INFO]: ::1 - - [07/Nov/2025:04:11:50 +0000] "GET /health HTTP/1.1" 200 123 "-" "-"
+2025-11-07 04:11:58 [INFO]: ::ffff:172.18.0.1 - - [07/Nov/2025:04:11:58 +0000] "GET /api/auth/me HTTP/1.1" 304 - "http://localhost:4001/" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36"
+2025-11-07 04:11:58 [INFO]: ::ffff:172.18.0.1 - - [07/Nov/2025:04:11:58 +0000] "GET /api/candidates?page=1&limit=100 HTTP/1.1" 304 - "http://localhost:4001/" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36"
+2025-11-07 04:12:00 [INFO]: User logged in: jerry.hakim@energi-up.com
+2025-11-07 04:12:00 [INFO]: ::ffff:172.18.0.1 - - [07/Nov/2025:04:12:00 +0000] "POST /api/auth/login HTTP/1.1" 200 505 "http://localhost:4001/" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36"
+2025-11-07 04:12:00 [INFO]: ::ffff:172.18.0.1 - - [07/Nov/2025:04:12:00 +0000] "GET /api/dashboard/stats HTTP/1.1" 304 - "http://localhost:4001/" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36"
+2025-11-07 04:12:04 [INFO]: ::ffff:172.18.0.1 - - [07/Nov/2025:04:12:04 +0000] "GET /api/candidates?page=1&limit=100 HTTP/1.1" 304 - "http://localhost:4001/" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36"
+2025-11-07 04:12:05 [INFO]: ::ffff:172.18.0.1 - - [07/Nov/2025:04:12:05 +0000] "GET /api/candidates?page=1&limit=100 HTTP/1.1" 304 - "http://localhost:4001/" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36"
+2025-11-07 04:12:21 [INFO]: ::1 - - [07/Nov/2025:04:12:21 +0000] "GET /health HTTP/1.1" 200 123 "-" "-"
+2025-11-07 04:12:51 [INFO]: ::1 - - [07/Nov/2025:04:12:51 +0000] "GET /health HTTP/1.1" 200 123 "-" "-"
+2025-11-07 04:13:21 [INFO]: ::1 - - [07/Nov/2025:04:13:21 +0000] "GET /health HTTP/1.1" 200 122 "-" "-"
+2025-11-07 04:13:51 [INFO]: ::1 - - [07/Nov/2025:04:13:51 +0000] "GET /health HTTP/1.1" 200 123 "-" "-"
+2025-11-07 04:14:21 [INFO]: ::1 - - [07/Nov/2025:04:14:21 +0000] "GET /health HTTP/1.1" 200 123 "-" "-"
+2025-11-07 04:14:51 [INFO]: ::1 - - [07/Nov/2025:04:14:51 +0000] "GET /health HTTP/1.1" 200 123 "-" "-"
+2025-11-07 04:15:21 [INFO]: ::1 - - [07/Nov/2025:04:15:21 +0000] "GET /health HTTP/1.1" 200 123 "-" "-"
+2025-11-07 04:15:51 [INFO]: ::1 - - [07/Nov/2025:04:15:51 +0000] "GET /health HTTP/1.1" 200 123 "-" "-"
+2025-11-07 04:16:21 [INFO]: ::1 - - [07/Nov/2025:04:16:21 +0000] "GET /health HTTP/1.1" 200 123 "-" "-"
+2025-11-07 04:16:51 [INFO]: ::1 - - [07/Nov/2025:04:16:51 +0000] "GET /health HTTP/1.1" 200 123 "-" "-"
+2025-11-07 04:17:22 [INFO]: ::1 - - [07/Nov/2025:04:17:22 +0000] "GET /health HTTP/1.1" 200 123 "-" "-"
+2025-11-07 04:17:33 [INFO]: ::ffff:172.18.0.1 - - [07/Nov/2025:04:17:33 +0000] "GET /api/auth/me HTTP/1.1" 304 - "http://localhost:4001/" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36"
+2025-11-07 04:17:33 [INFO]: ::ffff:172.18.0.1 - - [07/Nov/2025:04:17:33 +0000] "GET /api/candidates?page=1&limit=100 HTTP/1.1" 304 - "http://localhost:4001/" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36"
+2025-11-07 04:17:35 [INFO]: User logged in: jerry.hakim@energi-up.com
+2025-11-07 04:17:35 [INFO]: ::ffff:172.18.0.1 - - [07/Nov/2025:04:17:35 +0000] "POST /api/auth/login HTTP/1.1" 200 505 "http://localhost:4001/" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36"
+2025-11-07 04:17:35 [INFO]: ::ffff:172.18.0.1 - - [07/Nov/2025:04:17:35 +0000] "GET /api/dashboard/stats HTTP/1.1" 304 - "http://localhost:4001/" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36"
+2025-11-07 04:17:39 [INFO]: ::ffff:172.18.0.1 - - [07/Nov/2025:04:17:39 +0000] "GET /api/candidates?page=1&limit=100 HTTP/1.1" 304 - "http://localhost:4001/" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36"
+2025-11-07 04:17:40 [INFO]: ::ffff:172.18.0.1 - - [07/Nov/2025:04:17:40 +0000] "GET /api/candidates?page=1&limit=100 HTTP/1.1" 304 - "http://localhost:4001/" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36"
+2025-11-07 04:17:52 [INFO]: ::1 - - [07/Nov/2025:04:17:52 +0000] "GET /health HTTP/1.1" 200 123 "-" "-"
+2025-11-07 04:18:22 [INFO]: ::1 - - [07/Nov/2025:04:18:22 +0000] "GET /health HTTP/1.1" 200 123 "-" "-"
+2025-11-07 04:18:52 [INFO]: ::1 - - [07/Nov/2025:04:18:52 +0000] "GET /health HTTP/1.1" 200 123 "-" "-"
+2025-11-07 04:19:22 [INFO]: ::1 - - [07/Nov/2025:04:19:22 +0000] "GET /health HTTP/1.1" 200 123 "-" "-"
+2025-11-07 04:19:52 [INFO]: ::1 - - [07/Nov/2025:04:19:52 +0000] "GET /health HTTP/1.1" 200 123 "-" "-"
+2025-11-07 04:20:22 [INFO]: ::1 - - [07/Nov/2025:04:20:22 +0000] "GET /health HTTP/1.1" 200 123 "-" "-"
+2025-11-07 04:20:52 [INFO]: ::1 - - [07/Nov/2025:04:20:52 +0000] "GET /health HTTP/1.1" 200 123 "-" "-"
+2025-11-07 04:21:22 [INFO]: ::1 - - [07/Nov/2025:04:21:22 +0000] "GET /health HTTP/1.1" 200 123 "-" "-"
+2025-11-07 04:21:52 [INFO]: ::1 - - [07/Nov/2025:04:21:52 +0000] "GET /health HTTP/1.1" 200 123 "-" "-"
+2025-11-07 04:22:15 [INFO]: ::ffff:172.18.0.1 - - [07/Nov/2025:04:22:15 +0000] "GET /api/auth/me HTTP/1.1" 304 - "http://localhost:4001/" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36"
+2025-11-07 04:22:15 [INFO]: ::ffff:172.18.0.1 - - [07/Nov/2025:04:22:15 +0000] "GET /api/candidates?page=1&limit=100 HTTP/1.1" 304 - "http://localhost:4001/" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36"
+2025-11-07 04:22:16 [INFO]: User logged in: jerry.hakim@energi-up.com
+2025-11-07 04:22:16 [INFO]: ::ffff:172.18.0.1 - - [07/Nov/2025:04:22:16 +0000] "POST /api/auth/login HTTP/1.1" 200 505 "http://localhost:4001/" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36"
+2025-11-07 04:22:17 [INFO]: ::ffff:172.18.0.1 - - [07/Nov/2025:04:22:17 +0000] "GET /api/dashboard/stats HTTP/1.1" 304 - "http://localhost:4001/" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36"
+2025-11-07 04:22:19 [INFO]: ::ffff:172.18.0.1 - - [07/Nov/2025:04:22:19 +0000] "GET /api/candidates?page=1&limit=100 HTTP/1.1" 304 - "http://localhost:4001/" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36"
+2025-11-07 04:22:19 [INFO]: ::ffff:172.18.0.1 - - [07/Nov/2025:04:22:19 +0000] "GET /api/candidates?page=1&limit=100 HTTP/1.1" 304 - "http://localhost:4001/" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36"
+2025-11-07 04:22:23 [INFO]: ::1 - - [07/Nov/2025:04:22:23 +0000] "GET /health HTTP/1.1" 200 123 "-" "-"
+2025-11-07 04:22:53 [INFO]: ::1 - - [07/Nov/2025:04:22:53 +0000] "GET /health HTTP/1.1" 200 123 "-" "-"
+2025-11-07 04:23:23 [INFO]: ::1 - - [07/Nov/2025:04:23:23 +0000] "GET /health HTTP/1.1" 200 123 "-" "-"
+2025-11-07 04:23:53 [INFO]: ::1 - - [07/Nov/2025:04:23:53 +0000] "GET /health HTTP/1.1" 200 122 "-" "-"
+2025-11-07 04:24:23 [INFO]: ::1 - - [07/Nov/2025:04:24:23 +0000] "GET /health HTTP/1.1" 200 123 "-" "-"
+2025-11-07 04:24:53 [INFO]: ::1 - - [07/Nov/2025:04:24:53 +0000] "GET /health HTTP/1.1" 200 122 "-" "-"
+2025-11-07 04:25:23 [INFO]: ::1 - - [07/Nov/2025:04:25:23 +0000] "GET /health HTTP/1.1" 200 123 "-" "-"
+2025-11-07 04:25:53 [INFO]: ::1 - - [07/Nov/2025:04:25:53 +0000] "GET /health HTTP/1.1" 200 123 "-" "-"
+2025-11-07 04:26:23 [INFO]: ::1 - - [07/Nov/2025:04:26:23 +0000] "GET /health HTTP/1.1" 200 123 "-" "-"
+2025-11-07 04:26:53 [INFO]: ::1 - - [07/Nov/2025:04:26:53 +0000] "GET /health HTTP/1.1" 200 123 "-" "-"
+2025-11-07 04:27:24 [INFO]: ::1 - - [07/Nov/2025:04:27:24 +0000] "GET /health HTTP/1.1" 200 123 "-" "-"
+2025-11-07 04:27:37 [INFO]: ::ffff:172.18.0.1 - - [07/Nov/2025:04:27:37 +0000] "GET /api/auth/me HTTP/1.1" 304 - "http://localhost:4001/" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36"
+2025-11-07 04:27:37 [INFO]: ::ffff:172.18.0.1 - - [07/Nov/2025:04:27:37 +0000] "GET /api/candidates?page=1&limit=100 HTTP/1.1" 304 - "http://localhost:4001/" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36"
+2025-11-07 04:27:38 [INFO]: User logged in: jerry.hakim@energi-up.com
+2025-11-07 04:27:38 [INFO]: ::ffff:172.18.0.1 - - [07/Nov/2025:04:27:38 +0000] "POST /api/auth/login HTTP/1.1" 200 505 "http://localhost:4001/" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36"
+2025-11-07 04:27:38 [INFO]: ::ffff:172.18.0.1 - - [07/Nov/2025:04:27:38 +0000] "GET /api/dashboard/stats HTTP/1.1" 304 - "http://localhost:4001/" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36"
+2025-11-07 04:27:41 [INFO]: ::ffff:172.18.0.1 - - [07/Nov/2025:04:27:41 +0000] "GET /api/candidates?page=1&limit=100 HTTP/1.1" 304 - "http://localhost:4001/" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36"
+2025-11-07 04:27:42 [INFO]: ::ffff:172.18.0.1 - - [07/Nov/2025:04:27:42 +0000] "GET /api/candidates?page=1&limit=100 HTTP/1.1" 304 - "http://localhost:4001/" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36"
+2025-11-07 04:27:54 [INFO]: ::1 - - [07/Nov/2025:04:27:54 +0000] "GET /health HTTP/1.1" 200 121 "-" "-"
+2025-11-07 04:28:24 [INFO]: ::1 - - [07/Nov/2025:04:28:24 +0000] "GET /health HTTP/1.1" 200 123 "-" "-"
+2025-11-07 04:28:54 [INFO]: ::1 - - [07/Nov/2025:04:28:54 +0000] "GET /health HTTP/1.1" 200 123 "-" "-"
+2025-11-07 04:29:24 [INFO]: ::1 - - [07/Nov/2025:04:29:24 +0000] "GET /health HTTP/1.1" 200 123 "-" "-"
+2025-11-07 04:29:34 [INFO]: ::ffff:172.18.0.1 - - [07/Nov/2025:04:29:34 +0000] "GET /api/auth/me HTTP/1.1" 304 - "http://localhost:4001/" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36"
+2025-11-07 04:29:34 [INFO]: ::ffff:172.18.0.1 - - [07/Nov/2025:04:29:34 +0000] "GET /api/candidates?page=1&limit=100 HTTP/1.1" 304 - "http://localhost:4001/" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36"
+2025-11-07 04:29:36 [INFO]: User logged in: jerry.hakim@energi-up.com
+2025-11-07 04:29:36 [INFO]: ::ffff:172.18.0.1 - - [07/Nov/2025:04:29:36 +0000] "POST /api/auth/login HTTP/1.1" 200 505 "http://localhost:4001/" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36"
+2025-11-07 04:29:36 [INFO]: ::ffff:172.18.0.1 - - [07/Nov/2025:04:29:36 +0000] "GET /api/dashboard/stats HTTP/1.1" 304 - "http://localhost:4001/" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36"
+2025-11-07 04:29:40 [INFO]: SIGTERM received. Starting graceful shutdown...
+2025-11-07 04:29:40 [INFO]: HTTP server closed
+2025-11-07 04:29:40 [INFO]: Database disconnected
+2025-11-07 04:29:40 [INFO]: Redis disconnected
+2025-11-07 04:29:41 [INFO]: Redis connected successfully
+2025-11-07 04:29:41 [INFO]: PostgreSQL connected successfully
+2025-11-07 04:29:41 [INFO]: Redis connected successfully
+2025-11-07 04:29:41 [INFO]: Server running on port 4000 in production mode
+2025-11-07 04:29:41 [INFO]: API available at: http://localhost:4000/api
+2025-11-07 04:29:46 [INFO]: ::1 - - [07/Nov/2025:04:29:46 +0000] "GET /health HTTP/1.1" 200 120 "-" "-"
+2025-11-07 04:30:13 [INFO]: ::ffff:172.18.0.1 - - [07/Nov/2025:04:30:13 +0000] "GET /api/auth/me HTTP/1.1" 304 - "http://localhost:4001/" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36"
+2025-11-07 04:30:15 [INFO]: User logged in: jerry.hakim@energi-up.com
+2025-11-07 04:30:15 [INFO]: ::ffff:172.18.0.1 - - [07/Nov/2025:04:30:15 +0000] "POST /api/auth/login HTTP/1.1" 200 505 "http://localhost:4001/" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36"
+2025-11-07 04:30:15 [INFO]: ::ffff:172.18.0.1 - - [07/Nov/2025:04:30:15 +0000] "GET /api/dashboard/stats HTTP/1.1" 304 - "http://localhost:4001/" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36"
+2025-11-07 04:30:16 [INFO]: ::1 - - [07/Nov/2025:04:30:16 +0000] "GET /health HTTP/1.1" 200 120 "-" "-"
+2025-11-07 04:30:18 [INFO]: ::ffff:172.18.0.1 - - [07/Nov/2025:04:30:18 +0000] "GET /api/candidates?page=1&limit=100 HTTP/1.1" 304 - "http://localhost:4001/" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36"
+2025-11-07 04:30:18 [INFO]: ::ffff:172.18.0.1 - - [07/Nov/2025:04:30:18 +0000] "GET /api/candidates?page=1&limit=100 HTTP/1.1" 304 - "http://localhost:4001/" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36"
+2025-11-07 04:30:46 [INFO]: ::1 - - [07/Nov/2025:04:30:46 +0000] "GET /health HTTP/1.1" 200 121 "-" "-"
+2025-11-07 04:31:16 [INFO]: ::1 - - [07/Nov/2025:04:31:16 +0000] "GET /health HTTP/1.1" 200 121 "-" "-"
+2025-11-07 04:31:46 [INFO]: ::1 - - [07/Nov/2025:04:31:46 +0000] "GET /health HTTP/1.1" 200 122 "-" "-"
+2025-11-07 04:32:12 [INFO]: ::ffff:172.18.0.1 - - [07/Nov/2025:04:32:12 +0000] "GET /api/auth/me HTTP/1.1" 304 - "http://localhost:4001/" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36"
+2025-11-07 04:32:12 [INFO]: ::ffff:172.18.0.1 - - [07/Nov/2025:04:32:12 +0000] "GET /api/candidates?page=1&limit=100 HTTP/1.1" 304 - "http://localhost:4001/" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36"
+2025-11-07 04:32:13 [INFO]: User logged in: jerry.hakim@energi-up.com
+2025-11-07 04:32:13 [INFO]: ::ffff:172.18.0.1 - - [07/Nov/2025:04:32:13 +0000] "POST /api/auth/login HTTP/1.1" 200 505 "http://localhost:4001/" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36"
+2025-11-07 04:32:13 [INFO]: ::ffff:172.18.0.1 - - [07/Nov/2025:04:32:13 +0000] "GET /api/dashboard/stats HTTP/1.1" 304 - "http://localhost:4001/" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36"
+2025-11-07 04:32:16 [INFO]: ::1 - - [07/Nov/2025:04:32:16 +0000] "GET /health HTTP/1.1" 200 122 "-" "-"
+2025-11-07 04:32:18 [INFO]: ::ffff:172.18.0.1 - - [07/Nov/2025:04:32:18 +0000] "GET /api/candidates?page=1&limit=100 HTTP/1.1" 304 - "http://localhost:4001/" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36"
+2025-11-07 04:32:18 [INFO]: ::ffff:172.18.0.1 - - [07/Nov/2025:04:32:18 +0000] "GET /api/candidates?page=1&limit=100 HTTP/1.1" 304 - "http://localhost:4001/" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36"
+2025-11-07 04:32:46 [INFO]: ::1 - - [07/Nov/2025:04:32:46 +0000] "GET /health HTTP/1.1" 200 122 "-" "-"
+2025-11-07 04:33:17 [INFO]: ::1 - - [07/Nov/2025:04:33:17 +0000] "GET /health HTTP/1.1" 200 122 "-" "-"
+2025-11-07 04:33:47 [INFO]: ::ffff:172.18.0.1 - - [07/Nov/2025:04:33:47 +0000] "GET /api/auth/me HTTP/1.1" 304 - "http://localhost:4001/" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36"
+2025-11-07 04:33:47 [INFO]: ::ffff:172.18.0.1 - - [07/Nov/2025:04:33:47 +0000] "GET /api/candidates?page=1&limit=100 HTTP/1.1" 304 - "http://localhost:4001/" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36"
+2025-11-07 04:33:47 [INFO]: ::1 - - [07/Nov/2025:04:33:47 +0000] "GET /health HTTP/1.1" 200 122 "-" "-"
+2025-11-07 04:33:49 [INFO]: User logged in: jerry.hakim@energi-up.com
+2025-11-07 04:33:49 [INFO]: ::ffff:172.18.0.1 - - [07/Nov/2025:04:33:49 +0000] "POST /api/auth/login HTTP/1.1" 200 505 "http://localhost:4001/" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36"
+2025-11-07 04:33:49 [INFO]: ::ffff:172.18.0.1 - - [07/Nov/2025:04:33:49 +0000] "GET /api/dashboard/stats HTTP/1.1" 304 - "http://localhost:4001/" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36"
+2025-11-07 04:33:52 [INFO]: ::ffff:172.18.0.1 - - [07/Nov/2025:04:33:52 +0000] "GET /api/candidates?page=1&limit=100 HTTP/1.1" 304 - "http://localhost:4001/" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36"
+2025-11-07 04:33:52 [INFO]: ::ffff:172.18.0.1 - - [07/Nov/2025:04:33:52 +0000] "GET /api/candidates?page=1&limit=100 HTTP/1.1" 304 - "http://localhost:4001/" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36"
+2025-11-07 04:34:17 [INFO]: ::1 - - [07/Nov/2025:04:34:17 +0000] "GET /health HTTP/1.1" 200 122 "-" "-"
+2025-11-07 04:34:47 [INFO]: ::1 - - [07/Nov/2025:04:34:47 +0000] "GET /health HTTP/1.1" 200 122 "-" "-"
+2025-11-07 04:35:17 [INFO]: ::1 - - [07/Nov/2025:04:35:17 +0000] "GET /health HTTP/1.1" 200 122 "-" "-"
+2025-11-07 04:35:47 [INFO]: ::1 - - [07/Nov/2025:04:35:47 +0000] "GET /health HTTP/1.1" 200 122 "-" "-"
+2025-11-07 04:36:17 [INFO]: ::1 - - [07/Nov/2025:04:36:17 +0000] "GET /health HTTP/1.1" 200 121 "-" "-"
+2025-11-07 04:36:30 [INFO]: ::ffff:172.18.0.1 - - [07/Nov/2025:04:36:30 +0000] "GET /api/auth/me HTTP/1.1" 304 - "http://localhost:4001/" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36"
+2025-11-07 04:36:30 [INFO]: ::ffff:172.18.0.1 - - [07/Nov/2025:04:36:30 +0000] "GET /api/candidates?page=1&limit=100 HTTP/1.1" 304 - "http://localhost:4001/" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36"
+2025-11-07 04:36:47 [INFO]: ::1 - - [07/Nov/2025:04:36:47 +0000] "GET /health HTTP/1.1" 200 122 "-" "-"
+2025-11-07 04:37:17 [INFO]: ::1 - - [07/Nov/2025:04:37:17 +0000] "GET /health HTTP/1.1" 200 122 "-" "-"
+2025-11-07 04:37:48 [INFO]: ::1 - - [07/Nov/2025:04:37:48 +0000] "GET /health HTTP/1.1" 200 122 "-" "-"
+2025-11-07 04:38:02 [INFO]: User logged in: jerry.hakim@energi-up.com
+2025-11-07 04:38:02 [INFO]: ::ffff:172.18.0.1 - - [07/Nov/2025:04:38:02 +0000] "POST /api/auth/login HTTP/1.1" 200 505 "http://localhost:4001/" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36"
+2025-11-07 04:38:03 [INFO]: ::ffff:172.18.0.1 - - [07/Nov/2025:04:38:03 +0000] "GET /api/dashboard/stats HTTP/1.1" 200 204 "http://localhost:4001/" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36"
+2025-11-07 04:38:11 [INFO]: ::ffff:172.18.0.1 - - [07/Nov/2025:04:38:11 +0000] "GET /api/candidates?page=1&limit=100 HTTP/1.1" 200 - "http://localhost:4001/" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36"
+2025-11-07 04:38:12 [INFO]: ::ffff:172.18.0.1 - - [07/Nov/2025:04:38:12 +0000] "GET /api/candidates?page=1&limit=100 HTTP/1.1" 304 - "http://localhost:4001/" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36"
+2025-11-07 04:38:18 [INFO]: ::1 - - [07/Nov/2025:04:38:18 +0000] "GET /health HTTP/1.1" 200 122 "-" "-"
+2025-11-07 04:38:48 [INFO]: ::1 - - [07/Nov/2025:04:38:48 +0000] "GET /health HTTP/1.1" 200 122 "-" "-"
+2025-11-07 04:39:18 [INFO]: ::1 - - [07/Nov/2025:04:39:18 +0000] "GET /health HTTP/1.1" 200 121 "-" "-"
+2025-11-07 04:39:48 [INFO]: ::1 - - [07/Nov/2025:04:39:48 +0000] "GET /health HTTP/1.1" 200 122 "-" "-"
+2025-11-07 04:40:18 [INFO]: ::1 - - [07/Nov/2025:04:40:18 +0000] "GET /health HTTP/1.1" 200 122 "-" "-"
+2025-11-07 04:40:48 [INFO]: ::1 - - [07/Nov/2025:04:40:48 +0000] "GET /health HTTP/1.1" 200 122 "-" "-"
+2025-11-07 04:41:11 [INFO]: ::ffff:172.18.0.1 - - [07/Nov/2025:04:41:11 +0000] "GET /api/auth/me HTTP/1.1" 200 213 "http://localhost:4001/" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36"
+2025-11-07 04:41:11 [INFO]: ::ffff:172.18.0.1 - - [07/Nov/2025:04:41:11 +0000] "GET /api/candidates?page=1&limit=100 HTTP/1.1" 304 - "http://localhost:4001/" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36"
+2025-11-07 04:41:12 [INFO]: User logged in: jerry.hakim@energi-up.com
+2025-11-07 04:41:12 [INFO]: ::ffff:172.18.0.1 - - [07/Nov/2025:04:41:12 +0000] "POST /api/auth/login HTTP/1.1" 200 505 "http://localhost:4001/" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36"
+2025-11-07 04:41:12 [INFO]: ::ffff:172.18.0.1 - - [07/Nov/2025:04:41:12 +0000] "GET /api/dashboard/stats HTTP/1.1" 304 - "http://localhost:4001/" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36"
+2025-11-07 04:41:14 [INFO]: ::ffff:172.18.0.1 - - [07/Nov/2025:04:41:14 +0000] "GET /api/candidates?page=1&limit=100 HTTP/1.1" 304 - "http://localhost:4001/" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36"
+2025-11-07 04:41:15 [INFO]: ::ffff:172.18.0.1 - - [07/Nov/2025:04:41:15 +0000] "GET /api/candidates?page=1&limit=100 HTTP/1.1" 304 - "http://localhost:4001/" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36"
+2025-11-07 04:41:18 [INFO]: ::1 - - [07/Nov/2025:04:41:18 +0000] "GET /health HTTP/1.1" 200 122 "-" "-"
+2025-11-07 04:41:48 [INFO]: ::1 - - [07/Nov/2025:04:41:48 +0000] "GET /health HTTP/1.1" 200 122 "-" "-"
+2025-11-07 04:42:19 [INFO]: ::1 - - [07/Nov/2025:04:42:19 +0000] "GET /health HTTP/1.1" 200 122 "-" "-"
+2025-11-07 04:42:23 [INFO]: ::ffff:172.18.0.1 - - [07/Nov/2025:04:42:23 +0000] "GET /api/auth/me HTTP/1.1" 304 - "http://localhost:4001/" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36"
+2025-11-07 04:42:23 [INFO]: ::ffff:172.18.0.1 - - [07/Nov/2025:04:42:23 +0000] "GET /api/candidates?page=1&limit=100 HTTP/1.1" 304 - "http://localhost:4001/" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36"
+2025-11-07 04:42:24 [INFO]: User logged in: jerry.hakim@energi-up.com
+2025-11-07 04:42:24 [INFO]: ::ffff:172.18.0.1 - - [07/Nov/2025:04:42:24 +0000] "POST /api/auth/login HTTP/1.1" 200 505 "http://localhost:4001/" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36"
+2025-11-07 04:42:24 [INFO]: ::ffff:172.18.0.1 - - [07/Nov/2025:04:42:24 +0000] "GET /api/dashboard/stats HTTP/1.1" 304 - "http://localhost:4001/" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36"
+2025-11-07 04:42:28 [INFO]: ::ffff:172.18.0.1 - - [07/Nov/2025:04:42:28 +0000] "GET /api/candidates?page=1&limit=100 HTTP/1.1" 304 - "http://localhost:4001/" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36"
+2025-11-07 04:42:28 [INFO]: ::ffff:172.18.0.1 - - [07/Nov/2025:04:42:28 +0000] "GET /api/candidates?page=1&limit=100 HTTP/1.1" 304 - "http://localhost:4001/" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36"
+2025-11-07 04:42:49 [INFO]: ::1 - - [07/Nov/2025:04:42:49 +0000] "GET /health HTTP/1.1" 200 120 "-" "-"
+2025-11-07 04:43:19 [INFO]: ::1 - - [07/Nov/2025:04:43:19 +0000] "GET /health HTTP/1.1" 200 122 "-" "-"
+2025-11-07 04:43:37 [INFO]: ::ffff:172.18.0.1 - - [07/Nov/2025:04:43:37 +0000] "GET /api/fptk?search=&page=1&limit=100 HTTP/1.1" 200 - "http://localhost:4001/" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36"
+2025-11-07 04:43:37 [INFO]: ::ffff:172.18.0.1 - - [07/Nov/2025:04:43:37 +0000] "GET /api/fptk?search=&page=1&limit=100 HTTP/1.1" 304 - "http://localhost:4001/" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36"
+2025-11-07 04:43:49 [INFO]: ::1 - - [07/Nov/2025:04:43:49 +0000] "GET /health HTTP/1.1" 200 122 "-" "-"
+2025-11-07 04:44:19 [INFO]: ::1 - - [07/Nov/2025:04:44:19 +0000] "GET /health HTTP/1.1" 200 122 "-" "-"
+2025-11-07 04:44:49 [INFO]: ::1 - - [07/Nov/2025:04:44:49 +0000] "GET /health HTTP/1.1" 200 122 "-" "-"
+2025-11-07 04:45:19 [INFO]: ::1 - - [07/Nov/2025:04:45:19 +0000] "GET /health HTTP/1.1" 200 122 "-" "-"
+2025-11-07 04:45:49 [INFO]: ::1 - - [07/Nov/2025:04:45:49 +0000] "GET /health HTTP/1.1" 200 122 "-" "-"
+2025-11-07 04:45:57 [INFO]: ::ffff:172.18.0.1 - - [07/Nov/2025:04:45:57 +0000] "GET /api/auth/me HTTP/1.1" 304 - "http://localhost:4001/" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36"
+2025-11-07 04:45:58 [INFO]: User logged in: jerry.hakim@energi-up.com
+2025-11-07 04:45:58 [INFO]: ::ffff:172.18.0.1 - - [07/Nov/2025:04:45:58 +0000] "POST /api/auth/login HTTP/1.1" 200 505 "http://localhost:4001/" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36"
+2025-11-07 04:45:58 [INFO]: ::ffff:172.18.0.1 - - [07/Nov/2025:04:45:58 +0000] "GET /api/dashboard/stats HTTP/1.1" 304 - "http://localhost:4001/" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36"
+2025-11-07 04:46:00 [INFO]: ::ffff:172.18.0.1 - - [07/Nov/2025:04:46:00 +0000] "GET /api/candidates?page=1&limit=100 HTTP/1.1" 304 - "http://localhost:4001/" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36"
+2025-11-07 04:46:01 [INFO]: ::ffff:172.18.0.1 - - [07/Nov/2025:04:46:01 +0000] "GET /api/candidates?page=1&limit=100 HTTP/1.1" 304 - "http://localhost:4001/" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36"
+2025-11-07 04:46:19 [INFO]: ::1 - - [07/Nov/2025:04:46:19 +0000] "GET /health HTTP/1.1" 200 122 "-" "-"
+2025-11-07 04:46:50 [INFO]: ::1 - - [07/Nov/2025:04:46:50 +0000] "GET /health HTTP/1.1" 200 123 "-" "-"
+2025-11-07 04:47:20 [INFO]: ::1 - - [07/Nov/2025:04:47:20 +0000] "GET /health HTTP/1.1" 200 123 "-" "-"
+2025-11-07 04:47:50 [INFO]: ::1 - - [07/Nov/2025:04:47:50 +0000] "GET /health HTTP/1.1" 200 123 "-" "-"
+2025-11-07 04:48:20 [INFO]: ::1 - - [07/Nov/2025:04:48:20 +0000] "GET /health HTTP/1.1" 200 123 "-" "-"
+2025-11-07 04:48:50 [INFO]: ::1 - - [07/Nov/2025:04:48:50 +0000] "GET /health HTTP/1.1" 200 123 "-" "-"
+2025-11-07 04:49:20 [INFO]: ::1 - - [07/Nov/2025:04:49:20 +0000] "GET /health HTTP/1.1" 200 123 "-" "-"
+2025-11-07 04:49:50 [INFO]: ::1 - - [07/Nov/2025:04:49:50 +0000] "GET /health HTTP/1.1" 200 123 "-" "-"
+2025-11-07 04:50:20 [INFO]: ::1 - - [07/Nov/2025:04:50:20 +0000] "GET /health HTTP/1.1" 200 123 "-" "-"
+2025-11-07 04:50:50 [INFO]: ::1 - - [07/Nov/2025:04:50:50 +0000] "GET /health HTTP/1.1" 200 123 "-" "-"
+2025-11-07 04:51:21 [INFO]: ::1 - - [07/Nov/2025:04:51:21 +0000] "GET /health HTTP/1.1" 200 123 "-" "-"
+2025-11-07 04:51:51 [INFO]: ::1 - - [07/Nov/2025:04:51:51 +0000] "GET /health HTTP/1.1" 200 123 "-" "-"
+2025-11-07 04:52:21 [INFO]: ::1 - - [07/Nov/2025:04:52:21 +0000] "GET /health HTTP/1.1" 200 123 "-" "-"
+2025-11-07 04:52:51 [INFO]: ::1 - - [07/Nov/2025:04:52:51 +0000] "GET /health HTTP/1.1" 200 123 "-" "-"
+2025-11-07 04:53:21 [INFO]: ::1 - - [07/Nov/2025:04:53:21 +0000] "GET /health HTTP/1.1" 200 123 "-" "-"
+2025-11-07 04:53:51 [INFO]: ::1 - - [07/Nov/2025:04:53:51 +0000] "GET /health HTTP/1.1" 200 123 "-" "-"
+2025-11-07 04:54:21 [INFO]: ::1 - - [07/Nov/2025:04:54:21 +0000] "GET /health HTTP/1.1" 200 123 "-" "-"
+2025-11-07 04:54:51 [INFO]: ::1 - - [07/Nov/2025:04:54:51 +0000] "GET /health HTTP/1.1" 200 123 "-" "-"
+2025-11-07 04:55:21 [INFO]: ::1 - - [07/Nov/2025:04:55:21 +0000] "GET /health HTTP/1.1" 200 123 "-" "-"
+2025-11-07 04:55:51 [INFO]: ::1 - - [07/Nov/2025:04:55:51 +0000] "GET /health HTTP/1.1" 200 123 "-" "-"
+2025-11-07 04:56:21 [INFO]: ::1 - - [07/Nov/2025:04:56:21 +0000] "GET /health HTTP/1.1" 200 123 "-" "-"
+2025-11-07 05:57:23 [INFO]: ::1 - - [07/Nov/2025:05:57:23 +0000] "GET /health HTTP/1.1" 200 123 "-" "-"
+2025-11-07 05:57:54 [INFO]: ::1 - - [07/Nov/2025:05:57:54 +0000] "GET /health HTTP/1.1" 200 123 "-" "-"
+2025-11-07 05:58:24 [INFO]: ::1 - - [07/Nov/2025:05:58:24 +0000] "GET /health HTTP/1.1" 200 123 "-" "-"
+2025-11-07 06:25:37 [INFO]: ::1 - - [07/Nov/2025:06:25:37 +0000] "GET /health HTTP/1.1" 200 123 "-" "-"
+2025-11-07 06:26:07 [INFO]: ::1 - - [07/Nov/2025:06:26:07 +0000] "GET /health HTTP/1.1" 200 123 "-" "-"
+2025-11-07 06:26:37 [INFO]: ::1 - - [07/Nov/2025:06:26:37 +0000] "GET /health HTTP/1.1" 200 122 "-" "-"
+2025-11-07 06:27:07 [INFO]: ::1 - - [07/Nov/2025:06:27:07 +0000] "GET /health HTTP/1.1" 200 123 "-" "-"
+2025-11-07 06:27:37 [INFO]: ::1 - - [07/Nov/2025:06:27:37 +0000] "GET /health HTTP/1.1" 200 123 "-" "-"
+2025-11-07 06:28:08 [INFO]: ::1 - - [07/Nov/2025:06:28:08 +0000] "GET /health HTTP/1.1" 200 123 "-" "-"
+2025-11-07 06:28:38 [INFO]: ::1 - - [07/Nov/2025:06:28:38 +0000] "GET /health HTTP/1.1" 200 123 "-" "-"
+2025-11-07 06:28:49 [ERROR]: Authentication error: Invalid or expired token
+Error: Invalid or expired token
+    at verifyAccessToken (/app/src/utils/token.js:37:11)
+    at authenticate (/app/src/middleware/auth.js:23:21)
+    at Layer.handle [as handle_request] (/app/node_modules/express/lib/router/layer.js:95:5)
+    at next (/app/node_modules/express/lib/router/route.js:149:13)
+    at Route.dispatch (/app/node_modules/express/lib/router/route.js:119:3)
+    at Layer.handle [as handle_request] (/app/node_modules/express/lib/router/layer.js:95:5)
+    at /app/node_modules/express/lib/router/index.js:284:15
+    at Function.process_params (/app/node_modules/express/lib/router/index.js:346:12)
+    at next (/app/node_modules/express/lib/router/index.js:280:10)
+    at Function.handle (/app/node_modules/express/lib/router/index.js:175:3)
+2025-11-07 06:28:49 [INFO]: ::ffff:172.18.0.1 - - [07/Nov/2025:06:28:49 +0000] "GET /api/candidates?page=1&limit=100 HTTP/1.1" 401 54 "http://localhost:4001/" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36"
+2025-11-07 06:28:49 [ERROR]: Authentication error: Invalid or expired token
+Error: Invalid or expired token
+    at verifyAccessToken (/app/src/utils/token.js:37:11)
+    at authenticate (/app/src/middleware/auth.js:23:21)
+    at Layer.handle [as handle_request] (/app/node_modules/express/lib/router/layer.js:95:5)
+    at next (/app/node_modules/express/lib/router/route.js:149:13)
+    at Route.dispatch (/app/node_modules/express/lib/router/route.js:119:3)
+    at Layer.handle [as handle_request] (/app/node_modules/express/lib/router/layer.js:95:5)
+    at /app/node_modules/express/lib/router/index.js:284:15
+    at Function.process_params (/app/node_modules/express/lib/router/index.js:346:12)
+    at next (/app/node_modules/express/lib/router/index.js:280:10)
+    at Function.handle (/app/node_modules/express/lib/router/index.js:175:3)
+2025-11-07 06:28:49 [INFO]: ::ffff:172.18.0.1 - - [07/Nov/2025:06:28:49 +0000] "GET /api/auth/me HTTP/1.1" 401 54 "http://localhost:4001/" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36"
+2025-11-07 06:28:50 [INFO]: User logged in: jerry.hakim@energi-up.com
+2025-11-07 06:28:50 [INFO]: ::ffff:172.18.0.1 - - [07/Nov/2025:06:28:50 +0000] "POST /api/auth/login HTTP/1.1" 200 505 "http://localhost:4001/" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36"
+2025-11-07 06:28:51 [INFO]: ::ffff:172.18.0.1 - - [07/Nov/2025:06:28:51 +0000] "GET /api/dashboard/stats HTTP/1.1" 304 - "http://localhost:4001/" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36"
+2025-11-07 06:28:53 [INFO]: ::ffff:172.18.0.1 - - [07/Nov/2025:06:28:53 +0000] "GET /api/candidates?page=1&limit=100 HTTP/1.1" 304 - "http://localhost:4001/" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36"
+2025-11-07 06:28:53 [INFO]: ::ffff:172.18.0.1 - - [07/Nov/2025:06:28:53 +0000] "GET /api/candidates?page=1&limit=100 HTTP/1.1" 304 - "http://localhost:4001/" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36"
+2025-11-07 06:29:08 [INFO]: ::1 - - [07/Nov/2025:06:29:08 +0000] "GET /health HTTP/1.1" 200 123 "-" "-"
+2025-11-07 06:29:38 [INFO]: ::1 - - [07/Nov/2025:06:29:38 +0000] "GET /health HTTP/1.1" 200 123 "-" "-"
+2025-11-07 06:30:08 [INFO]: ::1 - - [07/Nov/2025:06:30:08 +0000] "GET /health HTTP/1.1" 200 123 "-" "-"
+2025-11-07 06:30:38 [INFO]: ::1 - - [07/Nov/2025:06:30:38 +0000] "GET /health HTTP/1.1" 200 123 "-" "-"
+2025-11-07 06:31:08 [INFO]: ::1 - - [07/Nov/2025:06:31:08 +0000] "GET /health HTTP/1.1" 200 123 "-" "-"
+2025-11-07 06:31:38 [INFO]: ::1 - - [07/Nov/2025:06:31:38 +0000] "GET /health HTTP/1.1" 200 122 "-" "-"
+2025-11-07 06:31:58 [INFO]: ::ffff:172.18.0.1 - - [07/Nov/2025:06:31:58 +0000] "GET /api/auth/me HTTP/1.1" 304 - "http://localhost:4001/" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36"
+2025-11-07 06:31:58 [INFO]: ::ffff:172.18.0.1 - - [07/Nov/2025:06:31:58 +0000] "GET /api/candidates?page=1&limit=100 HTTP/1.1" 304 - "http://localhost:4001/" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36"
+2025-11-07 06:32:08 [INFO]: ::1 - - [07/Nov/2025:06:32:08 +0000] "GET /health HTTP/1.1" 200 123 "-" "-"
+2025-11-07 06:32:21 [INFO]: User logged in: jerry.hakim@energi-up.com
+2025-11-07 06:32:21 [INFO]: ::ffff:172.18.0.1 - - [07/Nov/2025:06:32:21 +0000] "POST /api/auth/login HTTP/1.1" 200 505 "http://localhost:4001/" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36"
+2025-11-07 06:32:21 [INFO]: ::ffff:172.18.0.1 - - [07/Nov/2025:06:32:21 +0000] "GET /api/dashboard/stats HTTP/1.1" 200 204 "http://localhost:4001/" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36"
+2025-11-07 06:32:25 [INFO]: ::ffff:172.18.0.1 - - [07/Nov/2025:06:32:25 +0000] "GET /api/candidates?page=1&limit=100 HTTP/1.1" 200 - "http://localhost:4001/" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36"
+2025-11-07 06:32:25 [INFO]: ::ffff:172.18.0.1 - - [07/Nov/2025:06:32:25 +0000] "GET /api/candidates?page=1&limit=100 HTTP/1.1" 304 - "http://localhost:4001/" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36"
+2025-11-07 06:32:38 [INFO]: ::1 - - [07/Nov/2025:06:32:38 +0000] "GET /health HTTP/1.1" 200 123 "-" "-"
+2025-11-07 06:33:08 [INFO]: ::1 - - [07/Nov/2025:06:33:08 +0000] "GET /health HTTP/1.1" 200 123 "-" "-"
+2025-11-07 06:33:37 [INFO]: SIGTERM received. Starting graceful shutdown...
+2025-11-07 06:33:37 [INFO]: HTTP server closed
+2025-11-07 06:33:37 [INFO]: Database disconnected
+2025-11-07 06:33:38 [INFO]: Redis connected successfully
+2025-11-07 06:33:38 [INFO]: PostgreSQL connected successfully
+2025-11-07 06:33:38 [INFO]: Redis connected successfully
+2025-11-07 06:33:38 [INFO]: Server running on port 4000 in production mode
+2025-11-07 06:33:38 [INFO]: API available at: http://localhost:4000/api
+2025-11-07 06:33:43 [INFO]: ::1 - - [07/Nov/2025:06:33:43 +0000] "GET /health HTTP/1.1" 200 120 "-" "-"
+2025-11-07 06:33:59 [INFO]: ::ffff:172.18.0.1 - - [07/Nov/2025:06:33:59 +0000] "GET /api/auth/me HTTP/1.1" 200 213 "http://localhost:4001/" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36"
+2025-11-07 06:33:59 [INFO]: ::ffff:172.18.0.1 - - [07/Nov/2025:06:33:59 +0000] "GET /api/candidates?page=1&limit=100 HTTP/1.1" 304 - "http://localhost:4001/" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36"
+2025-11-07 06:34:01 [INFO]: User logged in: jerry.hakim@energi-up.com
+2025-11-07 06:34:01 [INFO]: ::ffff:172.18.0.1 - - [07/Nov/2025:06:34:01 +0000] "POST /api/auth/login HTTP/1.1" 200 505 "http://localhost:4001/" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36"
+2025-11-07 06:34:01 [INFO]: ::ffff:172.18.0.1 - - [07/Nov/2025:06:34:01 +0000] "GET /api/dashboard/stats HTTP/1.1" 304 - "http://localhost:4001/" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36"
+2025-11-07 06:34:03 [INFO]: ::ffff:172.18.0.1 - - [07/Nov/2025:06:34:03 +0000] "GET /api/candidates?page=1&limit=100 HTTP/1.1" 304 - "http://localhost:4001/" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36"
+2025-11-07 06:34:03 [INFO]: ::ffff:172.18.0.1 - - [07/Nov/2025:06:34:03 +0000] "GET /api/candidates?page=1&limit=100 HTTP/1.1" 304 - "http://localhost:4001/" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36"
+2025-11-07 06:34:13 [INFO]: ::1 - - [07/Nov/2025:06:34:13 +0000] "GET /health HTTP/1.1" 200 121 "-" "-"
+2025-11-07 06:34:43 [INFO]: ::1 - - [07/Nov/2025:06:34:43 +0000] "GET /health HTTP/1.1" 200 121 "-" "-"
+2025-11-07 06:35:13 [INFO]: ::1 - - [07/Nov/2025:06:35:13 +0000] "GET /health HTTP/1.1" 200 121 "-" "-"
+2025-11-07 06:35:43 [INFO]: ::1 - - [07/Nov/2025:06:35:43 +0000] "GET /health HTTP/1.1" 200 122 "-" "-"
+2025-11-07 06:36:13 [INFO]: ::1 - - [07/Nov/2025:06:36:13 +0000] "GET /health HTTP/1.1" 200 122 "-" "-"
+2025-11-07 06:36:44 [INFO]: ::1 - - [07/Nov/2025:06:36:44 +0000] "GET /health HTTP/1.1" 200 122 "-" "-"
+2025-11-07 06:36:45 [INFO]: ::ffff:172.18.0.1 - - [07/Nov/2025:06:36:45 +0000] "GET /api/auth/me HTTP/1.1" 304 - "http://localhost:4001/" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36"
+2025-11-07 06:36:45 [INFO]: ::ffff:172.18.0.1 - - [07/Nov/2025:06:36:45 +0000] "GET /api/candidates?page=1&limit=100 HTTP/1.1" 304 - "http://localhost:4001/" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36"
+2025-11-07 06:36:46 [INFO]: User logged in: jerry.hakim@energi-up.com
+2025-11-07 06:36:46 [INFO]: ::ffff:172.18.0.1 - - [07/Nov/2025:06:36:46 +0000] "POST /api/auth/login HTTP/1.1" 200 505 "http://localhost:4001/" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36"
+2025-11-07 06:36:46 [INFO]: ::ffff:172.18.0.1 - - [07/Nov/2025:06:36:46 +0000] "GET /api/dashboard/stats HTTP/1.1" 304 - "http://localhost:4001/" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36"
+2025-11-07 06:36:49 [INFO]: ::ffff:172.18.0.1 - - [07/Nov/2025:06:36:49 +0000] "GET /api/candidates?page=1&limit=100 HTTP/1.1" 304 - "http://localhost:4001/" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36"
+2025-11-07 06:36:49 [INFO]: ::ffff:172.18.0.1 - - [07/Nov/2025:06:36:49 +0000] "GET /api/candidates?page=1&limit=100 HTTP/1.1" 304 - "http://localhost:4001/" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36"
+2025-11-07 06:36:57 [INFO]: ::ffff:172.18.0.1 - - [07/Nov/2025:06:36:57 +0000] "GET /api/auth/me HTTP/1.1" 304 - "http://localhost:4001/" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36"
+2025-11-07 06:36:57 [INFO]: ::ffff:172.18.0.1 - - [07/Nov/2025:06:36:57 +0000] "GET /api/candidates?page=1&limit=100 HTTP/1.1" 304 - "http://localhost:4001/" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36"
+2025-11-07 06:36:58 [INFO]: User logged in: jerry.hakim@energi-up.com
+2025-11-07 06:36:58 [INFO]: ::ffff:172.18.0.1 - - [07/Nov/2025:06:36:58 +0000] "POST /api/auth/login HTTP/1.1" 200 505 "http://localhost:4001/" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36"
+2025-11-07 06:36:58 [INFO]: ::ffff:172.18.0.1 - - [07/Nov/2025:06:36:58 +0000] "GET /api/dashboard/stats HTTP/1.1" 304 - "http://localhost:4001/" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36"
+2025-11-07 06:37:00 [INFO]: ::ffff:172.18.0.1 - - [07/Nov/2025:06:37:00 +0000] "GET /api/candidates?page=1&limit=100 HTTP/1.1" 304 - "http://localhost:4001/" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36"
+2025-11-07 06:37:01 [INFO]: ::ffff:172.18.0.1 - - [07/Nov/2025:06:37:01 +0000] "GET /api/candidates?page=1&limit=100 HTTP/1.1" 304 - "http://localhost:4001/" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36"
+2025-11-07 06:37:14 [INFO]: ::1 - - [07/Nov/2025:06:37:14 +0000] "GET /health HTTP/1.1" 200 122 "-" "-"
+2025-11-07 06:37:44 [INFO]: ::1 - - [07/Nov/2025:06:37:44 +0000] "GET /health HTTP/1.1" 200 122 "-" "-"
+2025-11-07 06:38:04 [INFO]: ::ffff:172.18.0.1 - - [07/Nov/2025:06:38:04 +0000] "GET /api/auth/me HTTP/1.1" 304 - "http://localhost:4001/" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36"
+2025-11-07 06:38:04 [INFO]: ::ffff:172.18.0.1 - - [07/Nov/2025:06:38:04 +0000] "GET /api/candidates?page=1&limit=100 HTTP/1.1" 304 - "http://localhost:4001/" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36"
+2025-11-07 06:38:09 [INFO]: User logged in: jerry.hakim@energi-up.com
+2025-11-07 06:38:09 [INFO]: ::ffff:172.18.0.1 - - [07/Nov/2025:06:38:09 +0000] "POST /api/auth/login HTTP/1.1" 200 505 "http://localhost:4001/" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36"
+2025-11-07 06:38:09 [INFO]: ::ffff:172.18.0.1 - - [07/Nov/2025:06:38:09 +0000] "GET /api/dashboard/stats HTTP/1.1" 304 - "http://localhost:4001/" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36"
+2025-11-07 06:38:11 [INFO]: ::ffff:172.18.0.1 - - [07/Nov/2025:06:38:11 +0000] "GET /api/candidates?page=1&limit=100 HTTP/1.1" 304 - "http://localhost:4001/" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36"
+2025-11-07 06:38:11 [INFO]: ::ffff:172.18.0.1 - - [07/Nov/2025:06:38:11 +0000] "GET /api/candidates?page=1&limit=100 HTTP/1.1" 304 - "http://localhost:4001/" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36"
+2025-11-07 06:38:14 [INFO]: ::1 - - [07/Nov/2025:06:38:14 +0000] "GET /health HTTP/1.1" 200 122 "-" "-"
+2025-11-07 06:38:44 [INFO]: ::1 - - [07/Nov/2025:06:38:44 +0000] "GET /health HTTP/1.1" 200 122 "-" "-"
+2025-11-07 06:39:14 [INFO]: ::1 - - [07/Nov/2025:06:39:14 +0000] "GET /health HTTP/1.1" 200 121 "-" "-"
+2025-11-07 06:39:44 [INFO]: ::1 - - [07/Nov/2025:06:39:44 +0000] "GET /health HTTP/1.1" 200 122 "-" "-"
+2025-11-07 06:40:14 [INFO]: ::1 - - [07/Nov/2025:06:40:14 +0000] "GET /health HTTP/1.1" 200 122 "-" "-"
+2025-11-07 06:40:44 [INFO]: ::1 - - [07/Nov/2025:06:40:44 +0000] "GET /health HTTP/1.1" 200 122 "-" "-"
+2025-11-07 06:41:14 [INFO]: ::1 - - [07/Nov/2025:06:41:14 +0000] "GET /health HTTP/1.1" 200 122 "-" "-"
+2025-11-07 06:41:45 [INFO]: ::1 - - [07/Nov/2025:06:41:45 +0000] "GET /health HTTP/1.1" 200 122 "-" "-"
+2025-11-07 06:41:50 [INFO]: ::ffff:172.18.0.1 - - [07/Nov/2025:06:41:50 +0000] "GET /api/auth/me HTTP/1.1" 304 - "http://localhost:4001/" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36"
+2025-11-07 06:41:50 [INFO]: ::ffff:172.18.0.1 - - [07/Nov/2025:06:41:50 +0000] "GET /api/candidates?page=1&limit=100 HTTP/1.1" 304 - "http://localhost:4001/" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36"
+2025-11-07 06:41:51 [INFO]: User logged in: jerry.hakim@energi-up.com
+2025-11-07 06:41:51 [INFO]: ::ffff:172.18.0.1 - - [07/Nov/2025:06:41:51 +0000] "POST /api/auth/login HTTP/1.1" 200 505 "http://localhost:4001/" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36"
+2025-11-07 06:41:51 [INFO]: ::ffff:172.18.0.1 - - [07/Nov/2025:06:41:51 +0000] "GET /api/dashboard/stats HTTP/1.1" 304 - "http://localhost:4001/" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36"
+2025-11-07 06:41:56 [INFO]: ::ffff:172.18.0.1 - - [07/Nov/2025:06:41:56 +0000] "GET /api/candidates?page=1&limit=100 HTTP/1.1" 304 - "http://localhost:4001/" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36"
+2025-11-07 06:41:56 [INFO]: ::ffff:172.18.0.1 - - [07/Nov/2025:06:41:56 +0000] "GET /api/candidates?page=1&limit=100 HTTP/1.1" 304 - "http://localhost:4001/" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36"
+2025-11-07 06:42:15 [INFO]: ::1 - - [07/Nov/2025:06:42:15 +0000] "GET /health HTTP/1.1" 200 122 "-" "-"
+2025-11-07 06:42:45 [INFO]: ::1 - - [07/Nov/2025:06:42:45 +0000] "GET /health HTTP/1.1" 200 122 "-" "-"
+2025-11-07 06:43:15 [INFO]: ::1 - - [07/Nov/2025:06:43:15 +0000] "GET /health HTTP/1.1" 200 122 "-" "-"
+2025-11-07 06:43:45 [INFO]: ::1 - - [07/Nov/2025:06:43:45 +0000] "GET /health HTTP/1.1" 200 122 "-" "-"
+2025-11-07 06:44:15 [INFO]: ::1 - - [07/Nov/2025:06:44:15 +0000] "GET /health HTTP/1.1" 200 122 "-" "-"
+2025-11-07 06:44:21 [INFO]: SIGTERM received. Starting graceful shutdown...
+2025-11-07 06:44:21 [INFO]: HTTP server closed
+2025-11-07 06:44:21 [INFO]: Database disconnected
+2025-11-07 06:44:22 [INFO]: Redis connected successfully
+2025-11-07 06:44:22 [INFO]: PostgreSQL connected successfully
+2025-11-07 06:44:22 [INFO]: Redis connected successfully
+2025-11-07 06:44:22 [INFO]: Server running on port 4000 in production mode
+2025-11-07 06:44:22 [INFO]: API available at: http://localhost:4000/api
+2025-11-07 06:44:26 [INFO]: ::1 - - [07/Nov/2025:06:44:26 +0000] "GET /health HTTP/1.1" 200 120 "-" "-"
+2025-11-07 06:44:56 [INFO]: ::1 - - [07/Nov/2025:06:44:56 +0000] "GET /health HTTP/1.1" 200 121 "-" "-"
+2025-11-07 06:45:26 [INFO]: ::1 - - [07/Nov/2025:06:45:26 +0000] "GET /health HTTP/1.1" 200 120 "-" "-"
+2025-11-07 06:45:56 [INFO]: ::1 - - [07/Nov/2025:06:45:56 +0000] "GET /health HTTP/1.1" 200 120 "-" "-"
+2025-11-07 06:46:27 [INFO]: ::1 - - [07/Nov/2025:06:46:27 +0000] "GET /health HTTP/1.1" 200 122 "-" "-"
+2025-11-07 06:46:56 [INFO]: SIGTERM received. Starting graceful shutdown...
+2025-11-07 06:46:56 [INFO]: HTTP server closed
+2025-11-07 06:46:56 [INFO]: Database disconnected
+2025-11-07 06:47:07 [INFO]: Redis connected successfully
+2025-11-07 06:47:07 [INFO]: PostgreSQL connected successfully
+2025-11-07 06:47:07 [INFO]: Redis connected successfully
+2025-11-07 06:47:07 [INFO]: Server running on port 4000 in production mode
+2025-11-07 06:47:07 [INFO]: API available at: http://localhost:4000/api
+2025-11-07 06:47:12 [INFO]: ::1 - - [07/Nov/2025:06:47:12 +0000] "GET /health HTTP/1.1" 200 120 "-" "-"
+2025-11-07 06:47:20 [INFO]: ::ffff:172.18.0.1 - - [07/Nov/2025:06:47:20 +0000] "GET /api/auth/me HTTP/1.1" 304 - "http://localhost:4001/" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36"
+2025-11-07 06:47:20 [INFO]: ::ffff:172.18.0.1 - - [07/Nov/2025:06:47:20 +0000] "GET /api/candidates?page=1&limit=100 HTTP/1.1" 304 - "http://localhost:4001/" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36"
+2025-11-07 06:47:22 [INFO]: User logged in: jerry.hakim@energi-up.com
+2025-11-07 06:47:22 [INFO]: ::ffff:172.18.0.1 - - [07/Nov/2025:06:47:22 +0000] "POST /api/auth/login HTTP/1.1" 200 505 "http://localhost:4001/" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36"
+2025-11-07 06:47:22 [INFO]: ::ffff:172.18.0.1 - - [07/Nov/2025:06:47:22 +0000] "GET /api/dashboard/stats HTTP/1.1" 304 - "http://localhost:4001/" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36"
+2025-11-07 06:47:42 [INFO]: ::1 - - [07/Nov/2025:06:47:42 +0000] "GET /health HTTP/1.1" 200 121 "-" "-"
+2025-11-07 06:47:48 [INFO]: ::ffff:172.18.0.1 - - [07/Nov/2025:06:47:48 +0000] "GET /api/candidates?page=1&limit=100 HTTP/1.1" 304 - "http://localhost:4001/" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36"
+2025-11-07 06:47:48 [INFO]: ::ffff:172.18.0.1 - - [07/Nov/2025:06:47:48 +0000] "GET /api/candidates?page=1&limit=100 HTTP/1.1" 304 - "http://localhost:4001/" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36"
+2025-11-07 06:48:12 [INFO]: ::1 - - [07/Nov/2025:06:48:12 +0000] "GET /health HTTP/1.1" 200 121 "-" "-"
+2025-11-07 06:48:43 [INFO]: ::1 - - [07/Nov/2025:06:48:43 +0000] "GET /health HTTP/1.1" 200 121 "-" "-"
+2025-11-07 06:49:13 [INFO]: ::1 - - [07/Nov/2025:06:49:13 +0000] "GET /health HTTP/1.1" 200 122 "-" "-"
+2025-11-07 06:49:43 [INFO]: ::1 - - [07/Nov/2025:06:49:43 +0000] "GET /health HTTP/1.1" 200 122 "-" "-"
+2025-11-07 06:50:13 [INFO]: ::1 - - [07/Nov/2025:06:50:13 +0000] "GET /health HTTP/1.1" 200 122 "-" "-"
+2025-11-07 06:50:43 [INFO]: ::1 - - [07/Nov/2025:06:50:43 +0000] "GET /health HTTP/1.1" 200 122 "-" "-"
+2025-11-07 06:51:13 [INFO]: ::1 - - [07/Nov/2025:06:51:13 +0000] "GET /health HTTP/1.1" 200 122 "-" "-"
+2025-11-07 06:51:43 [INFO]: ::1 - - [07/Nov/2025:06:51:43 +0000] "GET /health HTTP/1.1" 200 122 "-" "-"
+2025-11-07 06:52:13 [INFO]: ::1 - - [07/Nov/2025:06:52:13 +0000] "GET /health HTTP/1.1" 200 122 "-" "-"
+2025-11-07 06:52:43 [INFO]: ::1 - - [07/Nov/2025:06:52:43 +0000] "GET /health HTTP/1.1" 200 122 "-" "-"
+2025-11-07 06:52:58 [INFO]: SIGTERM received. Starting graceful shutdown...
+2025-11-07 06:52:58 [INFO]: HTTP server closed
+2025-11-07 06:52:58 [INFO]: Database disconnected
+2025-11-07 06:52:58 [INFO]: Redis disconnected
+2025-11-07 13:59:46 [INFO]: Redis connected successfully
+2025-11-07 13:59:46 [ERROR]: Redis connection error: NOAUTH Authentication required.
+ReplyError: NOAUTH Authentication required.
+    at parseError (D:\Cursor\Talent Acquisition Management\backend\node_modules\redis-parser\lib\parser.js:179:12)
+    at parseType (D:\Cursor\Talent Acquisition Management\backend\node_modules\redis-parser\lib\parser.js:302:14)
+2025-11-07 13:59:46 [WARN]: Redis connection closed
+2025-11-07 13:59:46 [INFO]: Redis connected successfully
+2025-11-07 13:59:46 [ERROR]: Redis connection error: NOAUTH Authentication required.
+ReplyError: NOAUTH Authentication required.
+    at parseError (D:\Cursor\Talent Acquisition Management\backend\node_modules\redis-parser\lib\parser.js:179:12)
+    at parseType (D:\Cursor\Talent Acquisition Management\backend\node_modules\redis-parser\lib\parser.js:302:14)
+2025-11-07 13:59:46 [WARN]: Redis connection closed
+2025-11-07 13:59:48 [INFO]: Redis connected successfully
+2025-11-07 13:59:48 [ERROR]: Redis connection error: NOAUTH Authentication required.
+ReplyError: NOAUTH Authentication required.
+    at parseError (D:\Cursor\Talent Acquisition Management\backend\node_modules\redis-parser\lib\parser.js:179:12)
+    at parseType (D:\Cursor\Talent Acquisition Management\backend\node_modules\redis-parser\lib\parser.js:302:14)
+2025-11-07 13:59:48 [WARN]: Redis connection closed
+2025-11-07 13:59:48 [INFO]: Redis connected successfully
+2025-11-07 13:59:48 [ERROR]: Redis connection error: NOAUTH Authentication required.
+ReplyError: NOAUTH Authentication required.
+    at parseError (D:\Cursor\Talent Acquisition Management\backend\node_modules\redis-parser\lib\parser.js:179:12)
+    at parseType (D:\Cursor\Talent Acquisition Management\backend\node_modules\redis-parser\lib\parser.js:302:14)
+2025-11-07 13:59:48 [WARN]: Redis connection closed
+2025-11-07 13:59:48 [ERROR]: Connection error: Authentication failed against database server at `localhost`, the provided database credentials for `tas_user` are not valid.
+
+Please make sure to provide valid database credentials for the database server at `localhost`.
+PrismaClientInitializationError: Authentication failed against database server at `localhost`, the provided database credentials for `tas_user` are not valid.
+
+Please make sure to provide valid database credentials for the database server at `localhost`.
+    at t (D:\Cursor\Talent Acquisition Management\backend\node_modules\@prisma\client\runtime\library.js:112:2488)
+    at async testConnections (D:\Cursor\Talent Acquisition Management\backend\src\server.js:42:5)
+    at async startServer (D:\Cursor\Talent Acquisition Management\backend\src\server.js:57:25)
+2025-11-07 14:14:24 [INFO]: Redis connected successfully
+2025-11-07 14:14:24 [ERROR]: Redis connection error: NOAUTH Authentication required.
+ReplyError: NOAUTH Authentication required.
+    at parseError (D:\Cursor\Talent Acquisition Management\backend\node_modules\redis-parser\lib\parser.js:179:12)
+    at parseType (D:\Cursor\Talent Acquisition Management\backend\node_modules\redis-parser\lib\parser.js:302:14)
+2025-11-07 14:14:24 [WARN]: Redis connection closed
+2025-11-07 14:14:24 [INFO]: Redis connected successfully
+2025-11-07 14:14:24 [ERROR]: Redis connection error: NOAUTH Authentication required.
+ReplyError: NOAUTH Authentication required.
+    at parseError (D:\Cursor\Talent Acquisition Management\backend\node_modules\redis-parser\lib\parser.js:179:12)
+    at parseType (D:\Cursor\Talent Acquisition Management\backend\node_modules\redis-parser\lib\parser.js:302:14)
+2025-11-07 14:14:24 [WARN]: Redis connection closed
+2025-11-07 14:14:24 [INFO]: Redis connected successfully
+2025-11-07 14:14:24 [ERROR]: Redis connection error: NOAUTH Authentication required.
+ReplyError: NOAUTH Authentication required.
+    at parseError (D:\Cursor\Talent Acquisition Management\backend\node_modules\redis-parser\lib\parser.js:179:12)
+    at parseType (D:\Cursor\Talent Acquisition Management\backend\node_modules\redis-parser\lib\parser.js:302:14)
+2025-11-07 14:14:24 [WARN]: Redis connection closed
+2025-11-07 14:14:24 [ERROR]: Connection error: Authentication failed against database server at `localhost`, the provided database credentials for `tas_user` are not valid.
+
+Please make sure to provide valid database credentials for the database server at `localhost`.
+PrismaClientInitializationError: Authentication failed against database server at `localhost`, the provided database credentials for `tas_user` are not valid.
+
+Please make sure to provide valid database credentials for the database server at `localhost`.
+    at t (D:\Cursor\Talent Acquisition Management\backend\node_modules\@prisma\client\runtime\library.js:112:2488)
+    at async testConnections (D:\Cursor\Talent Acquisition Management\backend\src\server.js:42:5)
+    at async startServer (D:\Cursor\Talent Acquisition Management\backend\src\server.js:57:25)
+2025-11-07 14:15:34 [ERROR]: Connection error: Authentication failed against database server at `localhost`, the provided database credentials for `tas_user` are not valid.
+
+Please make sure to provide valid database credentials for the database server at `localhost`.
+PrismaClientInitializationError: Authentication failed against database server at `localhost`, the provided database credentials for `tas_user` are not valid.
+
+Please make sure to provide valid database credentials for the database server at `localhost`.
+    at t (D:\Cursor\Talent Acquisition Management\backend\node_modules\@prisma\client\runtime\library.js:112:2488)
+    at async testConnections (D:\Cursor\Talent Acquisition Management\backend\src\server.js:42:5)
+    at async startServer (D:\Cursor\Talent Acquisition Management\backend\src\server.js:57:25)
+2025-11-07 14:15:38 [ERROR]: Database connection error:
+2025-11-07 14:15:48 [INFO]: Redis connected successfully
+2025-11-07 14:15:48 [INFO]: Redis connected successfully
+2025-11-07 14:15:48 [ERROR]: Database connection error:
+2025-11-07 14:15:48 [ERROR]: Please check your DATABASE_URL in .env file
+2025-11-07 14:15:48 [ERROR]: Expected format: postgresql://user:password@host:port/database?schema=public
+2025-11-07 14:15:48 [INFO]: Redis connected successfully
+2025-11-07 14:15:48 [WARN]: Redis connection failed:
+2025-11-07 14:15:57 [INFO]: Redis connected successfully
+2025-11-07 14:15:57 [INFO]: Redis connected successfully
+2025-11-07 14:15:57 [ERROR]: Database connection error:
+2025-11-07 14:15:57 [ERROR]: Please check your DATABASE_URL in .env file
+2025-11-07 14:15:57 [ERROR]: Expected format: postgresql://user:password@host:port/database?schema=public
+2025-11-07 14:15:57 [INFO]: Redis connected successfully
+2025-11-07 14:15:57 [WARN]: Redis connection failed:
+2025-11-07 14:16:21 [INFO]: Redis connected successfully
+2025-11-07 14:16:21 [INFO]: Redis connected successfully
+2025-11-07 14:16:21 [INFO]: Redis connected successfully
+2025-11-07 14:16:22 [INFO]: Redis connected successfully
+2025-11-07 14:16:22 [INFO]: Redis connected successfully
+2025-11-07 14:16:22 [INFO]: Redis connected successfully
+2025-11-07 14:16:22 [ERROR]: Database connection error:
+2025-11-07 14:16:22 [ERROR]: Please check your DATABASE_URL in .env file
+2025-11-07 14:16:22 [ERROR]: Expected format: postgresql://user:password@host:port/database?schema=public
+2025-11-07 14:16:22 [INFO]: Redis connected successfully
+2025-11-07 14:16:22 [WARN]: Redis connection failed after multiple retries. Continuing without Redis.
+2025-11-07 07:27:17 [INFO]: Redis connected successfully
+2025-11-07 07:27:17 [INFO]: PostgreSQL connected successfully
+2025-11-07 07:27:17 [INFO]: Redis connected successfully
+2025-11-07 07:27:17 [INFO]: Server running on port 4000 in production mode
+2025-11-07 07:27:17 [INFO]: API available at: http://localhost:4000/api
+2025-11-07 07:27:21 [INFO]: ::1 - - [07/Nov/2025:07:27:21 +0000] "GET /health HTTP/1.1" 200 120 "-" "-"
+2025-11-07 07:27:51 [INFO]: ::1 - - [07/Nov/2025:07:27:51 +0000] "GET /health HTTP/1.1" 200 120 "-" "-"
+2025-11-07 07:28:21 [INFO]: ::1 - - [07/Nov/2025:07:28:21 +0000] "GET /health HTTP/1.1" 200 121 "-" "-"
+2025-11-07 07:28:51 [INFO]: ::1 - - [07/Nov/2025:07:28:51 +0000] "GET /health HTTP/1.1" 200 121 "-" "-"
+2025-11-07 07:29:16 [ERROR]: Authentication error: Invalid or expired token
+Error: Invalid or expired token
+    at verifyAccessToken (/app/src/utils/token.js:37:11)
+    at authenticate (/app/src/middleware/auth.js:23:21)
+    at Layer.handle [as handle_request] (/app/node_modules/express/lib/router/layer.js:95:5)
+    at next (/app/node_modules/express/lib/router/route.js:149:13)
+    at Route.dispatch (/app/node_modules/express/lib/router/route.js:119:3)
+    at Layer.handle [as handle_request] (/app/node_modules/express/lib/router/layer.js:95:5)
+    at /app/node_modules/express/lib/router/index.js:284:15
+    at Function.process_params (/app/node_modules/express/lib/router/index.js:346:12)
+    at next (/app/node_modules/express/lib/router/index.js:280:10)
+    at Function.handle (/app/node_modules/express/lib/router/index.js:175:3)
+2025-11-07 07:29:16 [INFO]: ::ffff:172.18.0.1 - - [07/Nov/2025:07:29:16 +0000] "GET /api/auth/me HTTP/1.1" 401 54 "http://localhost:4001/" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36"
+2025-11-07 07:29:18 [INFO]: User logged in: jerry.hakim@energi-up.com
+2025-11-07 07:29:18 [INFO]: ::ffff:172.18.0.1 - - [07/Nov/2025:07:29:18 +0000] "POST /api/auth/login HTTP/1.1" 200 505 "http://localhost:4001/" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36"
+2025-11-07 07:29:18 [INFO]: ::ffff:172.18.0.1 - - [07/Nov/2025:07:29:18 +0000] "GET /api/dashboard/stats HTTP/1.1" 304 - "http://localhost:4001/" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36"
+2025-11-07 07:29:21 [INFO]: ::1 - - [07/Nov/2025:07:29:21 +0000] "GET /health HTTP/1.1" 200 122 "-" "-"
+2025-11-07 07:29:22 [INFO]: ::ffff:172.18.0.1 - - [07/Nov/2025:07:29:22 +0000] "GET /api/candidates?page=1&limit=100 HTTP/1.1" 304 - "http://localhost:4001/" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36"
+2025-11-07 07:29:23 [INFO]: ::ffff:172.18.0.1 - - [07/Nov/2025:07:29:23 +0000] "GET /api/candidates?page=1&limit=100 HTTP/1.1" 304 - "http://localhost:4001/" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36"
+2025-11-07 07:29:52 [INFO]: ::1 - - [07/Nov/2025:07:29:52 +0000] "GET /health HTTP/1.1" 200 122 "-" "-"
+2025-11-07 07:30:22 [INFO]: ::1 - - [07/Nov/2025:07:30:22 +0000] "GET /health HTTP/1.1" 200 122 "-" "-"
+2025-11-07 07:30:52 [INFO]: ::1 - - [07/Nov/2025:07:30:52 +0000] "GET /health HTTP/1.1" 200 122 "-" "-"
+2025-11-07 07:31:22 [INFO]: ::1 - - [07/Nov/2025:07:31:22 +0000] "GET /health HTTP/1.1" 200 122 "-" "-"
+2025-11-07 07:31:52 [INFO]: ::1 - - [07/Nov/2025:07:31:52 +0000] "GET /health HTTP/1.1" 200 121 "-" "-"
+2025-11-07 07:32:22 [INFO]: ::1 - - [07/Nov/2025:07:32:22 +0000] "GET /health HTTP/1.1" 200 122 "-" "-"
+2025-11-07 07:32:52 [INFO]: ::1 - - [07/Nov/2025:07:32:52 +0000] "GET /health HTTP/1.1" 200 122 "-" "-"
+2025-11-07 07:33:23 [INFO]: ::1 - - [07/Nov/2025:07:33:23 +0000] "GET /health HTTP/1.1" 200 122 "-" "-"
+2025-11-07 07:33:53 [INFO]: ::1 - - [07/Nov/2025:07:33:53 +0000] "GET /health HTTP/1.1" 200 122 "-" "-"
+2025-11-07 07:34:23 [INFO]: ::1 - - [07/Nov/2025:07:34:23 +0000] "GET /health HTTP/1.1" 200 122 "-" "-"
+2025-11-07 07:34:53 [INFO]: ::1 - - [07/Nov/2025:07:34:53 +0000] "GET /health HTTP/1.1" 200 122 "-" "-"
+2025-11-07 07:35:23 [INFO]: ::1 - - [07/Nov/2025:07:35:23 +0000] "GET /health HTTP/1.1" 200 122 "-" "-"
+2025-11-07 07:35:53 [INFO]: ::1 - - [07/Nov/2025:07:35:53 +0000] "GET /health HTTP/1.1" 200 122 "-" "-"
+2025-11-07 07:36:23 [INFO]: ::1 - - [07/Nov/2025:07:36:23 +0000] "GET /health HTTP/1.1" 200 122 "-" "-"
+2025-11-07 07:36:29 [INFO]: ::ffff:172.18.0.1 - - [07/Nov/2025:07:36:29 +0000] "GET /api/auth/me HTTP/1.1" 304 - "http://localhost:4001/" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36"
+2025-11-07 07:36:29 [INFO]: ::ffff:172.18.0.1 - - [07/Nov/2025:07:36:29 +0000] "GET /api/candidates?page=1&limit=100 HTTP/1.1" 304 - "http://localhost:4001/" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36"
+2025-11-07 07:36:31 [INFO]: User logged in: jerry.hakim@energi-up.com
+2025-11-07 07:36:31 [INFO]: ::ffff:172.18.0.1 - - [07/Nov/2025:07:36:31 +0000] "POST /api/auth/login HTTP/1.1" 200 505 "http://localhost:4001/" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36"
+2025-11-07 07:36:31 [INFO]: ::ffff:172.18.0.1 - - [07/Nov/2025:07:36:31 +0000] "GET /api/dashboard/stats HTTP/1.1" 304 - "http://localhost:4001/" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36"
+2025-11-07 07:36:33 [INFO]: ::ffff:172.18.0.1 - - [07/Nov/2025:07:36:33 +0000] "GET /api/candidates?page=1&limit=100 HTTP/1.1" 304 - "http://localhost:4001/" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36"
+2025-11-07 07:36:33 [INFO]: ::ffff:172.18.0.1 - - [07/Nov/2025:07:36:33 +0000] "GET /api/candidates?page=1&limit=100 HTTP/1.1" 304 - "http://localhost:4001/" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36"
+2025-11-07 07:36:54 [INFO]: ::1 - - [07/Nov/2025:07:36:54 +0000] "GET /health HTTP/1.1" 200 122 "-" "-"
+2025-11-07 07:37:24 [INFO]: ::1 - - [07/Nov/2025:07:37:24 +0000] "GET /health HTTP/1.1" 200 122 "-" "-"
+2025-11-07 07:37:54 [INFO]: ::1 - - [07/Nov/2025:07:37:54 +0000] "GET /health HTTP/1.1" 200 122 "-" "-"
+2025-11-07 07:38:24 [INFO]: ::1 - - [07/Nov/2025:07:38:24 +0000] "GET /health HTTP/1.1" 200 122 "-" "-"
+2025-11-07 07:38:54 [INFO]: ::1 - - [07/Nov/2025:07:38:54 +0000] "GET /health HTTP/1.1" 200 122 "-" "-"
+2025-11-07 07:39:24 [INFO]: ::1 - - [07/Nov/2025:07:39:24 +0000] "GET /health HTTP/1.1" 200 122 "-" "-"
+2025-11-07 07:39:55 [INFO]: ::1 - - [07/Nov/2025:07:39:55 +0000] "GET /health HTTP/1.1" 200 122 "-" "-"
+2025-11-07 07:40:25 [INFO]: ::1 - - [07/Nov/2025:07:40:25 +0000] "GET /health HTTP/1.1" 200 122 "-" "-"
+2025-11-07 07:40:55 [INFO]: ::1 - - [07/Nov/2025:07:40:55 +0000] "GET /health HTTP/1.1" 200 122 "-" "-"
+2025-11-07 07:41:25 [INFO]: ::1 - - [07/Nov/2025:07:41:25 +0000] "GET /health HTTP/1.1" 200 122 "-" "-"
+2025-11-07 07:41:55 [INFO]: ::1 - - [07/Nov/2025:07:41:55 +0000] "GET /health HTTP/1.1" 200 122 "-" "-"
+2025-11-07 07:42:25 [INFO]: ::1 - - [07/Nov/2025:07:42:25 +0000] "GET /health HTTP/1.1" 200 121 "-" "-"
+2025-11-07 07:42:55 [INFO]: ::1 - - [07/Nov/2025:07:42:55 +0000] "GET /health HTTP/1.1" 200 122 "-" "-"
+2025-11-07 07:43:26 [INFO]: ::1 - - [07/Nov/2025:07:43:26 +0000] "GET /health HTTP/1.1" 200 122 "-" "-"
+2025-11-07 07:43:30 [INFO]: ::ffff:172.18.0.1 - - [07/Nov/2025:07:43:30 +0000] "GET /api/masters/divisions?search= HTTP/1.1" 200 655 "http://localhost:4001/" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36"
+2025-11-07 07:43:30 [INFO]: ::ffff:172.18.0.1 - - [07/Nov/2025:07:43:30 +0000] "GET /api/masters/divisions?search= HTTP/1.1" 304 - "http://localhost:4001/" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36"
+2025-11-07 07:43:56 [INFO]: ::1 - - [07/Nov/2025:07:43:56 +0000] "GET /health HTTP/1.1" 200 123 "-" "-"
+2025-11-07 07:44:26 [INFO]: ::1 - - [07/Nov/2025:07:44:26 +0000] "GET /health HTTP/1.1" 200 123 "-" "-"
+2025-11-07 07:44:56 [INFO]: ::1 - - [07/Nov/2025:07:44:56 +0000] "GET /health HTTP/1.1" 200 123 "-" "-"
+2025-11-07 07:50:26 [INFO]: ::ffff:172.18.0.1 - - [07/Nov/2025:07:50:26 +0000] "GET /api/auth/me HTTP/1.1" 304 - "http://localhost:4001/" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36"
+2025-11-07 07:50:26 [INFO]: ::ffff:172.18.0.1 - - [07/Nov/2025:07:50:26 +0000] "GET /api/candidates?page=1&limit=100 HTTP/1.1" 304 - "http://localhost:4001/" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36"
+2025-11-07 07:50:27 [INFO]: User logged in: jerry.hakim@energi-up.com
+2025-11-07 07:50:27 [INFO]: ::ffff:172.18.0.1 - - [07/Nov/2025:07:50:27 +0000] "POST /api/auth/login HTTP/1.1" 200 505 "http://localhost:4001/" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36"
+2025-11-07 07:50:27 [INFO]: ::ffff:172.18.0.1 - - [07/Nov/2025:07:50:27 +0000] "GET /api/dashboard/stats HTTP/1.1" 304 - "http://localhost:4001/" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36"
+2025-11-07 07:50:36 [INFO]: ::ffff:172.18.0.1 - - [07/Nov/2025:07:50:36 +0000] "GET /api/candidates?page=1&limit=100 HTTP/1.1" 304 - "http://localhost:4001/" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36"
+2025-11-07 07:50:36 [INFO]: ::ffff:172.18.0.1 - - [07/Nov/2025:07:50:36 +0000] "GET /api/candidates?page=1&limit=100 HTTP/1.1" 304 - "http://localhost:4001/" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36"
+2025-11-07 07:50:38 [INFO]: ::1 - - [07/Nov/2025:07:50:38 +0000] "GET /health HTTP/1.1" 200 123 "-" "-"
+2025-11-07 07:51:08 [INFO]: ::1 - - [07/Nov/2025:07:51:08 +0000] "GET /health HTTP/1.1" 200 123 "-" "-"
+2025-11-07 07:51:38 [INFO]: ::1 - - [07/Nov/2025:07:51:38 +0000] "GET /health HTTP/1.1" 200 122 "-" "-"
+2025-11-07 07:52:09 [INFO]: ::1 - - [07/Nov/2025:07:52:09 +0000] "GET /health HTTP/1.1" 200 123 "-" "-"
+2025-11-07 07:52:39 [INFO]: ::1 - - [07/Nov/2025:07:52:39 +0000] "GET /health HTTP/1.1" 200 123 "-" "-"
+2025-11-07 07:53:09 [INFO]: ::1 - - [07/Nov/2025:07:53:09 +0000] "GET /health HTTP/1.1" 200 123 "-" "-"
+2025-11-07 07:53:39 [INFO]: ::1 - - [07/Nov/2025:07:53:39 +0000] "GET /health HTTP/1.1" 200 122 "-" "-"
+2025-11-07 07:54:09 [INFO]: ::1 - - [07/Nov/2025:07:54:09 +0000] "GET /health HTTP/1.1" 200 123 "-" "-"
+2025-11-07 07:54:39 [INFO]: ::1 - - [07/Nov/2025:07:54:39 +0000] "GET /health HTTP/1.1" 200 123 "-" "-"
+2025-11-07 07:55:05 [INFO]: ::ffff:172.18.0.1 - - [07/Nov/2025:07:55:05 +0000] "GET /api/auth/me HTTP/1.1" 304 - "http://localhost:4001/" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36"
+2025-11-07 07:55:05 [INFO]: ::ffff:172.18.0.1 - - [07/Nov/2025:07:55:05 +0000] "GET /api/candidates?page=1&limit=100 HTTP/1.1" 304 - "http://localhost:4001/" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36"
+2025-11-07 07:55:06 [INFO]: User logged in: jerry.hakim@energi-up.com
+2025-11-07 07:55:06 [INFO]: ::ffff:172.18.0.1 - - [07/Nov/2025:07:55:06 +0000] "POST /api/auth/login HTTP/1.1" 200 505 "http://localhost:4001/" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36"
+2025-11-07 07:55:06 [INFO]: ::ffff:172.18.0.1 - - [07/Nov/2025:07:55:06 +0000] "GET /api/dashboard/stats HTTP/1.1" 304 - "http://localhost:4001/" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36"
+2025-11-07 07:55:09 [INFO]: ::1 - - [07/Nov/2025:07:55:09 +0000] "GET /health HTTP/1.1" 200 123 "-" "-"
+2025-11-07 07:55:12 [INFO]: ::ffff:172.18.0.1 - - [07/Nov/2025:07:55:12 +0000] "GET /api/candidates?page=1&limit=100 HTTP/1.1" 304 - "http://localhost:4001/" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36"
+2025-11-07 07:55:13 [INFO]: ::ffff:172.18.0.1 - - [07/Nov/2025:07:55:13 +0000] "GET /api/candidates?page=1&limit=100 HTTP/1.1" 304 - "http://localhost:4001/" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36"
+2025-11-07 07:55:39 [INFO]: ::1 - - [07/Nov/2025:07:55:39 +0000] "GET /health HTTP/1.1" 200 121 "-" "-"
+2025-11-07 07:56:09 [INFO]: ::1 - - [07/Nov/2025:07:56:09 +0000] "GET /health HTTP/1.1" 200 123 "-" "-"
+2025-11-07 07:56:39 [INFO]: ::1 - - [07/Nov/2025:07:56:39 +0000] "GET /health HTTP/1.1" 200 123 "-" "-"
+2025-11-07 07:57:10 [INFO]: ::1 - - [07/Nov/2025:07:57:10 +0000] "GET /health HTTP/1.1" 200 123 "-" "-"
+2025-11-07 07:57:40 [INFO]: ::1 - - [07/Nov/2025:07:57:40 +0000] "GET /health HTTP/1.1" 200 123 "-" "-"
+2025-11-07 07:58:10 [INFO]: ::1 - - [07/Nov/2025:07:58:10 +0000] "GET /health HTTP/1.1" 200 123 "-" "-"
+2025-11-07 07:58:20 [INFO]: ::ffff:172.18.0.1 - - [07/Nov/2025:07:58:20 +0000] "GET /api/auth/me HTTP/1.1" 304 - "http://localhost:4001/" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36"
+2025-11-07 07:58:20 [INFO]: ::ffff:172.18.0.1 - - [07/Nov/2025:07:58:20 +0000] "GET /api/candidates?page=1&limit=100 HTTP/1.1" 304 - "http://localhost:4001/" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36"
+2025-11-07 07:58:21 [INFO]: User logged in: jerry.hakim@energi-up.com
+2025-11-07 07:58:21 [INFO]: ::ffff:172.18.0.1 - - [07/Nov/2025:07:58:21 +0000] "POST /api/auth/login HTTP/1.1" 200 505 "http://localhost:4001/" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36"
+2025-11-07 07:58:21 [INFO]: ::ffff:172.18.0.1 - - [07/Nov/2025:07:58:21 +0000] "GET /api/dashboard/stats HTTP/1.1" 304 - "http://localhost:4001/" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36"
+2025-11-07 07:58:24 [INFO]: ::ffff:172.18.0.1 - - [07/Nov/2025:07:58:24 +0000] "GET /api/candidates?page=1&limit=100 HTTP/1.1" 304 - "http://localhost:4001/" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36"
+2025-11-07 07:58:24 [INFO]: ::ffff:172.18.0.1 - - [07/Nov/2025:07:58:24 +0000] "GET /api/candidates?page=1&limit=100 HTTP/1.1" 304 - "http://localhost:4001/" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36"
+2025-11-07 07:58:40 [INFO]: ::1 - - [07/Nov/2025:07:58:40 +0000] "GET /health HTTP/1.1" 200 123 "-" "-"
+2025-11-07 07:59:10 [INFO]: ::1 - - [07/Nov/2025:07:59:10 +0000] "GET /health HTTP/1.1" 200 123 "-" "-"
+2025-11-07 07:59:40 [INFO]: ::1 - - [07/Nov/2025:07:59:40 +0000] "GET /health HTTP/1.1" 200 123 "-" "-"
+2025-11-07 08:00:10 [INFO]: ::1 - - [07/Nov/2025:08:00:10 +0000] "GET /health HTTP/1.1" 200 123 "-" "-"
+2025-11-07 08:00:40 [INFO]: ::1 - - [07/Nov/2025:08:00:40 +0000] "GET /health HTTP/1.1" 200 123 "-" "-"
+2025-11-07 08:01:11 [INFO]: ::1 - - [07/Nov/2025:08:01:11 +0000] "GET /health HTTP/1.1" 200 123 "-" "-"
+2025-11-07 08:01:41 [INFO]: ::1 - - [07/Nov/2025:08:01:41 +0000] "GET /health HTTP/1.1" 200 123 "-" "-"
+2025-11-07 08:02:11 [INFO]: ::1 - - [07/Nov/2025:08:02:11 +0000] "GET /health HTTP/1.1" 200 123 "-" "-"
+2025-11-07 08:02:41 [INFO]: ::1 - - [07/Nov/2025:08:02:41 +0000] "GET /health HTTP/1.1" 200 123 "-" "-"
+2025-11-07 08:03:12 [INFO]: ::1 - - [07/Nov/2025:08:03:12 +0000] "GET /health HTTP/1.1" 200 123 "-" "-"
+2025-11-07 08:03:42 [INFO]: ::1 - - [07/Nov/2025:08:03:42 +0000] "GET /health HTTP/1.1" 200 123 "-" "-"
+2025-11-07 08:04:12 [INFO]: ::1 - - [07/Nov/2025:08:04:12 +0000] "GET /health HTTP/1.1" 200 123 "-" "-"
+2025-11-07 08:04:42 [INFO]: ::1 - - [07/Nov/2025:08:04:42 +0000] "GET /health HTTP/1.1" 200 123 "-" "-"
+2025-11-07 08:05:12 [INFO]: ::1 - - [07/Nov/2025:08:05:12 +0000] "GET /health HTTP/1.1" 200 123 "-" "-"
+2025-11-07 08:05:43 [INFO]: ::1 - - [07/Nov/2025:08:05:43 +0000] "GET /health HTTP/1.1" 200 123 "-" "-"
+2025-11-07 08:06:13 [INFO]: ::1 - - [07/Nov/2025:08:06:13 +0000] "GET /health HTTP/1.1" 200 123 "-" "-"
+2025-11-07 08:06:43 [INFO]: ::1 - - [07/Nov/2025:08:06:43 +0000] "GET /health HTTP/1.1" 200 123 "-" "-"
+2025-11-07 08:07:13 [INFO]: ::1 - - [07/Nov/2025:08:07:13 +0000] "GET /health HTTP/1.1" 200 123 "-" "-"
+2025-11-07 08:07:42 [INFO]: SIGTERM received. Starting graceful shutdown...
+2025-11-07 08:07:42 [INFO]: HTTP server closed
+2025-11-07 08:07:42 [INFO]: Database disconnected
+2025-11-07 08:07:42 [INFO]: Redis disconnected
+2025-11-07 08:07:47 [INFO]: Redis connected successfully
+2025-11-07 08:07:47 [INFO]: PostgreSQL connected successfully
+2025-11-07 08:07:47 [INFO]: Redis connected successfully
+2025-11-07 08:07:47 [INFO]: Server running on port 4000 in production mode
+2025-11-07 08:07:47 [INFO]: API available at: http://localhost:4000/api
+2025-11-07 08:07:50 [INFO]: ::1 - - [07/Nov/2025:08:07:50 +0000] "GET /health HTTP/1.1" 200 120 "-" "-"
+2025-11-07 08:08:20 [INFO]: ::1 - - [07/Nov/2025:08:08:20 +0000] "GET /health HTTP/1.1" 200 121 "-" "-"
+2025-11-07 08:08:51 [INFO]: ::1 - - [07/Nov/2025:08:08:51 +0000] "GET /health HTTP/1.1" 200 121 "-" "-"
+2025-11-07 08:09:21 [INFO]: ::1 - - [07/Nov/2025:08:09:21 +0000] "GET /health HTTP/1.1" 200 121 "-" "-"
+2025-11-07 08:09:51 [INFO]: ::1 - - [07/Nov/2025:08:09:51 +0000] "GET /health HTTP/1.1" 200 122 "-" "-"
+2025-11-07 08:10:21 [INFO]: ::1 - - [07/Nov/2025:08:10:21 +0000] "GET /health HTTP/1.1" 200 122 "-" "-"
+2025-11-07 08:10:51 [INFO]: ::1 - - [07/Nov/2025:08:10:51 +0000] "GET /health HTTP/1.1" 200 122 "-" "-"
+2025-11-07 08:11:21 [INFO]: ::1 - - [07/Nov/2025:08:11:21 +0000] "GET /health HTTP/1.1" 200 121 "-" "-"
+2025-11-07 08:11:51 [INFO]: ::1 - - [07/Nov/2025:08:11:51 +0000] "GET /health HTTP/1.1" 200 122 "-" "-"
+2025-11-07 08:12:21 [INFO]: ::1 - - [07/Nov/2025:08:12:21 +0000] "GET /health HTTP/1.1" 200 122 "-" "-"
+2025-11-07 08:12:51 [INFO]: ::1 - - [07/Nov/2025:08:12:51 +0000] "GET /health HTTP/1.1" 200 122 "-" "-"
+2025-11-07 08:13:22 [INFO]: ::1 - - [07/Nov/2025:08:13:22 +0000] "GET /health HTTP/1.1" 200 122 "-" "-"
+2025-11-07 08:13:52 [INFO]: ::1 - - [07/Nov/2025:08:13:52 +0000] "GET /health HTTP/1.1" 200 122 "-" "-"
+2025-11-07 08:14:22 [INFO]: ::1 - - [07/Nov/2025:08:14:22 +0000] "GET /health HTTP/1.1" 200 122 "-" "-"
+2025-11-07 08:14:52 [INFO]: ::1 - - [07/Nov/2025:08:14:52 +0000] "GET /health HTTP/1.1" 200 122 "-" "-"
+2025-11-07 08:15:22 [INFO]: ::1 - - [07/Nov/2025:08:15:22 +0000] "GET /health HTTP/1.1" 200 122 "-" "-"
+2025-11-07 08:15:52 [INFO]: ::1 - - [07/Nov/2025:08:15:52 +0000] "GET /health HTTP/1.1" 200 121 "-" "-"
+2025-11-07 08:16:22 [INFO]: ::1 - - [07/Nov/2025:08:16:22 +0000] "GET /health HTTP/1.1" 200 122 "-" "-"
+2025-11-07 08:16:52 [INFO]: ::1 - - [07/Nov/2025:08:16:52 +0000] "GET /health HTTP/1.1" 200 122 "-" "-"
+2025-11-07 08:17:22 [INFO]: ::1 - - [07/Nov/2025:08:17:22 +0000] "GET /health HTTP/1.1" 200 122 "-" "-"
+2025-11-07 08:17:52 [INFO]: ::1 - - [07/Nov/2025:08:17:52 +0000] "GET /health HTTP/1.1" 200 122 "-" "-"
+2025-11-07 08:18:23 [INFO]: ::1 - - [07/Nov/2025:08:18:23 +0000] "GET /health HTTP/1.1" 200 122 "-" "-"
+2025-11-07 08:18:53 [INFO]: ::1 - - [07/Nov/2025:08:18:53 +0000] "GET /health HTTP/1.1" 200 122 "-" "-"
+2025-11-07 08:19:23 [INFO]: ::1 - - [07/Nov/2025:08:19:23 +0000] "GET /health HTTP/1.1" 200 122 "-" "-"
+2025-11-07 08:19:53 [INFO]: ::1 - - [07/Nov/2025:08:19:53 +0000] "GET /health HTTP/1.1" 200 122 "-" "-"
+2025-11-07 08:20:23 [INFO]: ::1 - - [07/Nov/2025:08:20:23 +0000] "GET /health HTTP/1.1" 200 122 "-" "-"
+2025-11-07 08:20:53 [INFO]: ::1 - - [07/Nov/2025:08:20:53 +0000] "GET /health HTTP/1.1" 200 122 "-" "-"
+2025-11-07 08:21:23 [INFO]: ::1 - - [07/Nov/2025:08:21:23 +0000] "GET /health HTTP/1.1" 200 122 "-" "-"
+2025-11-07 08:21:53 [INFO]: ::1 - - [07/Nov/2025:08:21:53 +0000] "GET /health HTTP/1.1" 200 122 "-" "-"
+2025-11-07 08:22:23 [INFO]: ::1 - - [07/Nov/2025:08:22:23 +0000] "GET /health HTTP/1.1" 200 122 "-" "-"
+2025-11-07 08:22:54 [INFO]: ::1 - - [07/Nov/2025:08:22:54 +0000] "GET /health HTTP/1.1" 200 122 "-" "-"
+2025-11-07 08:23:24 [INFO]: ::1 - - [07/Nov/2025:08:23:24 +0000] "GET /health HTTP/1.1" 200 122 "-" "-"
+2025-11-07 08:23:54 [INFO]: ::1 - - [07/Nov/2025:08:23:54 +0000] "GET /health HTTP/1.1" 200 122 "-" "-"
+2025-11-07 08:24:24 [INFO]: ::1 - - [07/Nov/2025:08:24:24 +0000] "GET /health HTTP/1.1" 200 122 "-" "-"
+2025-11-07 08:24:54 [INFO]: ::1 - - [07/Nov/2025:08:24:54 +0000] "GET /health HTTP/1.1" 200 123 "-" "-"
+2025-11-07 08:25:24 [INFO]: ::1 - - [07/Nov/2025:08:25:24 +0000] "GET /health HTTP/1.1" 200 123 "-" "-"
+2025-11-07 08:25:54 [INFO]: ::1 - - [07/Nov/2025:08:25:54 +0000] "GET /health HTTP/1.1" 200 123 "-" "-"
+2025-11-07 08:26:24 [INFO]: ::1 - - [07/Nov/2025:08:26:24 +0000] "GET /health HTTP/1.1" 200 123 "-" "-"
+2025-11-07 08:26:55 [INFO]: ::1 - - [07/Nov/2025:08:26:55 +0000] "GET /health HTTP/1.1" 200 123 "-" "-"
+2025-11-07 08:27:25 [INFO]: ::1 - - [07/Nov/2025:08:27:25 +0000] "GET /health HTTP/1.1" 200 123 "-" "-"
+2025-11-07 08:27:55 [INFO]: ::1 - - [07/Nov/2025:08:27:55 +0000] "GET /health HTTP/1.1" 200 123 "-" "-"
+2025-11-07 08:28:25 [INFO]: ::1 - - [07/Nov/2025:08:28:25 +0000] "GET /health HTTP/1.1" 200 123 "-" "-"
+2025-11-07 08:28:44 [ERROR]: Authentication error: Invalid or expired token
+Error: Invalid or expired token
+    at verifyAccessToken (/app/src/utils/token.js:37:11)
+    at authenticate (/app/src/middleware/auth.js:23:21)
+    at Layer.handle [as handle_request] (/app/node_modules/express/lib/router/layer.js:95:5)
+    at next (/app/node_modules/express/lib/router/route.js:149:13)
+    at Route.dispatch (/app/node_modules/express/lib/router/route.js:119:3)
+    at Layer.handle [as handle_request] (/app/node_modules/express/lib/router/layer.js:95:5)
+    at /app/node_modules/express/lib/router/index.js:284:15
+    at Function.process_params (/app/node_modules/express/lib/router/index.js:346:12)
+    at next (/app/node_modules/express/lib/router/index.js:280:10)
+    at Function.handle (/app/node_modules/express/lib/router/index.js:175:3)
+2025-11-07 08:28:44 [INFO]: ::ffff:172.18.0.1 - - [07/Nov/2025:08:28:44 +0000] "GET /api/auth/me HTTP/1.1" 401 54 "http://localhost:4001/" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36"
+2025-11-07 08:28:45 [INFO]: User logged in: jerry.hakim@energi-up.com
+2025-11-07 08:28:45 [INFO]: ::ffff:172.18.0.1 - - [07/Nov/2025:08:28:45 +0000] "POST /api/auth/login HTTP/1.1" 200 505 "http://localhost:4001/" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36"
+2025-11-07 08:28:45 [INFO]: ::ffff:172.18.0.1 - - [07/Nov/2025:08:28:45 +0000] "GET /api/dashboard/stats HTTP/1.1" 304 - "http://localhost:4001/" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36"
+2025-11-07 08:28:55 [INFO]: ::1 - - [07/Nov/2025:08:28:55 +0000] "GET /health HTTP/1.1" 200 123 "-" "-"
+2025-11-07 08:29:02 [INFO]: ::ffff:172.18.0.1 - - [07/Nov/2025:08:29:02 +0000] "GET /api/candidates?page=1&limit=100 HTTP/1.1" 304 - "http://localhost:4001/" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36"
+2025-11-07 08:29:03 [INFO]: ::ffff:172.18.0.1 - - [07/Nov/2025:08:29:03 +0000] "GET /api/candidates?page=1&limit=100 HTTP/1.1" 304 - "http://localhost:4001/" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36"
+2025-11-07 08:29:03 [INFO]: ::ffff:172.18.0.1 - - [07/Nov/2025:08:29:03 +0000] "GET /api/dashboard/stats HTTP/1.1" 304 - "http://localhost:4001/" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36"
+2025-11-07 08:29:08 [INFO]: ::ffff:172.18.0.1 - - [07/Nov/2025:08:29:08 +0000] "GET /api/candidates?page=1&limit=100 HTTP/1.1" 304 - "http://localhost:4001/" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36"
+2025-11-07 08:29:09 [INFO]: ::ffff:172.18.0.1 - - [07/Nov/2025:08:29:09 +0000] "GET /api/candidates?page=1&limit=100 HTTP/1.1" 304 - "http://localhost:4001/" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36"
+2025-11-07 08:29:09 [INFO]: ::ffff:172.18.0.1 - - [07/Nov/2025:08:29:09 +0000] "GET /api/fptk?search=&page=1&limit=100 HTTP/1.1" 200 - "http://localhost:4001/" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36"
+2025-11-07 08:29:10 [INFO]: ::ffff:172.18.0.1 - - [07/Nov/2025:08:29:10 +0000] "GET /api/fptk?search=&page=1&limit=100 HTTP/1.1" 304 - "http://localhost:4001/" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36"
+2025-11-07 08:29:10 [INFO]: ::ffff:172.18.0.1 - - [07/Nov/2025:08:29:10 +0000] "GET /api/fptk?page=1&limit=1000 HTTP/1.1" 400 119 "http://localhost:4001/" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36"
+2025-11-07 08:29:11 [INFO]: ::ffff:172.18.0.1 - - [07/Nov/2025:08:29:11 +0000] "GET /api/dashboard/stats HTTP/1.1" 304 - "http://localhost:4001/" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36"
+2025-11-07 08:29:25 [INFO]: ::1 - - [07/Nov/2025:08:29:25 +0000] "GET /health HTTP/1.1" 200 122 "-" "-"
+2025-11-07 08:29:55 [INFO]: ::1 - - [07/Nov/2025:08:29:55 +0000] "GET /health HTTP/1.1" 200 123 "-" "-"
+2025-11-07 08:30:25 [INFO]: ::1 - - [07/Nov/2025:08:30:25 +0000] "GET /health HTTP/1.1" 200 123 "-" "-"
+2025-11-07 08:30:55 [INFO]: ::1 - - [07/Nov/2025:08:30:55 +0000] "GET /health HTTP/1.1" 200 123 "-" "-"
+2025-11-07 08:30:56 [INFO]: ::ffff:172.18.0.1 - - [07/Nov/2025:08:30:56 +0000] "GET /api/candidates?page=1&limit=100 HTTP/1.1" 304 - "http://localhost:4001/" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36"
+2025-11-07 08:30:57 [INFO]: ::ffff:172.18.0.1 - - [07/Nov/2025:08:30:57 +0000] "GET /api/candidates?page=1&limit=100 HTTP/1.1" 304 - "http://localhost:4001/" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36"
+2025-11-07 08:30:58 [INFO]: ::ffff:172.18.0.1 - - [07/Nov/2025:08:30:58 +0000] "GET /api/fptk?search=&page=1&limit=100 HTTP/1.1" 304 - "http://localhost:4001/" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36"
+2025-11-07 08:30:58 [INFO]: ::ffff:172.18.0.1 - - [07/Nov/2025:08:30:58 +0000] "GET /api/fptk?search=&page=1&limit=100 HTTP/1.1" 304 - "http://localhost:4001/" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36"
+2025-11-07 08:31:01 [INFO]: ::ffff:172.18.0.1 - - [07/Nov/2025:08:31:01 +0000] "GET /api/candidates?page=1&limit=100 HTTP/1.1" 304 - "http://localhost:4001/" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36"
+2025-11-07 08:31:02 [INFO]: ::ffff:172.18.0.1 - - [07/Nov/2025:08:31:02 +0000] "GET /api/candidates?page=1&limit=100 HTTP/1.1" 304 - "http://localhost:4001/" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36"
+2025-11-07 08:31:06 [INFO]: ::ffff:172.18.0.1 - - [07/Nov/2025:08:31:06 +0000] "GET /api/dashboard/stats HTTP/1.1" 304 - "http://localhost:4001/" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36"
+2025-11-07 08:31:09 [INFO]: ::ffff:172.18.0.1 - - [07/Nov/2025:08:31:09 +0000] "GET /api/fptk?search=&page=1&limit=100 HTTP/1.1" 304 - "http://localhost:4001/" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36"
+2025-11-07 08:31:10 [INFO]: ::ffff:172.18.0.1 - - [07/Nov/2025:08:31:10 +0000] "GET /api/fptk?search=&page=1&limit=100 HTTP/1.1" 304 - "http://localhost:4001/" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36"
+2025-11-07 08:31:25 [INFO]: ::1 - - [07/Nov/2025:08:31:25 +0000] "GET /health HTTP/1.1" 200 123 "-" "-"
+2025-11-07 08:31:55 [INFO]: ::1 - - [07/Nov/2025:08:31:55 +0000] "GET /health HTTP/1.1" 200 123 "-" "-"
+2025-11-07 08:32:26 [INFO]: ::1 - - [07/Nov/2025:08:32:26 +0000] "GET /health HTTP/1.1" 200 123 "-" "-"
+2025-11-07 08:32:56 [INFO]: ::1 - - [07/Nov/2025:08:32:56 +0000] "GET /health HTTP/1.1" 200 123 "-" "-"
+2025-11-07 08:33:26 [INFO]: ::1 - - [07/Nov/2025:08:33:26 +0000] "GET /health HTTP/1.1" 200 122 "-" "-"
+2025-11-07 08:33:56 [INFO]: ::1 - - [07/Nov/2025:08:33:56 +0000] "GET /health HTTP/1.1" 200 123 "-" "-"
+2025-11-07 08:34:26 [INFO]: ::1 - - [07/Nov/2025:08:34:26 +0000] "GET /health HTTP/1.1" 200 123 "-" "-"
+2025-11-07 08:34:56 [INFO]: ::1 - - [07/Nov/2025:08:34:56 +0000] "GET /health HTTP/1.1" 200 123 "-" "-"
+2025-11-07 08:35:26 [INFO]: ::1 - - [07/Nov/2025:08:35:26 +0000] "GET /health HTTP/1.1" 200 123 "-" "-"
+2025-11-07 08:35:56 [INFO]: ::1 - - [07/Nov/2025:08:35:56 +0000] "GET /health HTTP/1.1" 200 123 "-" "-"
+2025-11-07 08:36:27 [INFO]: ::1 - - [07/Nov/2025:08:36:27 +0000] "GET /health HTTP/1.1" 200 123 "-" "-"
+2025-11-07 08:36:57 [INFO]: ::1 - - [07/Nov/2025:08:36:57 +0000] "GET /health HTTP/1.1" 200 123 "-" "-"
+2025-11-07 08:37:27 [INFO]: ::1 - - [07/Nov/2025:08:37:27 +0000] "GET /health HTTP/1.1" 200 122 "-" "-"
+2025-11-07 08:37:57 [INFO]: ::1 - - [07/Nov/2025:08:37:57 +0000] "GET /health HTTP/1.1" 200 123 "-" "-"
+2025-11-07 08:38:27 [INFO]: ::1 - - [07/Nov/2025:08:38:27 +0000] "GET /health HTTP/1.1" 200 123 "-" "-"
+2025-11-07 08:38:57 [INFO]: ::1 - - [07/Nov/2025:08:38:57 +0000] "GET /health HTTP/1.1" 200 123 "-" "-"
+2025-11-07 08:39:27 [INFO]: ::1 - - [07/Nov/2025:08:39:27 +0000] "GET /health HTTP/1.1" 200 122 "-" "-"
+2025-11-07 08:39:57 [INFO]: ::1 - - [07/Nov/2025:08:39:57 +0000] "GET /health HTTP/1.1" 200 123 "-" "-"
+2025-11-07 08:40:27 [INFO]: ::1 - - [07/Nov/2025:08:40:27 +0000] "GET /health HTTP/1.1" 200 123 "-" "-"
+2025-11-07 08:40:57 [INFO]: ::1 - - [07/Nov/2025:08:40:57 +0000] "GET /health HTTP/1.1" 200 123 "-" "-"
+2025-11-07 08:41:28 [INFO]: ::1 - - [07/Nov/2025:08:41:28 +0000] "GET /health HTTP/1.1" 200 123 "-" "-"
+2025-11-07 08:41:58 [INFO]: ::1 - - [07/Nov/2025:08:41:58 +0000] "GET /health HTTP/1.1" 200 123 "-" "-"
+2025-11-07 08:42:28 [INFO]: ::1 - - [07/Nov/2025:08:42:28 +0000] "GET /health HTTP/1.1" 200 123 "-" "-"
+2025-11-07 08:42:58 [INFO]: ::1 - - [07/Nov/2025:08:42:58 +0000] "GET /health HTTP/1.1" 200 122 "-" "-"
+2025-11-07 08:43:28 [INFO]: ::1 - - [07/Nov/2025:08:43:28 +0000] "GET /health HTTP/1.1" 200 123 "-" "-"
+2025-11-07 08:43:58 [INFO]: ::1 - - [07/Nov/2025:08:43:58 +0000] "GET /health HTTP/1.1" 200 122 "-" "-"
+2025-11-07 08:44:28 [INFO]: ::1 - - [07/Nov/2025:08:44:28 +0000] "GET /health HTTP/1.1" 200 123 "-" "-"
+2025-11-07 08:44:58 [INFO]: ::1 - - [07/Nov/2025:08:44:58 +0000] "GET /health HTTP/1.1" 200 123 "-" "-"
+2025-11-07 08:45:28 [INFO]: ::1 - - [07/Nov/2025:08:45:28 +0000] "GET /health HTTP/1.1" 200 123 "-" "-"
+2025-11-07 08:45:58 [INFO]: ::1 - - [07/Nov/2025:08:45:58 +0000] "GET /health HTTP/1.1" 200 123 "-" "-"
+2025-11-07 08:46:29 [INFO]: ::1 - - [07/Nov/2025:08:46:29 +0000] "GET /health HTTP/1.1" 200 123 "-" "-"
+2025-11-07 08:46:59 [INFO]: ::1 - - [07/Nov/2025:08:46:59 +0000] "GET /health HTTP/1.1" 200 123 "-" "-"
+2025-11-07 08:47:29 [INFO]: ::1 - - [07/Nov/2025:08:47:29 +0000] "GET /health HTTP/1.1" 200 123 "-" "-"
+2025-11-07 08:47:59 [INFO]: ::1 - - [07/Nov/2025:08:47:59 +0000] "GET /health HTTP/1.1" 200 123 "-" "-"
+2025-11-07 08:48:29 [INFO]: ::1 - - [07/Nov/2025:08:48:29 +0000] "GET /health HTTP/1.1" 200 123 "-" "-"
+2025-11-07 08:48:59 [INFO]: ::1 - - [07/Nov/2025:08:48:59 +0000] "GET /health HTTP/1.1" 200 123 "-" "-"
+2025-11-07 08:49:29 [INFO]: ::1 - - [07/Nov/2025:08:49:29 +0000] "GET /health HTTP/1.1" 200 123 "-" "-"
+2025-11-07 08:49:59 [INFO]: ::1 - - [07/Nov/2025:08:49:59 +0000] "GET /health HTTP/1.1" 200 123 "-" "-"
+2025-11-07 08:50:12 [ERROR]: Authentication error: Invalid or expired token
+Error: Invalid or expired token
+    at verifyAccessToken (/app/src/utils/token.js:37:11)
+    at authenticate (/app/src/middleware/auth.js:23:21)
+    at Layer.handle [as handle_request] (/app/node_modules/express/lib/router/layer.js:95:5)
+    at next (/app/node_modules/express/lib/router/route.js:149:13)
+    at Route.dispatch (/app/node_modules/express/lib/router/route.js:119:3)
+    at Layer.handle [as handle_request] (/app/node_modules/express/lib/router/layer.js:95:5)
+    at /app/node_modules/express/lib/router/index.js:284:15
+    at Function.process_params (/app/node_modules/express/lib/router/index.js:346:12)
+    at next (/app/node_modules/express/lib/router/index.js:280:10)
+    at Function.handle (/app/node_modules/express/lib/router/index.js:175:3)
+2025-11-07 08:50:12 [INFO]: ::ffff:172.18.0.1 - - [07/Nov/2025:08:50:12 +0000] "GET /api/dashboard/stats HTTP/1.1" 401 54 "http://localhost:4001/" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36"
+2025-11-07 08:50:15 [INFO]: User logged in: jerry.hakim@energi-up.com
+2025-11-07 08:50:15 [INFO]: ::ffff:172.18.0.1 - - [07/Nov/2025:08:50:15 +0000] "POST /api/auth/login HTTP/1.1" 200 505 "http://localhost:4001/" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36"
+2025-11-07 08:50:15 [INFO]: ::ffff:172.18.0.1 - - [07/Nov/2025:08:50:15 +0000] "GET /api/dashboard/stats HTTP/1.1" 304 - "http://localhost:4001/" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36"
+2025-11-07 08:50:29 [INFO]: ::1 - - [07/Nov/2025:08:50:29 +0000] "GET /health HTTP/1.1" 200 123 "-" "-"
+2025-11-07 08:50:59 [INFO]: ::1 - - [07/Nov/2025:08:50:59 +0000] "GET /health HTTP/1.1" 200 123 "-" "-"
+2025-11-07 08:51:30 [INFO]: ::1 - - [07/Nov/2025:08:51:30 +0000] "GET /health HTTP/1.1" 200 123 "-" "-"
+2025-11-07 08:52:00 [INFO]: ::1 - - [07/Nov/2025:08:52:00 +0000] "GET /health HTTP/1.1" 200 123 "-" "-"
+2025-11-07 08:52:30 [INFO]: ::1 - - [07/Nov/2025:08:52:30 +0000] "GET /health HTTP/1.1" 200 123 "-" "-"
+2025-11-07 08:53:00 [INFO]: ::1 - - [07/Nov/2025:08:53:00 +0000] "GET /health HTTP/1.1" 200 123 "-" "-"
+2025-11-07 08:53:30 [INFO]: ::1 - - [07/Nov/2025:08:53:30 +0000] "GET /health HTTP/1.1" 200 123 "-" "-"
+2025-11-07 08:54:00 [INFO]: ::1 - - [07/Nov/2025:08:54:00 +0000] "GET /health HTTP/1.1" 200 123 "-" "-"
+2025-11-07 08:54:30 [INFO]: ::1 - - [07/Nov/2025:08:54:30 +0000] "GET /health HTTP/1.1" 200 123 "-" "-"
+2025-11-07 08:55:00 [INFO]: ::1 - - [07/Nov/2025:08:55:00 +0000] "GET /health HTTP/1.1" 200 123 "-" "-"
+2025-11-07 08:55:30 [INFO]: ::1 - - [07/Nov/2025:08:55:30 +0000] "GET /health HTTP/1.1" 200 122 "-" "-"
+2025-11-07 08:56:00 [INFO]: ::1 - - [07/Nov/2025:08:56:00 +0000] "GET /health HTTP/1.1" 200 123 "-" "-"
+2025-11-07 08:56:31 [INFO]: ::1 - - [07/Nov/2025:08:56:31 +0000] "GET /health HTTP/1.1" 200 123 "-" "-"
+2025-11-07 08:57:01 [INFO]: ::1 - - [07/Nov/2025:08:57:01 +0000] "GET /health HTTP/1.1" 200 123 "-" "-"
+2025-11-07 08:57:31 [INFO]: ::1 - - [07/Nov/2025:08:57:31 +0000] "GET /health HTTP/1.1" 200 123 "-" "-"
+2025-11-07 08:58:01 [INFO]: ::1 - - [07/Nov/2025:08:58:01 +0000] "GET /health HTTP/1.1" 200 123 "-" "-"
+2025-11-07 08:58:31 [INFO]: ::1 - - [07/Nov/2025:08:58:31 +0000] "GET /health HTTP/1.1" 200 123 "-" "-"
+2025-11-07 08:59:01 [INFO]: ::1 - - [07/Nov/2025:08:59:01 +0000] "GET /health HTTP/1.1" 200 123 "-" "-"
+2025-11-07 08:59:31 [INFO]: ::1 - - [07/Nov/2025:08:59:31 +0000] "GET /health HTTP/1.1" 200 123 "-" "-"
+2025-11-07 09:00:01 [INFO]: ::1 - - [07/Nov/2025:09:00:01 +0000] "GET /health HTTP/1.1" 200 123 "-" "-"
+2025-11-07 09:00:31 [INFO]: ::1 - - [07/Nov/2025:09:00:31 +0000] "GET /health HTTP/1.1" 200 123 "-" "-"
+2025-11-07 09:01:02 [INFO]: ::1 - - [07/Nov/2025:09:01:02 +0000] "GET /health HTTP/1.1" 200 123 "-" "-"
+2025-11-07 09:01:32 [INFO]: ::1 - - [07/Nov/2025:09:01:32 +0000] "GET /health HTTP/1.1" 200 123 "-" "-"
+2025-11-07 09:09:39 [INFO]: ::1 - - [07/Nov/2025:09:09:39 +0000] "GET /health HTTP/1.1" 200 123 "-" "-"
+2025-11-07 09:10:10 [INFO]: ::1 - - [07/Nov/2025:09:10:10 +0000] "GET /health HTTP/1.1" 200 123 "-" "-"
+2025-11-07 09:10:40 [INFO]: ::1 - - [07/Nov/2025:09:10:40 +0000] "GET /health HTTP/1.1" 200 123 "-" "-"
+2025-11-07 09:11:10 [INFO]: ::1 - - [07/Nov/2025:09:11:10 +0000] "GET /health HTTP/1.1" 200 123 "-" "-"
+2025-11-07 09:11:40 [INFO]: ::1 - - [07/Nov/2025:09:11:40 +0000] "GET /health HTTP/1.1" 200 123 "-" "-"
+2025-11-07 09:12:10 [INFO]: ::1 - - [07/Nov/2025:09:12:10 +0000] "GET /health HTTP/1.1" 200 123 "-" "-"
+2025-11-07 09:12:40 [INFO]: ::1 - - [07/Nov/2025:09:12:40 +0000] "GET /health HTTP/1.1" 200 123 "-" "-"
+2025-11-07 09:13:10 [INFO]: ::1 - - [07/Nov/2025:09:13:10 +0000] "GET /health HTTP/1.1" 200 123 "-" "-"
+2025-11-07 09:13:40 [INFO]: ::1 - - [07/Nov/2025:09:13:40 +0000] "GET /health HTTP/1.1" 200 123 "-" "-"
+2025-11-07 09:14:10 [INFO]: ::1 - - [07/Nov/2025:09:14:10 +0000] "GET /health HTTP/1.1" 200 122 "-" "-"
+2025-11-07 09:16:49 [INFO]: ::1 - - [07/Nov/2025:09:16:49 +0000] "GET /health HTTP/1.1" 200 123 "-" "-"
+2025-11-07 09:17:19 [INFO]: ::1 - - [07/Nov/2025:09:17:19 +0000] "GET /health HTTP/1.1" 200 123 "-" "-"
+2025-11-07 09:17:49 [INFO]: ::1 - - [07/Nov/2025:09:17:49 +0000] "GET /health HTTP/1.1" 200 123 "-" "-"
+2025-11-07 09:18:19 [INFO]: ::1 - - [07/Nov/2025:09:18:19 +0000] "GET /health HTTP/1.1" 200 123 "-" "-"
+2025-11-07 09:18:50 [INFO]: ::1 - - [07/Nov/2025:09:18:50 +0000] "GET /health HTTP/1.1" 200 123 "-" "-"
+2025-11-07 09:19:20 [INFO]: ::1 - - [07/Nov/2025:09:19:20 +0000] "GET /health HTTP/1.1" 200 123 "-" "-"
+2025-11-07 09:19:50 [INFO]: ::1 - - [07/Nov/2025:09:19:50 +0000] "GET /health HTTP/1.1" 200 123 "-" "-"
+2025-11-07 09:20:20 [INFO]: ::1 - - [07/Nov/2025:09:20:20 +0000] "GET /health HTTP/1.1" 200 123 "-" "-"
+2025-11-07 09:20:50 [INFO]: ::1 - - [07/Nov/2025:09:20:50 +0000] "GET /health HTTP/1.1" 200 123 "-" "-"
+2025-11-07 09:21:20 [INFO]: ::1 - - [07/Nov/2025:09:21:20 +0000] "GET /health HTTP/1.1" 200 123 "-" "-"
+2025-11-07 09:21:50 [INFO]: ::1 - - [07/Nov/2025:09:21:50 +0000] "GET /health HTTP/1.1" 200 123 "-" "-"
+2025-11-07 09:22:20 [INFO]: ::1 - - [07/Nov/2025:09:22:20 +0000] "GET /health HTTP/1.1" 200 123 "-" "-"
+2025-11-07 09:22:50 [INFO]: ::1 - - [07/Nov/2025:09:22:50 +0000] "GET /health HTTP/1.1" 200 122 "-" "-"
+2025-11-07 09:23:21 [INFO]: ::1 - - [07/Nov/2025:09:23:21 +0000] "GET /health HTTP/1.1" 200 123 "-" "-"
+2025-11-07 09:23:51 [INFO]: ::1 - - [07/Nov/2025:09:23:51 +0000] "GET /health HTTP/1.1" 200 123 "-" "-"
+2025-11-07 09:24:21 [INFO]: ::1 - - [07/Nov/2025:09:24:21 +0000] "GET /health HTTP/1.1" 200 123 "-" "-"
+2025-11-07 09:24:51 [INFO]: ::1 - - [07/Nov/2025:09:24:51 +0000] "GET /health HTTP/1.1" 200 122 "-" "-"
+2025-11-07 09:25:21 [INFO]: ::1 - - [07/Nov/2025:09:25:21 +0000] "GET /health HTTP/1.1" 200 123 "-" "-"
+2025-11-07 09:25:51 [INFO]: ::1 - - [07/Nov/2025:09:25:51 +0000] "GET /health HTTP/1.1" 200 123 "-" "-"
+2025-11-07 09:25:54 [ERROR]: Authentication error: Invalid or expired token
+Error: Invalid or expired token
+    at verifyAccessToken (/app/src/utils/token.js:37:11)
+    at authenticate (/app/src/middleware/auth.js:23:21)
+    at Layer.handle [as handle_request] (/app/node_modules/express/lib/router/layer.js:95:5)
+    at next (/app/node_modules/express/lib/router/route.js:149:13)
+    at Route.dispatch (/app/node_modules/express/lib/router/route.js:119:3)
+    at Layer.handle [as handle_request] (/app/node_modules/express/lib/router/layer.js:95:5)
+    at /app/node_modules/express/lib/router/index.js:284:15
+    at Function.process_params (/app/node_modules/express/lib/router/index.js:346:12)
+    at next (/app/node_modules/express/lib/router/index.js:280:10)
+    at Function.handle (/app/node_modules/express/lib/router/index.js:175:3)
+2025-11-07 09:25:54 [INFO]: ::ffff:172.18.0.1 - - [07/Nov/2025:09:25:54 +0000] "GET /api/candidates?page=1&limit=100 HTTP/1.1" 401 54 "http://localhost:4001/" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36"
+2025-11-07 09:25:55 [INFO]: User logged in: jerry.hakim@energi-up.com
+2025-11-07 09:25:55 [INFO]: ::ffff:172.18.0.1 - - [07/Nov/2025:09:25:55 +0000] "POST /api/auth/login HTTP/1.1" 200 505 "http://localhost:4001/" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36"
+2025-11-07 09:25:55 [INFO]: ::ffff:172.18.0.1 - - [07/Nov/2025:09:25:55 +0000] "GET /api/dashboard/stats HTTP/1.1" 304 - "http://localhost:4001/" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36"
+2025-11-07 09:25:57 [INFO]: ::ffff:172.18.0.1 - - [07/Nov/2025:09:25:57 +0000] "GET /api/candidates?page=1&limit=100 HTTP/1.1" 304 - "http://localhost:4001/" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36"
+2025-11-07 09:25:57 [INFO]: ::ffff:172.18.0.1 - - [07/Nov/2025:09:25:57 +0000] "GET /api/candidates?page=1&limit=100 HTTP/1.1" 304 - "http://localhost:4001/" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36"
+2025-11-07 09:25:59 [INFO]: ::ffff:172.18.0.1 - - [07/Nov/2025:09:25:59 +0000] "GET /api/candidates/2256783e-951c-44fe-b6ee-44b179f6401a HTTP/1.1" 200 - "http://localhost:4001/" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36"
+2025-11-07 09:25:59 [INFO]: ::ffff:172.18.0.1 - - [07/Nov/2025:09:25:59 +0000] "GET /api/fptk?page=1&limit=1000 HTTP/1.1" 400 119 "http://localhost:4001/" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36"
+2025-11-07 09:25:59 [INFO]: ::ffff:172.18.0.1 - - [07/Nov/2025:09:25:59 +0000] "GET /api/masters/divisions HTTP/1.1" 200 655 "http://localhost:4001/" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36"
+2025-11-07 09:26:21 [INFO]: ::1 - - [07/Nov/2025:09:26:21 +0000] "GET /health HTTP/1.1" 200 122 "-" "-"
+2025-11-07 09:26:51 [INFO]: ::1 - - [07/Nov/2025:09:26:51 +0000] "GET /health HTTP/1.1" 200 123 "-" "-"
+2025-11-07 09:27:21 [INFO]: ::1 - - [07/Nov/2025:09:27:21 +0000] "GET /health HTTP/1.1" 200 123 "-" "-"
+2025-11-07 09:27:52 [INFO]: ::1 - - [07/Nov/2025:09:27:52 +0000] "GET /health HTTP/1.1" 200 123 "-" "-"
+2025-11-07 09:28:22 [INFO]: ::1 - - [07/Nov/2025:09:28:22 +0000] "GET /health HTTP/1.1" 200 123 "-" "-"
+2025-11-07 09:28:52 [INFO]: ::1 - - [07/Nov/2025:09:28:52 +0000] "GET /health HTTP/1.1" 200 123 "-" "-"
+2025-11-07 09:29:22 [INFO]: ::1 - - [07/Nov/2025:09:29:22 +0000] "GET /health HTTP/1.1" 200 123 "-" "-"
+2025-11-07 09:29:52 [INFO]: ::1 - - [07/Nov/2025:09:29:52 +0000] "GET /health HTTP/1.1" 200 123 "-" "-"
+2025-11-07 09:30:22 [INFO]: ::1 - - [07/Nov/2025:09:30:22 +0000] "GET /health HTTP/1.1" 200 123 "-" "-"
+2025-11-07 09:30:52 [INFO]: ::1 - - [07/Nov/2025:09:30:52 +0000] "GET /health HTTP/1.1" 200 123 "-" "-"
+2025-11-07 09:31:22 [INFO]: ::1 - - [07/Nov/2025:09:31:22 +0000] "GET /health HTTP/1.1" 200 123 "-" "-"
+2025-11-07 09:31:52 [INFO]: ::1 - - [07/Nov/2025:09:31:52 +0000] "GET /health HTTP/1.1" 200 123 "-" "-"
+2025-11-07 09:32:22 [INFO]: ::1 - - [07/Nov/2025:09:32:22 +0000] "GET /health HTTP/1.1" 200 123 "-" "-"
+2025-11-07 09:32:53 [INFO]: ::1 - - [07/Nov/2025:09:32:53 +0000] "GET /health HTTP/1.1" 200 123 "-" "-"
+2025-11-07 09:33:23 [INFO]: ::1 - - [07/Nov/2025:09:33:23 +0000] "GET /health HTTP/1.1" 200 121 "-" "-"
+2025-11-07 09:33:53 [INFO]: ::1 - - [07/Nov/2025:09:33:53 +0000] "GET /health HTTP/1.1" 200 123 "-" "-"
+2025-11-07 09:34:23 [INFO]: ::1 - - [07/Nov/2025:09:34:23 +0000] "GET /health HTTP/1.1" 200 123 "-" "-"
+2025-11-07 09:34:53 [INFO]: ::1 - - [07/Nov/2025:09:34:53 +0000] "GET /health HTTP/1.1" 200 123 "-" "-"
+2025-11-07 09:35:23 [INFO]: ::1 - - [07/Nov/2025:09:35:23 +0000] "GET /health HTTP/1.1" 200 123 "-" "-"
+2025-11-07 09:35:53 [INFO]: ::1 - - [07/Nov/2025:09:35:53 +0000] "GET /health HTTP/1.1" 200 123 "-" "-"
+2025-11-07 09:36:23 [INFO]: ::1 - - [07/Nov/2025:09:36:23 +0000] "GET /health HTTP/1.1" 200 123 "-" "-"
+2025-11-07 09:36:53 [INFO]: ::1 - - [07/Nov/2025:09:36:53 +0000] "GET /health HTTP/1.1" 200 123 "-" "-"
+2025-11-07 09:37:24 [INFO]: ::1 - - [07/Nov/2025:09:37:24 +0000] "GET /health HTTP/1.1" 200 123 "-" "-"
+2025-11-07 09:37:54 [INFO]: ::1 - - [07/Nov/2025:09:37:54 +0000] "GET /health HTTP/1.1" 200 123 "-" "-"
+2025-11-07 09:38:24 [INFO]: ::1 - - [07/Nov/2025:09:38:24 +0000] "GET /health HTTP/1.1" 200 121 "-" "-"
+2025-11-07 09:38:54 [INFO]: ::1 - - [07/Nov/2025:09:38:54 +0000] "GET /health HTTP/1.1" 200 123 "-" "-"
+2025-11-07 09:39:24 [INFO]: ::1 - - [07/Nov/2025:09:39:24 +0000] "GET /health HTTP/1.1" 200 123 "-" "-"
+2025-11-07 09:39:54 [INFO]: ::1 - - [07/Nov/2025:09:39:54 +0000] "GET /health HTTP/1.1" 200 123 "-" "-"
+2025-11-07 09:40:24 [INFO]: ::1 - - [07/Nov/2025:09:40:24 +0000] "GET /health HTTP/1.1" 200 123 "-" "-"
+2025-11-07 09:40:54 [INFO]: ::1 - - [07/Nov/2025:09:40:54 +0000] "GET /health HTTP/1.1" 200 123 "-" "-"
+2025-11-07 09:41:24 [INFO]: ::1 - - [07/Nov/2025:09:41:24 +0000] "GET /health HTTP/1.1" 200 122 "-" "-"
+2025-11-07 09:41:54 [INFO]: ::1 - - [07/Nov/2025:09:41:54 +0000] "GET /health HTTP/1.1" 200 123 "-" "-"
+2025-11-07 09:42:25 [INFO]: ::1 - - [07/Nov/2025:09:42:25 +0000] "GET /health HTTP/1.1" 200 123 "-" "-"
+2025-11-07 09:42:55 [INFO]: ::1 - - [07/Nov/2025:09:42:55 +0000] "GET /health HTTP/1.1" 200 123 "-" "-"
+2025-11-07 09:43:25 [INFO]: ::1 - - [07/Nov/2025:09:43:25 +0000] "GET /health HTTP/1.1" 200 123 "-" "-"
+2025-11-07 09:43:55 [INFO]: ::1 - - [07/Nov/2025:09:43:55 +0000] "GET /health HTTP/1.1" 200 123 "-" "-"
+2025-11-07 09:44:25 [INFO]: ::1 - - [07/Nov/2025:09:44:25 +0000] "GET /health HTTP/1.1" 200 123 "-" "-"
+2025-11-07 09:44:55 [INFO]: ::1 - - [07/Nov/2025:09:44:55 +0000] "GET /health HTTP/1.1" 200 123 "-" "-"
+2025-11-07 09:45:25 [INFO]: ::1 - - [07/Nov/2025:09:45:25 +0000] "GET /health HTTP/1.1" 200 123 "-" "-"
+2025-11-07 09:45:55 [INFO]: ::1 - - [07/Nov/2025:09:45:55 +0000] "GET /health HTTP/1.1" 200 123 "-" "-"
+2025-11-07 09:46:25 [INFO]: ::1 - - [07/Nov/2025:09:46:25 +0000] "GET /health HTTP/1.1" 200 123 "-" "-"
+2025-11-07 09:46:55 [INFO]: ::1 - - [07/Nov/2025:09:46:55 +0000] "GET /health HTTP/1.1" 200 123 "-" "-"
+2025-11-07 09:47:25 [INFO]: ::1 - - [07/Nov/2025:09:47:25 +0000] "GET /health HTTP/1.1" 200 123 "-" "-"
+2025-11-07 09:47:56 [INFO]: ::1 - - [07/Nov/2025:09:47:56 +0000] "GET /health HTTP/1.1" 200 121 "-" "-"
+2025-11-07 09:48:26 [INFO]: ::1 - - [07/Nov/2025:09:48:26 +0000] "GET /health HTTP/1.1" 200 123 "-" "-"
+2025-11-07 09:48:56 [INFO]: ::1 - - [07/Nov/2025:09:48:56 +0000] "GET /health HTTP/1.1" 200 123 "-" "-"
+2025-11-07 09:49:26 [INFO]: ::1 - - [07/Nov/2025:09:49:26 +0000] "GET /health HTTP/1.1" 200 123 "-" "-"
+2025-11-07 09:49:56 [INFO]: ::1 - - [07/Nov/2025:09:49:56 +0000] "GET /health HTTP/1.1" 200 123 "-" "-"
+2025-11-07 09:50:26 [INFO]: ::1 - - [07/Nov/2025:09:50:26 +0000] "GET /health HTTP/1.1" 200 123 "-" "-"
+2025-11-07 09:50:56 [INFO]: ::1 - - [07/Nov/2025:09:50:56 +0000] "GET /health HTTP/1.1" 200 123 "-" "-"
+2025-11-07 09:51:26 [INFO]: ::1 - - [07/Nov/2025:09:51:26 +0000] "GET /health HTTP/1.1" 200 123 "-" "-"
+2025-11-07 09:51:56 [INFO]: ::1 - - [07/Nov/2025:09:51:56 +0000] "GET /health HTTP/1.1" 200 123 "-" "-"
+2025-11-07 09:52:26 [INFO]: ::1 - - [07/Nov/2025:09:52:26 +0000] "GET /health HTTP/1.1" 200 123 "-" "-"
+2025-11-07 09:52:57 [INFO]: ::1 - - [07/Nov/2025:09:52:57 +0000] "GET /health HTTP/1.1" 200 122 "-" "-"
+2025-11-07 09:53:27 [INFO]: ::1 - - [07/Nov/2025:09:53:27 +0000] "GET /health HTTP/1.1" 200 123 "-" "-"
+2025-11-07 09:53:57 [INFO]: ::1 - - [07/Nov/2025:09:53:57 +0000] "GET /health HTTP/1.1" 200 123 "-" "-"
+2025-11-07 09:54:27 [INFO]: ::1 - - [07/Nov/2025:09:54:27 +0000] "GET /health HTTP/1.1" 200 123 "-" "-"
+2025-11-07 09:54:57 [INFO]: ::1 - - [07/Nov/2025:09:54:57 +0000] "GET /health HTTP/1.1" 200 122 "-" "-"
+2025-11-07 09:55:27 [INFO]: ::1 - - [07/Nov/2025:09:55:27 +0000] "GET /health HTTP/1.1" 200 123 "-" "-"
+2025-11-07 09:55:57 [INFO]: ::1 - - [07/Nov/2025:09:55:57 +0000] "GET /health HTTP/1.1" 200 123 "-" "-"
+2025-11-07 09:56:27 [INFO]: ::1 - - [07/Nov/2025:09:56:27 +0000] "GET /health HTTP/1.1" 200 123 "-" "-"
+2025-11-07 09:56:57 [INFO]: ::1 - - [07/Nov/2025:09:56:57 +0000] "GET /health HTTP/1.1" 200 123 "-" "-"
+2025-11-07 09:57:27 [INFO]: ::1 - - [07/Nov/2025:09:57:27 +0000] "GET /health HTTP/1.1" 200 123 "-" "-"
+2025-11-07 09:57:58 [INFO]: ::1 - - [07/Nov/2025:09:57:58 +0000] "GET /health HTTP/1.1" 200 123 "-" "-"
+2025-11-07 09:58:28 [INFO]: ::1 - - [07/Nov/2025:09:58:28 +0000] "GET /health HTTP/1.1" 200 123 "-" "-"
+2025-11-07 09:58:58 [INFO]: ::1 - - [07/Nov/2025:09:58:58 +0000] "GET /health HTTP/1.1" 200 123 "-" "-"
+2025-11-07 09:59:28 [INFO]: ::1 - - [07/Nov/2025:09:59:28 +0000] "GET /health HTTP/1.1" 200 123 "-" "-"
+2025-11-07 09:59:58 [INFO]: ::1 - - [07/Nov/2025:09:59:58 +0000] "GET /health HTTP/1.1" 200 123 "-" "-"
+2025-11-07 10:00:21 [ERROR]: Authentication error: Invalid or expired token
+Error: Invalid or expired token
+    at verifyAccessToken (/app/src/utils/token.js:37:11)
+    at authenticate (/app/src/middleware/auth.js:23:21)
+    at Layer.handle [as handle_request] (/app/node_modules/express/lib/router/layer.js:95:5)
+    at next (/app/node_modules/express/lib/router/route.js:149:13)
+    at Route.dispatch (/app/node_modules/express/lib/router/route.js:119:3)
+    at Layer.handle [as handle_request] (/app/node_modules/express/lib/router/layer.js:95:5)
+    at /app/node_modules/express/lib/router/index.js:284:15
+    at Function.process_params (/app/node_modules/express/lib/router/index.js:346:12)
+    at next (/app/node_modules/express/lib/router/index.js:280:10)
+    at Function.handle (/app/node_modules/express/lib/router/index.js:175:3)
+2025-11-07 10:00:21 [INFO]: ::ffff:172.18.0.1 - - [07/Nov/2025:10:00:21 +0000] "GET /api/candidates?page=1&limit=100 HTTP/1.1" 401 54 "http://localhost:4001/" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36"
+2025-11-07 10:00:21 [ERROR]: Authentication error: Invalid or expired token
+Error: Invalid or expired token
+    at verifyAccessToken (/app/src/utils/token.js:37:11)
+    at authenticate (/app/src/middleware/auth.js:23:21)
+    at Layer.handle [as handle_request] (/app/node_modules/express/lib/router/layer.js:95:5)
+    at next (/app/node_modules/express/lib/router/route.js:149:13)
+    at Route.dispatch (/app/node_modules/express/lib/router/route.js:119:3)
+    at Layer.handle [as handle_request] (/app/node_modules/express/lib/router/layer.js:95:5)
+    at /app/node_modules/express/lib/router/index.js:284:15
+    at Function.process_params (/app/node_modules/express/lib/router/index.js:346:12)
+    at next (/app/node_modules/express/lib/router/index.js:280:10)
+    at Function.handle (/app/node_modules/express/lib/router/index.js:175:3)
+2025-11-07 10:00:21 [INFO]: ::ffff:172.18.0.1 - - [07/Nov/2025:10:00:21 +0000] "GET /api/auth/me HTTP/1.1" 401 54 "http://localhost:4001/" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36"
+2025-11-07 10:00:22 [INFO]: User logged in: jerry.hakim@energi-up.com
+2025-11-07 10:00:22 [INFO]: ::ffff:172.18.0.1 - - [07/Nov/2025:10:00:22 +0000] "POST /api/auth/login HTTP/1.1" 200 505 "http://localhost:4001/" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36"
+2025-11-07 10:00:22 [INFO]: ::ffff:172.18.0.1 - - [07/Nov/2025:10:00:22 +0000] "GET /api/dashboard/stats HTTP/1.1" 304 - "http://localhost:4001/" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36"
+2025-11-07 10:00:28 [INFO]: ::ffff:172.18.0.1 - - [07/Nov/2025:10:00:28 +0000] "GET /api/candidates?page=1&limit=100 HTTP/1.1" 304 - "http://localhost:4001/" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36"
+2025-11-07 10:00:28 [INFO]: ::1 - - [07/Nov/2025:10:00:28 +0000] "GET /health HTTP/1.1" 200 122 "-" "-"
+2025-11-07 10:00:29 [INFO]: ::ffff:172.18.0.1 - - [07/Nov/2025:10:00:29 +0000] "GET /api/candidates?page=1&limit=100 HTTP/1.1" 304 - "http://localhost:4001/" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36"
+2025-11-07 10:00:30 [INFO]: ::ffff:172.18.0.1 - - [07/Nov/2025:10:00:30 +0000] "GET /api/candidates/2256783e-951c-44fe-b6ee-44b179f6401a HTTP/1.1" 304 - "http://localhost:4001/" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36"
+2025-11-07 10:00:30 [INFO]: ::ffff:172.18.0.1 - - [07/Nov/2025:10:00:30 +0000] "GET /api/fptk?page=1&limit=1000 HTTP/1.1" 400 119 "http://localhost:4001/" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36"
+2025-11-07 10:00:30 [INFO]: ::ffff:172.18.0.1 - - [07/Nov/2025:10:00:30 +0000] "GET /api/masters/divisions HTTP/1.1" 304 - "http://localhost:4001/" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36"
+2025-11-07 10:00:58 [INFO]: ::1 - - [07/Nov/2025:10:00:58 +0000] "GET /health HTTP/1.1" 200 123 "-" "-"
+2025-11-07 10:01:28 [INFO]: ::1 - - [07/Nov/2025:10:01:28 +0000] "GET /health HTTP/1.1" 200 123 "-" "-"
+2025-11-07 10:01:59 [INFO]: ::1 - - [07/Nov/2025:10:01:59 +0000] "GET /health HTTP/1.1" 200 123 "-" "-"
+2025-11-07 10:02:29 [INFO]: ::1 - - [07/Nov/2025:10:02:29 +0000] "GET /health HTTP/1.1" 200 123 "-" "-"
+2025-11-07 10:02:59 [INFO]: ::1 - - [07/Nov/2025:10:02:59 +0000] "GET /health HTTP/1.1" 200 123 "-" "-"
+2025-11-07 10:03:29 [INFO]: ::1 - - [07/Nov/2025:10:03:29 +0000] "GET /health HTTP/1.1" 200 123 "-" "-"
+2025-11-07 10:03:59 [INFO]: ::1 - - [07/Nov/2025:10:03:59 +0000] "GET /health HTTP/1.1" 200 123 "-" "-"
+2025-11-07 10:04:29 [INFO]: ::1 - - [07/Nov/2025:10:04:29 +0000] "GET /health HTTP/1.1" 200 123 "-" "-"
+2025-11-07 10:04:55 [INFO]: ::ffff:172.18.0.1 - - [07/Nov/2025:10:04:55 +0000] "GET /api/auth/me HTTP/1.1" 304 - "http://localhost:4001/" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36"
+2025-11-07 10:04:55 [INFO]: ::ffff:172.18.0.1 - - [07/Nov/2025:10:04:55 +0000] "GET /api/candidates?page=1&limit=100 HTTP/1.1" 304 - "http://localhost:4001/" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36"
+2025-11-07 10:04:56 [INFO]: User logged in: jerry.hakim@energi-up.com
+2025-11-07 10:04:56 [INFO]: ::ffff:172.18.0.1 - - [07/Nov/2025:10:04:56 +0000] "POST /api/auth/login HTTP/1.1" 200 505 "http://localhost:4001/" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36"
+2025-11-07 10:04:56 [INFO]: ::ffff:172.18.0.1 - - [07/Nov/2025:10:04:56 +0000] "GET /api/dashboard/stats HTTP/1.1" 304 - "http://localhost:4001/" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36"
+2025-11-07 10:04:57 [INFO]: ::ffff:172.18.0.1 - - [07/Nov/2025:10:04:57 +0000] "GET /api/candidates?page=1&limit=100 HTTP/1.1" 304 - "http://localhost:4001/" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36"
+2025-11-07 10:04:57 [INFO]: ::ffff:172.18.0.1 - - [07/Nov/2025:10:04:57 +0000] "GET /api/candidates?page=1&limit=100 HTTP/1.1" 304 - "http://localhost:4001/" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36"
+2025-11-07 10:04:58 [INFO]: ::ffff:172.18.0.1 - - [07/Nov/2025:10:04:58 +0000] "GET /api/candidates/2256783e-951c-44fe-b6ee-44b179f6401a HTTP/1.1" 304 - "http://localhost:4001/" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36"
+2025-11-07 10:04:58 [INFO]: ::ffff:172.18.0.1 - - [07/Nov/2025:10:04:58 +0000] "GET /api/masters/divisions HTTP/1.1" 304 - "http://localhost:4001/" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36"
+2025-11-07 10:04:58 [INFO]: ::ffff:172.18.0.1 - - [07/Nov/2025:10:04:58 +0000] "GET /api/fptk?page=1&limit=1000 HTTP/1.1" 400 119 "http://localhost:4001/" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36"
+2025-11-07 10:04:59 [INFO]: ::1 - - [07/Nov/2025:10:04:59 +0000] "GET /health HTTP/1.1" 200 123 "-" "-"
+2025-11-07 10:05:29 [INFO]: ::1 - - [07/Nov/2025:10:05:29 +0000] "GET /health HTTP/1.1" 200 123 "-" "-"
+2025-11-07 10:05:40 [INFO]: ::ffff:172.18.0.1 - - [07/Nov/2025:10:05:40 +0000] "GET /api/fptk?search=&page=1&limit=100 HTTP/1.1" 304 - "http://localhost:4001/" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36"
+2025-11-07 10:05:40 [INFO]: ::ffff:172.18.0.1 - - [07/Nov/2025:10:05:40 +0000] "GET /api/fptk?search=&page=1&limit=100 HTTP/1.1" 304 - "http://localhost:4001/" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36"
+2025-11-07 10:06:00 [INFO]: ::1 - - [07/Nov/2025:10:06:00 +0000] "GET /health HTTP/1.1" 200 123 "-" "-"
+2025-11-07 10:06:30 [INFO]: ::1 - - [07/Nov/2025:10:06:30 +0000] "GET /health HTTP/1.1" 200 122 "-" "-"
+2025-11-07 10:07:00 [INFO]: ::1 - - [07/Nov/2025:10:07:00 +0000] "GET /health HTTP/1.1" 200 123 "-" "-"
+2025-11-07 10:07:30 [INFO]: ::1 - - [07/Nov/2025:10:07:30 +0000] "GET /health HTTP/1.1" 200 123 "-" "-"
+2025-11-07 10:08:00 [INFO]: ::1 - - [07/Nov/2025:10:08:00 +0000] "GET /health HTTP/1.1" 200 123 "-" "-"
+2025-11-07 10:08:30 [INFO]: ::1 - - [07/Nov/2025:10:08:30 +0000] "GET /health HTTP/1.1" 200 123 "-" "-"
+2025-11-07 10:09:00 [INFO]: ::1 - - [07/Nov/2025:10:09:00 +0000] "GET /health HTTP/1.1" 200 122 "-" "-"
+2025-11-07 10:09:30 [INFO]: ::1 - - [07/Nov/2025:10:09:30 +0000] "GET /health HTTP/1.1" 200 123 "-" "-"
+2025-11-07 10:10:01 [INFO]: ::1 - - [07/Nov/2025:10:10:01 +0000] "GET /health HTTP/1.1" 200 123 "-" "-"
+2025-11-07 10:10:31 [INFO]: ::1 - - [07/Nov/2025:10:10:31 +0000] "GET /health HTTP/1.1" 200 123 "-" "-"
+2025-11-07 10:11:01 [INFO]: ::1 - - [07/Nov/2025:10:11:01 +0000] "GET /health HTTP/1.1" 200 123 "-" "-"
+2025-11-07 10:11:31 [INFO]: ::1 - - [07/Nov/2025:10:11:31 +0000] "GET /health HTTP/1.1" 200 123 "-" "-"
+2025-11-07 10:12:01 [INFO]: ::1 - - [07/Nov/2025:10:12:01 +0000] "GET /health HTTP/1.1" 200 121 "-" "-"
+2025-11-07 10:12:27 [INFO]: ::ffff:172.18.0.1 - - [07/Nov/2025:10:12:27 +0000] "GET /api/auth/me HTTP/1.1" 304 - "http://localhost:4001/" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36"
+2025-11-07 10:12:29 [INFO]: User logged in: jerry.hakim@energi-up.com
+2025-11-07 10:12:29 [INFO]: ::ffff:172.18.0.1 - - [07/Nov/2025:10:12:29 +0000] "POST /api/auth/login HTTP/1.1" 200 505 "http://localhost:4001/" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36"
+2025-11-07 10:12:29 [INFO]: ::ffff:172.18.0.1 - - [07/Nov/2025:10:12:29 +0000] "GET /api/dashboard/stats HTTP/1.1" 304 - "http://localhost:4001/" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36"
+2025-11-07 10:12:30 [INFO]: ::ffff:172.18.0.1 - - [07/Nov/2025:10:12:30 +0000] "GET /api/fptk?search=&page=1&limit=100 HTTP/1.1" 304 - "http://localhost:4001/" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36"
+2025-11-07 10:12:30 [INFO]: ::ffff:172.18.0.1 - - [07/Nov/2025:10:12:30 +0000] "GET /api/fptk?search=&page=1&limit=100 HTTP/1.1" 304 - "http://localhost:4001/" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36"
+2025-11-07 10:12:31 [INFO]: ::1 - - [07/Nov/2025:10:12:31 +0000] "GET /health HTTP/1.1" 200 123 "-" "-"
+2025-11-07 10:12:32 [INFO]: ::ffff:172.18.0.1 - - [07/Nov/2025:10:12:32 +0000] "GET /api/candidates?page=1&limit=100 HTTP/1.1" 304 - "http://localhost:4001/" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36"
+2025-11-07 10:12:32 [INFO]: ::ffff:172.18.0.1 - - [07/Nov/2025:10:12:32 +0000] "GET /api/candidates?page=1&limit=100 HTTP/1.1" 304 - "http://localhost:4001/" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36"
+2025-11-07 10:12:33 [INFO]: ::ffff:172.18.0.1 - - [07/Nov/2025:10:12:33 +0000] "GET /api/candidates/2256783e-951c-44fe-b6ee-44b179f6401a HTTP/1.1" 304 - "http://localhost:4001/" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36"
+2025-11-07 10:12:33 [INFO]: ::ffff:172.18.0.1 - - [07/Nov/2025:10:12:33 +0000] "GET /api/fptk?page=1&limit=1000 HTTP/1.1" 400 119 "http://localhost:4001/" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36"
+2025-11-07 10:12:33 [INFO]: ::ffff:172.18.0.1 - - [07/Nov/2025:10:12:33 +0000] "GET /api/masters/divisions HTTP/1.1" 304 - "http://localhost:4001/" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36"
+2025-11-07 10:12:52 [INFO]: ::ffff:172.18.0.1 - - [07/Nov/2025:10:12:52 +0000] "PUT /api/candidates/2256783e-951c-44fe-b6ee-44b179f6401a HTTP/1.1" 404 102 "http://localhost:4001/" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36"
+2025-11-07 10:13:01 [INFO]: ::1 - - [07/Nov/2025:10:13:01 +0000] "GET /health HTTP/1.1" 200 123 "-" "-"
+2025-11-07 10:13:09 [INFO]: ::ffff:172.18.0.1 - - [07/Nov/2025:10:13:09 +0000] "GET /api/candidates/2256783e-951c-44fe-b6ee-44b179f6401a HTTP/1.1" 304 - "http://localhost:4001/" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36"
+2025-11-07 10:13:09 [INFO]: ::ffff:172.18.0.1 - - [07/Nov/2025:10:13:09 +0000] "GET /api/fptk?page=1&limit=1000 HTTP/1.1" 400 119 "http://localhost:4001/" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36"
+2025-11-07 10:13:09 [INFO]: ::ffff:172.18.0.1 - - [07/Nov/2025:10:13:09 +0000] "GET /api/masters/divisions HTTP/1.1" 304 - "http://localhost:4001/" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36"
+2025-11-07 10:13:12 [INFO]: ::ffff:172.18.0.1 - - [07/Nov/2025:10:13:12 +0000] "GET /api/fptk?search=&page=1&limit=100 HTTP/1.1" 304 - "http://localhost:4001/" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36"
+2025-11-07 10:13:12 [INFO]: ::ffff:172.18.0.1 - - [07/Nov/2025:10:13:12 +0000] "GET /api/fptk?search=&page=1&limit=100 HTTP/1.1" 304 - "http://localhost:4001/" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36"
+2025-11-07 10:13:31 [INFO]: ::1 - - [07/Nov/2025:10:13:31 +0000] "GET /health HTTP/1.1" 200 123 "-" "-"
+2025-11-07 10:14:02 [INFO]: ::1 - - [07/Nov/2025:10:14:02 +0000] "GET /health HTTP/1.1" 200 123 "-" "-"
+2025-11-07 10:14:32 [INFO]: ::1 - - [07/Nov/2025:10:14:32 +0000] "GET /health HTTP/1.1" 200 123 "-" "-"
+2025-11-07 10:15:02 [INFO]: ::1 - - [07/Nov/2025:10:15:02 +0000] "GET /health HTTP/1.1" 200 123 "-" "-"
+2025-11-07 10:15:32 [INFO]: ::1 - - [07/Nov/2025:10:15:32 +0000] "GET /health HTTP/1.1" 200 123 "-" "-"
+2025-11-07 10:16:02 [INFO]: ::1 - - [07/Nov/2025:10:16:02 +0000] "GET /health HTTP/1.1" 200 123 "-" "-"
+2025-11-07 10:16:32 [INFO]: ::1 - - [07/Nov/2025:10:16:32 +0000] "GET /health HTTP/1.1" 200 123 "-" "-"
+2025-11-07 10:17:02 [INFO]: ::1 - - [07/Nov/2025:10:17:02 +0000] "GET /health HTTP/1.1" 200 123 "-" "-"
+2025-11-07 10:17:10 [INFO]: ::ffff:172.18.0.1 - - [07/Nov/2025:10:17:10 +0000] "GET /api/candidates?page=1&limit=100 HTTP/1.1" 304 - "http://localhost:4001/" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36"
+2025-11-07 10:17:11 [INFO]: ::ffff:172.18.0.1 - - [07/Nov/2025:10:17:11 +0000] "GET /api/candidates?page=1&limit=100 HTTP/1.1" 304 - "http://localhost:4001/" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36"
+2025-11-07 10:17:12 [INFO]: ::ffff:172.18.0.1 - - [07/Nov/2025:10:17:12 +0000] "GET /api/candidates?page=1&limit=100 HTTP/1.1" 304 - "http://localhost:4001/" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36"
+2025-11-07 10:17:12 [INFO]: ::ffff:172.18.0.1 - - [07/Nov/2025:10:17:12 +0000] "GET /api/auth/me HTTP/1.1" 304 - "http://localhost:4001/" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36"
+2025-11-07 10:17:22 [INFO]: User logged in: jerry.hakim@energi-up.com
+2025-11-07 10:17:22 [INFO]: ::ffff:172.18.0.1 - - [07/Nov/2025:10:17:22 +0000] "POST /api/auth/login HTTP/1.1" 200 505 "http://localhost:4001/" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36"
+2025-11-07 10:17:22 [INFO]: ::ffff:172.18.0.1 - - [07/Nov/2025:10:17:22 +0000] "GET /api/dashboard/stats HTTP/1.1" 304 - "http://localhost:4001/" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36"
+2025-11-07 10:17:23 [INFO]: ::ffff:172.18.0.1 - - [07/Nov/2025:10:17:23 +0000] "GET /api/candidates?page=1&limit=100 HTTP/1.1" 304 - "http://localhost:4001/" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36"
+2025-11-07 10:17:24 [INFO]: ::ffff:172.18.0.1 - - [07/Nov/2025:10:17:24 +0000] "GET /api/candidates?page=1&limit=100 HTTP/1.1" 304 - "http://localhost:4001/" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36"
+2025-11-07 10:17:32 [INFO]: ::1 - - [07/Nov/2025:10:17:32 +0000] "GET /health HTTP/1.1" 200 123 "-" "-"
+2025-11-07 10:17:37 [INFO]: ::ffff:172.18.0.1 - - [07/Nov/2025:10:17:37 +0000] "GET /api/candidates/2256783e-951c-44fe-b6ee-44b179f6401a HTTP/1.1" 304 - "http://localhost:4001/" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36"
+2025-11-07 10:17:37 [INFO]: ::ffff:172.18.0.1 - - [07/Nov/2025:10:17:37 +0000] "GET /api/fptk?page=1&limit=1000 HTTP/1.1" 400 119 "http://localhost:4001/" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36"
+2025-11-07 10:17:37 [INFO]: ::ffff:172.18.0.1 - - [07/Nov/2025:10:17:37 +0000] "GET /api/masters/divisions HTTP/1.1" 304 - "http://localhost:4001/" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36"
+2025-11-07 10:18:02 [INFO]: ::1 - - [07/Nov/2025:10:18:02 +0000] "GET /health HTTP/1.1" 200 123 "-" "-"
+2025-11-07 10:18:33 [INFO]: ::1 - - [07/Nov/2025:10:18:33 +0000] "GET /health HTTP/1.1" 200 123 "-" "-"
+2025-11-07 10:18:34 [INFO]: ::ffff:172.18.0.1 - - [07/Nov/2025:10:18:34 +0000] "GET /api/masters/divisions HTTP/1.1" 304 - "http://localhost:4001/" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36"
+2025-11-07 10:18:34 [INFO]: ::ffff:172.18.0.1 - - [07/Nov/2025:10:18:34 +0000] "GET /api/fptk?page=1&limit=1000 HTTP/1.1" 400 119 "http://localhost:4001/" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36"
+2025-11-07 10:19:03 [INFO]: ::1 - - [07/Nov/2025:10:19:03 +0000] "GET /health HTTP/1.1" 200 123 "-" "-"
+2025-11-07 10:19:33 [INFO]: ::1 - - [07/Nov/2025:10:19:33 +0000] "GET /health HTTP/1.1" 200 123 "-" "-"
+2025-11-07 10:20:03 [INFO]: ::1 - - [07/Nov/2025:10:20:03 +0000] "GET /health HTTP/1.1" 200 123 "-" "-"
+2025-11-07 10:20:33 [INFO]: ::1 - - [07/Nov/2025:10:20:33 +0000] "GET /health HTTP/1.1" 200 123 "-" "-"
+2025-11-07 10:21:03 [INFO]: ::1 - - [07/Nov/2025:10:21:03 +0000] "GET /health HTTP/1.1" 200 123 "-" "-"
+2025-11-07 10:21:33 [INFO]: ::1 - - [07/Nov/2025:10:21:33 +0000] "GET /health HTTP/1.1" 200 123 "-" "-"
+2025-11-07 10:22:03 [INFO]: ::1 - - [07/Nov/2025:10:22:03 +0000] "GET /health HTTP/1.1" 200 123 "-" "-"
+2025-11-07 10:22:34 [INFO]: ::1 - - [07/Nov/2025:10:22:34 +0000] "GET /health HTTP/1.1" 200 123 "-" "-"
+2025-11-07 10:23:04 [INFO]: ::1 - - [07/Nov/2025:10:23:04 +0000] "GET /health HTTP/1.1" 200 123 "-" "-"
+2025-11-07 10:23:34 [INFO]: ::1 - - [07/Nov/2025:10:23:34 +0000] "GET /health HTTP/1.1" 200 123 "-" "-"
+2025-11-07 10:24:04 [INFO]: ::1 - - [07/Nov/2025:10:24:04 +0000] "GET /health HTTP/1.1" 200 123 "-" "-"
+2025-11-07 10:24:33 [INFO]: ::ffff:172.18.0.1 - - [07/Nov/2025:10:24:33 +0000] "GET /api/auth/me HTTP/1.1" 304 - "http://localhost:4001/" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36"
+2025-11-07 10:24:33 [INFO]: ::ffff:172.18.0.1 - - [07/Nov/2025:10:24:33 +0000] "GET /api/candidates?page=1&limit=100 HTTP/1.1" 304 - "http://localhost:4001/" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36"
+2025-11-07 10:24:34 [INFO]: User logged in: jerry.hakim@energi-up.com
+2025-11-07 10:24:34 [INFO]: ::ffff:172.18.0.1 - - [07/Nov/2025:10:24:34 +0000] "POST /api/auth/login HTTP/1.1" 200 505 "http://localhost:4001/" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36"
+2025-11-07 10:24:34 [INFO]: ::ffff:172.18.0.1 - - [07/Nov/2025:10:24:34 +0000] "GET /api/dashboard/stats HTTP/1.1" 304 - "http://localhost:4001/" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36"
+2025-11-07 10:24:34 [INFO]: ::1 - - [07/Nov/2025:10:24:34 +0000] "GET /health HTTP/1.1" 200 123 "-" "-"
+2025-11-07 10:24:37 [INFO]: ::ffff:172.18.0.1 - - [07/Nov/2025:10:24:37 +0000] "GET /api/candidates?page=1&limit=100 HTTP/1.1" 304 - "http://localhost:4001/" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36"
+2025-11-07 10:24:37 [INFO]: ::ffff:172.18.0.1 - - [07/Nov/2025:10:24:37 +0000] "GET /api/candidates?page=1&limit=100 HTTP/1.1" 304 - "http://localhost:4001/" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36"
+2025-11-07 10:24:38 [INFO]: ::ffff:172.18.0.1 - - [07/Nov/2025:10:24:38 +0000] "GET /api/candidates/2256783e-951c-44fe-b6ee-44b179f6401a HTTP/1.1" 304 - "http://localhost:4001/" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36"
+2025-11-07 10:24:38 [INFO]: ::ffff:172.18.0.1 - - [07/Nov/2025:10:24:38 +0000] "GET /api/fptk?page=1&limit=1000 HTTP/1.1" 400 119 "http://localhost:4001/" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36"
+2025-11-07 10:24:38 [INFO]: ::ffff:172.18.0.1 - - [07/Nov/2025:10:24:38 +0000] "GET /api/masters/divisions HTTP/1.1" 304 - "http://localhost:4001/" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36"
+2025-11-07 10:25:04 [INFO]: ::1 - - [07/Nov/2025:10:25:04 +0000] "GET /health HTTP/1.1" 200 123 "-" "-"
+2025-11-07 10:25:23 [INFO]: ::ffff:172.18.0.1 - - [07/Nov/2025:10:25:23 +0000] "GET /api/candidates/2256783e-951c-44fe-b6ee-44b179f6401a HTTP/1.1" 304 - "http://localhost:4001/" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36"
+2025-11-07 10:25:23 [INFO]: ::ffff:172.18.0.1 - - [07/Nov/2025:10:25:23 +0000] "GET /api/fptk?page=1&limit=1000 HTTP/1.1" 400 119 "http://localhost:4001/" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36"
+2025-11-07 10:25:23 [INFO]: ::ffff:172.18.0.1 - - [07/Nov/2025:10:25:23 +0000] "GET /api/masters/divisions HTTP/1.1" 304 - "http://localhost:4001/" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36"
+2025-11-07 10:25:35 [INFO]: ::1 - - [07/Nov/2025:10:25:35 +0000] "GET /health HTTP/1.1" 200 123 "-" "-"
+2025-11-07 10:26:05 [INFO]: ::1 - - [07/Nov/2025:10:26:05 +0000] "GET /health HTTP/1.1" 200 121 "-" "-"
+2025-11-07 10:26:35 [INFO]: ::1 - - [07/Nov/2025:10:26:35 +0000] "GET /health HTTP/1.1" 200 123 "-" "-"
+2025-11-07 10:27:05 [INFO]: ::1 - - [07/Nov/2025:10:27:05 +0000] "GET /health HTTP/1.1" 200 123 "-" "-"
+2025-11-07 10:27:35 [INFO]: ::1 - - [07/Nov/2025:10:27:35 +0000] "GET /health HTTP/1.1" 200 123 "-" "-"
+2025-11-07 10:28:05 [INFO]: ::1 - - [07/Nov/2025:10:28:05 +0000] "GET /health HTTP/1.1" 200 123 "-" "-"
+2025-11-07 10:28:36 [INFO]: ::1 - - [07/Nov/2025:10:28:36 +0000] "GET /health HTTP/1.1" 200 123 "-" "-"
+2025-11-07 10:29:04 [INFO]: ::ffff:172.18.0.1 - - [07/Nov/2025:10:29:04 +0000] "GET /api/auth/me HTTP/1.1" 304 - "http://localhost:4001/" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36"
+2025-11-07 10:29:04 [INFO]: ::ffff:172.18.0.1 - - [07/Nov/2025:10:29:04 +0000] "GET /api/candidates?page=1&limit=100 HTTP/1.1" 304 - "http://localhost:4001/" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36"
+2025-11-07 10:29:05 [INFO]: User logged in: jerry.hakim@energi-up.com
+2025-11-07 10:29:05 [INFO]: ::ffff:172.18.0.1 - - [07/Nov/2025:10:29:05 +0000] "POST /api/auth/login HTTP/1.1" 200 505 "http://localhost:4001/" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36"
+2025-11-07 10:29:05 [INFO]: ::ffff:172.18.0.1 - - [07/Nov/2025:10:29:05 +0000] "GET /api/dashboard/stats HTTP/1.1" 304 - "http://localhost:4001/" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36"
+2025-11-07 10:29:06 [INFO]: ::1 - - [07/Nov/2025:10:29:06 +0000] "GET /health HTTP/1.1" 200 123 "-" "-"
+2025-11-07 10:29:07 [INFO]: ::ffff:172.18.0.1 - - [07/Nov/2025:10:29:07 +0000] "GET /api/candidates?page=1&limit=100 HTTP/1.1" 304 - "http://localhost:4001/" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36"
+2025-11-07 10:29:08 [INFO]: ::ffff:172.18.0.1 - - [07/Nov/2025:10:29:08 +0000] "GET /api/candidates?page=1&limit=100 HTTP/1.1" 304 - "http://localhost:4001/" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36"
+2025-11-07 10:29:09 [INFO]: ::ffff:172.18.0.1 - - [07/Nov/2025:10:29:09 +0000] "GET /api/candidates/2256783e-951c-44fe-b6ee-44b179f6401a HTTP/1.1" 304 - "http://localhost:4001/" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36"
+2025-11-07 10:29:09 [INFO]: ::ffff:172.18.0.1 - - [07/Nov/2025:10:29:09 +0000] "GET /api/masters/divisions HTTP/1.1" 304 - "http://localhost:4001/" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36"
+2025-11-07 10:29:09 [INFO]: ::ffff:172.18.0.1 - - [07/Nov/2025:10:29:09 +0000] "GET /api/fptk?page=1&limit=100 HTTP/1.1" 200 - "http://localhost:4001/" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36"
+2025-11-07 10:29:25 [INFO]: ::ffff:172.18.0.1 - - [07/Nov/2025:10:29:25 +0000] "PUT /api/candidates/2256783e-951c-44fe-b6ee-44b179f6401a HTTP/1.1" 404 102 "http://localhost:4001/" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36"
+2025-11-07 10:29:36 [INFO]: ::1 - - [07/Nov/2025:10:29:36 +0000] "GET /health HTTP/1.1" 200 123 "-" "-"
+2025-11-07 10:30:06 [INFO]: ::1 - - [07/Nov/2025:10:30:06 +0000] "GET /health HTTP/1.1" 200 123 "-" "-"
+2025-11-07 10:30:36 [INFO]: ::1 - - [07/Nov/2025:10:30:36 +0000] "GET /health HTTP/1.1" 200 123 "-" "-"
+2025-11-07 10:31:06 [INFO]: ::1 - - [07/Nov/2025:10:31:06 +0000] "GET /health HTTP/1.1" 200 123 "-" "-"
+2025-11-07 10:31:36 [INFO]: ::1 - - [07/Nov/2025:10:31:36 +0000] "GET /health HTTP/1.1" 200 123 "-" "-"
+2025-11-07 10:32:06 [INFO]: ::1 - - [07/Nov/2025:10:32:06 +0000] "GET /health HTTP/1.1" 200 123 "-" "-"
+2025-11-07 10:32:37 [INFO]: ::1 - - [07/Nov/2025:10:32:37 +0000] "GET /health HTTP/1.1" 200 123 "-" "-"
+2025-11-07 10:33:07 [INFO]: ::1 - - [07/Nov/2025:10:33:07 +0000] "GET /health HTTP/1.1" 200 123 "-" "-"
+2025-11-07 10:33:37 [INFO]: ::1 - - [07/Nov/2025:10:33:37 +0000] "GET /health HTTP/1.1" 200 123 "-" "-"
+2025-11-07 10:34:07 [INFO]: ::1 - - [07/Nov/2025:10:34:07 +0000] "GET /health HTTP/1.1" 200 123 "-" "-"
+2025-11-07 10:34:37 [INFO]: ::1 - - [07/Nov/2025:10:34:37 +0000] "GET /health HTTP/1.1" 200 123 "-" "-"
+2025-11-07 10:34:50 [INFO]: SIGTERM received. Starting graceful shutdown...
+2025-11-07 10:34:50 [INFO]: HTTP server closed
+2025-11-07 10:34:50 [INFO]: Database disconnected
+2025-11-07 10:34:50 [INFO]: Redis disconnected
+2025-11-07 10:34:53 [INFO]: Redis connected successfully
+2025-11-07 10:34:53 [INFO]: PostgreSQL connected successfully
+2025-11-07 10:34:53 [INFO]: Redis connected successfully
+2025-11-07 10:34:53 [INFO]: Server running on port 4000 in production mode
+2025-11-07 10:34:53 [INFO]: API available at: http://localhost:4000/api
+2025-11-07 10:34:57 [INFO]: ::1 - - [07/Nov/2025:10:34:57 +0000] "GET /health HTTP/1.1" 200 120 "-" "-"
+2025-11-07 10:35:13 [INFO]: ::ffff:172.18.0.1 - - [07/Nov/2025:10:35:13 +0000] "GET /api/auth/me HTTP/1.1" 200 213 "http://localhost:4001/" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36"
+2025-11-07 10:35:13 [INFO]: SEARCH CANDIDATES - Sample candidate data:
+2025-11-07 10:35:13 [INFO]: ::ffff:172.18.0.1 - - [07/Nov/2025:10:35:13 +0000] "GET /api/candidates?page=1&limit=100 HTTP/1.1" 200 - "http://localhost:4001/" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36"
+2025-11-07 10:35:14 [INFO]: User logged in: jerry.hakim@energi-up.com
+2025-11-07 10:35:14 [INFO]: ::ffff:172.18.0.1 - - [07/Nov/2025:10:35:14 +0000] "POST /api/auth/login HTTP/1.1" 200 505 "http://localhost:4001/" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36"
+2025-11-07 10:35:14 [INFO]: ::ffff:172.18.0.1 - - [07/Nov/2025:10:35:14 +0000] "GET /api/dashboard/stats HTTP/1.1" 200 299 "http://localhost:4001/" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36"
+2025-11-07 10:35:17 [INFO]: SEARCH CANDIDATES - Sample candidate data:
+2025-11-07 10:35:17 [INFO]: ::ffff:172.18.0.1 - - [07/Nov/2025:10:35:17 +0000] "GET /api/candidates?page=1&limit=100 HTTP/1.1" 200 - "http://localhost:4001/" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36"
+2025-11-07 10:35:17 [INFO]: SEARCH CANDIDATES - Sample candidate data:
+2025-11-07 10:35:17 [INFO]: ::ffff:172.18.0.1 - - [07/Nov/2025:10:35:17 +0000] "GET /api/candidates?page=1&limit=100 HTTP/1.1" 200 - "http://localhost:4001/" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36"
+2025-11-07 10:35:18 [INFO]: ::ffff:172.18.0.1 - - [07/Nov/2025:10:35:18 +0000] "GET /api/candidates/2256783e-951c-44fe-b6ee-44b179f6401a HTTP/1.1" 200 - "http://localhost:4001/" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36"
+2025-11-07 10:35:18 [INFO]: ::ffff:172.18.0.1 - - [07/Nov/2025:10:35:18 +0000] "GET /api/masters/divisions HTTP/1.1" 200 655 "http://localhost:4001/" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36"
+2025-11-07 10:35:18 [INFO]: ::ffff:172.18.0.1 - - [07/Nov/2025:10:35:18 +0000] "GET /api/fptk?page=1&limit=100 HTTP/1.1" 200 - "http://localhost:4001/" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36"
+2025-11-07 10:35:27 [INFO]: Updating candidate 2256783e-951c-44fe-b6ee-44b179f6401a with data:
+2025-11-07 10:35:27 [INFO]: Existing languages data:
+2025-11-07 10:35:27 [INFO]: PositionAppliedFor processed:
+2025-11-07 10:35:27 [INFO]: Updating languages with:
+2025-11-07 10:35:27 [INFO]: Languages updateData.languages will be:
+2025-11-07 10:35:27 [INFO]: Candidate updateData:
+2025-11-07 10:35:27 [INFO]: Division being updated:
+2025-11-07 10:35:27 [INFO]: PositionAppliedFor being updated:
+2025-11-07 10:35:27 [INFO]: Ethnicity being updated:
+2025-11-07 10:35:27 [INFO]: HealthStatus being updated:
+2025-11-07 10:35:27 [INFO]: ::ffff:172.18.0.1 - - [07/Nov/2025:10:35:27 +0000] "PUT /api/candidates/2256783e-951c-44fe-b6ee-44b179f6401a HTTP/1.1" 200 - "http://localhost:4001/" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36"
+2025-11-07 10:35:27 [INFO]: SEARCH CANDIDATES - Sample candidate data:
+2025-11-07 10:35:27 [INFO]: ::ffff:172.18.0.1 - - [07/Nov/2025:10:35:27 +0000] "GET /api/candidates?page=1&limit=100 HTTP/1.1" 200 - "http://localhost:4001/" "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36"
+2025-11-07 10:35:27 [INFO]: ::1 - - [07/Nov/2025:10:35:27 +0000] "GET /health HTTP/1.1" 200 121 "-" "-"
+2025-11-07 10:35:57 [INFO]: ::1 - - [07/Nov/2025:10:35:57 +0000] "GET /health HTTP/1.1" 200 121 "-" "-"

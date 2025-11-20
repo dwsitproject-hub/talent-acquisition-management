@@ -1,0 +1,1 @@
+﻿ALTER TABLE "fptk" ALTER COLUMN "fptk_number" DROP NOT NULL;

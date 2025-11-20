@@ -1,0 +1,50 @@
+{
+    "keep": {
+        "days": true,
+        "amount": 30
+    },
+    "auditLog": "logs\\.855be6164c7d7dd744bfae70c89653ee39a828be-audit.json",
+    "files": [
+        {
+            "date": 1761202181609,
+            "name": "logs\\exceptions-2025-10-23.log",
+            "hash": "79de5ef93fcd5479238d30716792b83b6d2a5dcbc0a6867c70dacdd8f6f75f8f"
+        },
+        {
+            "date": 1761268662184,
+            "name": "logs\\exceptions-2025-10-24.log",
+            "hash": "3f234a69b933122c58c4af67f78e7367503ad740a03e0cace803c9f5683b7bef"
+        },
+        {
+            "date": 1761552538868,
+            "name": "logs\\exceptions-2025-10-27.log",
+            "hash": "b2e8fe4dad745eec442757c059eab48654e510da5df4eeca7fa8293397d17a7d"
+        },
+        {
+            "date": 1761702341702,
+            "name": "logs\\exceptions-2025-10-29.log",
+            "hash": "717eecfe804c3bf663479f8fbac62e38c6675c07ed3001e11828a9b138caa10c"
+        },
+        {
+            "date": 1761797804532,
+            "name": "logs\\exceptions-2025-10-30.log",
+            "hash": "bc0ef9865384ddfd708ca88025de85a68a363ff2f61d009a5174b7916f04609a"
+        },
+        {
+            "date": 1761896634235,
+            "name": "logs\\exceptions-2025-10-31.log",
+            "hash": "8cf56b309403e88d43fc505c603cdaccab28cecf806f1c8e23dc74c667f225cb"
+        },
+        {
+            "date": 1762498392706,
+            "name": "logs\\exceptions-2025-11-07.log",
+            "hash": "e73d7b19781f8e6e122ab9da4f86c1a23931b55621661a6934fe0f8d94391eb8"
+        },
+        {
+            "date": 1763103900167,
+            "name": "logs\\exceptions-2025-11-14.log",
+            "hash": "55559ec1e6140d9b6377bfb3d0112876143379ac33246fd5528e8fc50e54cd0a"
+        }
+    ],
+    "hashType": "sha256"
+}

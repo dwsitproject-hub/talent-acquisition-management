@@ -1,0 +1,407 @@
+2025-11-17 02:20:26 [ERROR]: Authentication error: Invalid or expired token
+Error: Invalid or expired token
+    at verifyAccessToken (/app/src/utils/token.js:37:11)
+    at authenticate (/app/src/middleware/auth.js:23:21)
+    at Layer.handle [as handle_request] (/app/node_modules/express/lib/router/layer.js:95:5)
+    at next (/app/node_modules/express/lib/router/route.js:149:13)
+    at Route.dispatch (/app/node_modules/express/lib/router/route.js:119:3)
+    at Layer.handle [as handle_request] (/app/node_modules/express/lib/router/layer.js:95:5)
+    at /app/node_modules/express/lib/router/index.js:284:15
+    at Function.process_params (/app/node_modules/express/lib/router/index.js:346:12)
+    at next (/app/node_modules/express/lib/router/index.js:280:10)
+    at Function.handle (/app/node_modules/express/lib/router/index.js:175:3)
+2025-11-17 02:56:51 [ERROR]: Authentication error: Invalid or expired token
+Error: Invalid or expired token
+    at verifyAccessToken (/app/src/utils/token.js:37:11)
+    at authenticate (/app/src/middleware/auth.js:23:21)
+    at Layer.handle [as handle_request] (/app/node_modules/express/lib/router/layer.js:95:5)
+    at next (/app/node_modules/express/lib/router/route.js:149:13)
+    at Route.dispatch (/app/node_modules/express/lib/router/route.js:119:3)
+    at Layer.handle [as handle_request] (/app/node_modules/express/lib/router/layer.js:95:5)
+    at /app/node_modules/express/lib/router/index.js:284:15
+    at Function.process_params (/app/node_modules/express/lib/router/index.js:346:12)
+    at next (/app/node_modules/express/lib/router/index.js:280:10)
+    at Function.handle (/app/node_modules/express/lib/router/index.js:175:3)
+2025-11-17 02:56:51 [ERROR]: Authentication error: Invalid or expired token
+Error: Invalid or expired token
+    at verifyAccessToken (/app/src/utils/token.js:37:11)
+    at authenticate (/app/src/middleware/auth.js:23:21)
+    at Layer.handle [as handle_request] (/app/node_modules/express/lib/router/layer.js:95:5)
+    at next (/app/node_modules/express/lib/router/route.js:149:13)
+    at Route.dispatch (/app/node_modules/express/lib/router/route.js:119:3)
+    at Layer.handle [as handle_request] (/app/node_modules/express/lib/router/layer.js:95:5)
+    at /app/node_modules/express/lib/router/index.js:284:15
+    at Function.process_params (/app/node_modules/express/lib/router/index.js:346:12)
+    at next (/app/node_modules/express/lib/router/index.js:280:10)
+    at Function.handle (/app/node_modules/express/lib/router/index.js:175:3)
+2025-11-17 02:57:49 [ERROR]: Prisma Error: 
+Invalid `prisma.document.findFirst()` invocation:
+
+{
+  where: {
+    candidateId: "2256783e-951c-44fe-b6ee-44b179f6401a",
+    documentType: "ADDITIONAL"
+                  ~~~~~~~~~~~~
+  }
+}
+
+Invalid value for argument `documentType`. Expected DocumentType.
+2025-11-17 02:57:49 [ERROR]: Error: 
+Invalid `prisma.document.findFirst()` invocation:
+
+{
+  where: {
+    candidateId: "2256783e-951c-44fe-b6ee-44b179f6401a",
+    documentType: "ADDITIONAL"
+                  ~~~~~~~~~~~~
+  }
+}
+
+Invalid value for argument `documentType`. Expected DocumentType.
+PrismaClientValidationError: 
+Invalid `prisma.document.findFirst()` invocation:
+
+{
+  where: {
+    candidateId: "2256783e-951c-44fe-b6ee-44b179f6401a",
+    documentType: "ADDITIONAL"
+                  ~~~~~~~~~~~~
+  }
+}
+
+Invalid value for argument `documentType`. Expected DocumentType.
+    at wn (/app/node_modules/@prisma/client/runtime/library.js:29:1363)
+    at $n.handleRequestError (/app/node_modules/@prisma/client/runtime/library.js:121:6958)
+    at $n.handleAndLogRequestError (/app/node_modules/@prisma/client/runtime/library.js:121:6623)
+    at $n.request (/app/node_modules/@prisma/client/runtime/library.js:121:6307)
+    at async l (/app/node_modules/@prisma/client/runtime/library.js:130:9633)
+    at async Object.uploadCandidateDocument (/app/src/services/documentService.js:95:28)
+    at async /app/src/routes/candidateRoutes.js:231:30
+2025-11-17 02:58:31 [ERROR]: Prisma Error: 
+Invalid `prisma.document.findFirst()` invocation:
+
+{
+  where: {
+    candidateId: "2256783e-951c-44fe-b6ee-44b179f6401a",
+    documentType: "ADDITIONAL"
+                  ~~~~~~~~~~~~
+  }
+}
+
+Invalid value for argument `documentType`. Expected DocumentType.
+2025-11-17 02:58:31 [ERROR]: Error: 
+Invalid `prisma.document.findFirst()` invocation:
+
+{
+  where: {
+    candidateId: "2256783e-951c-44fe-b6ee-44b179f6401a",
+    documentType: "ADDITIONAL"
+                  ~~~~~~~~~~~~
+  }
+}
+
+Invalid value for argument `documentType`. Expected DocumentType.
+PrismaClientValidationError: 
+Invalid `prisma.document.findFirst()` invocation:
+
+{
+  where: {
+    candidateId: "2256783e-951c-44fe-b6ee-44b179f6401a",
+    documentType: "ADDITIONAL"
+                  ~~~~~~~~~~~~
+  }
+}
+
+Invalid value for argument `documentType`. Expected DocumentType.
+    at wn (/app/node_modules/@prisma/client/runtime/library.js:29:1363)
+    at $n.handleRequestError (/app/node_modules/@prisma/client/runtime/library.js:121:6958)
+    at $n.handleAndLogRequestError (/app/node_modules/@prisma/client/runtime/library.js:121:6623)
+    at $n.request (/app/node_modules/@prisma/client/runtime/library.js:121:6307)
+    at async l (/app/node_modules/@prisma/client/runtime/library.js:130:9633)
+    at async Object.uploadCandidateDocument (/app/src/services/documentService.js:95:28)
+    at async /app/src/routes/candidateRoutes.js:231:30
+2025-11-17 02:58:33 [ERROR]: Prisma Error: 
+Invalid `prisma.document.findFirst()` invocation:
+
+{
+  where: {
+    candidateId: "2256783e-951c-44fe-b6ee-44b179f6401a",
+    documentType: "ADDITIONAL"
+                  ~~~~~~~~~~~~
+  }
+}
+
+Invalid value for argument `documentType`. Expected DocumentType.
+2025-11-17 02:58:33 [ERROR]: Error: 
+Invalid `prisma.document.findFirst()` invocation:
+
+{
+  where: {
+    candidateId: "2256783e-951c-44fe-b6ee-44b179f6401a",
+    documentType: "ADDITIONAL"
+                  ~~~~~~~~~~~~
+  }
+}
+
+Invalid value for argument `documentType`. Expected DocumentType.
+PrismaClientValidationError: 
+Invalid `prisma.document.findFirst()` invocation:
+
+{
+  where: {
+    candidateId: "2256783e-951c-44fe-b6ee-44b179f6401a",
+    documentType: "ADDITIONAL"
+                  ~~~~~~~~~~~~
+  }
+}
+
+Invalid value for argument `documentType`. Expected DocumentType.
+    at wn (/app/node_modules/@prisma/client/runtime/library.js:29:1363)
+    at $n.handleRequestError (/app/node_modules/@prisma/client/runtime/library.js:121:6958)
+    at $n.handleAndLogRequestError (/app/node_modules/@prisma/client/runtime/library.js:121:6623)
+    at $n.request (/app/node_modules/@prisma/client/runtime/library.js:121:6307)
+    at async l (/app/node_modules/@prisma/client/runtime/library.js:130:9633)
+    at async Object.uploadCandidateDocument (/app/src/services/documentService.js:95:28)
+    at async /app/src/routes/candidateRoutes.js:231:30
+2025-11-17 02:58:34 [ERROR]: Prisma Error: 
+Invalid `prisma.document.findFirst()` invocation:
+
+{
+  where: {
+    candidateId: "2256783e-951c-44fe-b6ee-44b179f6401a",
+    documentType: "ADDITIONAL"
+                  ~~~~~~~~~~~~
+  }
+}
+
+Invalid value for argument `documentType`. Expected DocumentType.
+2025-11-17 02:58:34 [ERROR]: Error: 
+Invalid `prisma.document.findFirst()` invocation:
+
+{
+  where: {
+    candidateId: "2256783e-951c-44fe-b6ee-44b179f6401a",
+    documentType: "ADDITIONAL"
+                  ~~~~~~~~~~~~
+  }
+}
+
+Invalid value for argument `documentType`. Expected DocumentType.
+PrismaClientValidationError: 
+Invalid `prisma.document.findFirst()` invocation:
+
+{
+  where: {
+    candidateId: "2256783e-951c-44fe-b6ee-44b179f6401a",
+    documentType: "ADDITIONAL"
+                  ~~~~~~~~~~~~
+  }
+}
+
+Invalid value for argument `documentType`. Expected DocumentType.
+    at wn (/app/node_modules/@prisma/client/runtime/library.js:29:1363)
+    at $n.handleRequestError (/app/node_modules/@prisma/client/runtime/library.js:121:6958)
+    at $n.handleAndLogRequestError (/app/node_modules/@prisma/client/runtime/library.js:121:6623)
+    at $n.request (/app/node_modules/@prisma/client/runtime/library.js:121:6307)
+    at async l (/app/node_modules/@prisma/client/runtime/library.js:130:9633)
+    at async Object.uploadCandidateDocument (/app/src/services/documentService.js:95:28)
+    at async /app/src/routes/candidateRoutes.js:231:30
+2025-11-17 02:58:35 [ERROR]: Prisma Error: 
+Invalid `prisma.document.findFirst()` invocation:
+
+{
+  where: {
+    candidateId: "2256783e-951c-44fe-b6ee-44b179f6401a",
+    documentType: "ADDITIONAL"
+                  ~~~~~~~~~~~~
+  }
+}
+
+Invalid value for argument `documentType`. Expected DocumentType.
+2025-11-17 02:58:35 [ERROR]: Error: 
+Invalid `prisma.document.findFirst()` invocation:
+
+{
+  where: {
+    candidateId: "2256783e-951c-44fe-b6ee-44b179f6401a",
+    documentType: "ADDITIONAL"
+                  ~~~~~~~~~~~~
+  }
+}
+
+Invalid value for argument `documentType`. Expected DocumentType.
+PrismaClientValidationError: 
+Invalid `prisma.document.findFirst()` invocation:
+
+{
+  where: {
+    candidateId: "2256783e-951c-44fe-b6ee-44b179f6401a",
+    documentType: "ADDITIONAL"
+                  ~~~~~~~~~~~~
+  }
+}
+
+Invalid value for argument `documentType`. Expected DocumentType.
+    at wn (/app/node_modules/@prisma/client/runtime/library.js:29:1363)
+    at $n.handleRequestError (/app/node_modules/@prisma/client/runtime/library.js:121:6958)
+    at $n.handleAndLogRequestError (/app/node_modules/@prisma/client/runtime/library.js:121:6623)
+    at $n.request (/app/node_modules/@prisma/client/runtime/library.js:121:6307)
+    at async l (/app/node_modules/@prisma/client/runtime/library.js:130:9633)
+    at async Object.uploadCandidateDocument (/app/src/services/documentService.js:95:28)
+    at async /app/src/routes/candidateRoutes.js:231:30
+2025-11-17 04:05:17 [ERROR]: Authentication error: Invalid or expired token
+Error: Invalid or expired token
+    at verifyAccessToken (/app/src/utils/token.js:37:11)
+    at authenticate (/app/src/middleware/auth.js:23:21)
+    at Layer.handle [as handle_request] (/app/node_modules/express/lib/router/layer.js:95:5)
+    at next (/app/node_modules/express/lib/router/route.js:149:13)
+    at Route.dispatch (/app/node_modules/express/lib/router/route.js:119:3)
+    at Layer.handle [as handle_request] (/app/node_modules/express/lib/router/layer.js:95:5)
+    at /app/node_modules/express/lib/router/index.js:284:15
+    at Function.process_params (/app/node_modules/express/lib/router/index.js:346:12)
+    at next (/app/node_modules/express/lib/router/index.js:280:10)
+    at Function.handle (/app/node_modules/express/lib/router/index.js:175:3)
+2025-11-17 04:05:17 [ERROR]: Authentication error: Invalid or expired token
+Error: Invalid or expired token
+    at verifyAccessToken (/app/src/utils/token.js:37:11)
+    at authenticate (/app/src/middleware/auth.js:23:21)
+    at Layer.handle [as handle_request] (/app/node_modules/express/lib/router/layer.js:95:5)
+    at next (/app/node_modules/express/lib/router/route.js:149:13)
+    at Route.dispatch (/app/node_modules/express/lib/router/route.js:119:3)
+    at Layer.handle [as handle_request] (/app/node_modules/express/lib/router/layer.js:95:5)
+    at /app/node_modules/express/lib/router/index.js:284:15
+    at Function.process_params (/app/node_modules/express/lib/router/index.js:346:12)
+    at next (/app/node_modules/express/lib/router/index.js:280:10)
+    at Function.handle (/app/node_modules/express/lib/router/index.js:175:3)
+2025-11-17 06:30:07 [ERROR]: Authentication error: Invalid or expired token
+Error: Invalid or expired token
+    at verifyAccessToken (/app/src/utils/token.js:37:11)
+    at authenticate (/app/src/middleware/auth.js:23:21)
+    at Layer.handle [as handle_request] (/app/node_modules/express/lib/router/layer.js:95:5)
+    at next (/app/node_modules/express/lib/router/route.js:149:13)
+    at Route.dispatch (/app/node_modules/express/lib/router/route.js:119:3)
+    at Layer.handle [as handle_request] (/app/node_modules/express/lib/router/layer.js:95:5)
+    at /app/node_modules/express/lib/router/index.js:284:15
+    at Function.process_params (/app/node_modules/express/lib/router/index.js:346:12)
+    at next (/app/node_modules/express/lib/router/index.js:280:10)
+    at Function.handle (/app/node_modules/express/lib/router/index.js:175:3)
+2025-11-17 06:30:07 [ERROR]: Authentication error: Invalid or expired token
+Error: Invalid or expired token
+    at verifyAccessToken (/app/src/utils/token.js:37:11)
+    at authenticate (/app/src/middleware/auth.js:23:21)
+    at Layer.handle [as handle_request] (/app/node_modules/express/lib/router/layer.js:95:5)
+    at next (/app/node_modules/express/lib/router/route.js:149:13)
+    at Route.dispatch (/app/node_modules/express/lib/router/route.js:119:3)
+    at Layer.handle [as handle_request] (/app/node_modules/express/lib/router/layer.js:95:5)
+    at /app/node_modules/express/lib/router/index.js:284:15
+    at Function.process_params (/app/node_modules/express/lib/router/index.js:346:12)
+    at next (/app/node_modules/express/lib/router/index.js:280:10)
+    at Function.handle (/app/node_modules/express/lib/router/index.js:175:3)
+2025-11-17 07:30:51 [ERROR]: Authentication error: Invalid or expired token
+Error: Invalid or expired token
+    at verifyAccessToken (/app/src/utils/token.js:37:11)
+    at authenticate (/app/src/middleware/auth.js:23:21)
+    at Layer.handle [as handle_request] (/app/node_modules/express/lib/router/layer.js:95:5)
+    at next (/app/node_modules/express/lib/router/route.js:149:13)
+    at Route.dispatch (/app/node_modules/express/lib/router/route.js:119:3)
+    at Layer.handle [as handle_request] (/app/node_modules/express/lib/router/layer.js:95:5)
+    at /app/node_modules/express/lib/router/index.js:284:15
+    at Function.process_params (/app/node_modules/express/lib/router/index.js:346:12)
+    at next (/app/node_modules/express/lib/router/index.js:280:10)
+    at Function.handle (/app/node_modules/express/lib/router/index.js:175:3)
+2025-11-17 07:30:51 [ERROR]: Authentication error: Invalid or expired token
+Error: Invalid or expired token
+    at verifyAccessToken (/app/src/utils/token.js:37:11)
+    at authenticate (/app/src/middleware/auth.js:23:21)
+    at Layer.handle [as handle_request] (/app/node_modules/express/lib/router/layer.js:95:5)
+    at next (/app/node_modules/express/lib/router/route.js:149:13)
+    at Route.dispatch (/app/node_modules/express/lib/router/route.js:119:3)
+    at Layer.handle [as handle_request] (/app/node_modules/express/lib/router/layer.js:95:5)
+    at /app/node_modules/express/lib/router/index.js:284:15
+    at Function.process_params (/app/node_modules/express/lib/router/index.js:346:12)
+    at next (/app/node_modules/express/lib/router/index.js:280:10)
+    at Function.handle (/app/node_modules/express/lib/router/index.js:175:3)
+2025-11-17 08:33:38 [ERROR]: Authentication error: Invalid or expired token
+Error: Invalid or expired token
+    at verifyAccessToken (/app/src/utils/token.js:37:11)
+    at authenticate (/app/src/middleware/auth.js:23:21)
+    at Layer.handle [as handle_request] (/app/node_modules/express/lib/router/layer.js:95:5)
+    at next (/app/node_modules/express/lib/router/route.js:149:13)
+    at Route.dispatch (/app/node_modules/express/lib/router/route.js:119:3)
+    at Layer.handle [as handle_request] (/app/node_modules/express/lib/router/layer.js:95:5)
+    at /app/node_modules/express/lib/router/index.js:284:15
+    at Function.process_params (/app/node_modules/express/lib/router/index.js:346:12)
+    at next (/app/node_modules/express/lib/router/index.js:280:10)
+    at Function.handle (/app/node_modules/express/lib/router/index.js:175:3)
+2025-11-17 08:33:38 [ERROR]: Authentication error: Invalid or expired token
+Error: Invalid or expired token
+    at verifyAccessToken (/app/src/utils/token.js:37:11)
+    at authenticate (/app/src/middleware/auth.js:23:21)
+    at Layer.handle [as handle_request] (/app/node_modules/express/lib/router/layer.js:95:5)
+    at next (/app/node_modules/express/lib/router/route.js:149:13)
+    at Route.dispatch (/app/node_modules/express/lib/router/route.js:119:3)
+    at Layer.handle [as handle_request] (/app/node_modules/express/lib/router/layer.js:95:5)
+    at /app/node_modules/express/lib/router/index.js:284:15
+    at Function.process_params (/app/node_modules/express/lib/router/index.js:346:12)
+    at next (/app/node_modules/express/lib/router/index.js:280:10)
+    at Function.handle (/app/node_modules/express/lib/router/index.js:175:3)
+2025-11-17 09:04:44 [ERROR]: Authentication error: Invalid or expired token
+Error: Invalid or expired token
+    at verifyAccessToken (/app/src/utils/token.js:37:11)
+    at authenticate (/app/src/middleware/auth.js:23:21)
+    at Layer.handle [as handle_request] (/app/node_modules/express/lib/router/layer.js:95:5)
+    at next (/app/node_modules/express/lib/router/route.js:149:13)
+    at Route.dispatch (/app/node_modules/express/lib/router/route.js:119:3)
+    at Layer.handle [as handle_request] (/app/node_modules/express/lib/router/layer.js:95:5)
+    at /app/node_modules/express/lib/router/index.js:284:15
+    at param (/app/node_modules/express/lib/router/index.js:365:14)
+    at param (/app/node_modules/express/lib/router/index.js:376:14)
+    at Function.process_params (/app/node_modules/express/lib/router/index.js:421:3)
+2025-11-17 09:41:01 [ERROR]: Authentication error: Invalid or expired token
+Error: Invalid or expired token
+    at verifyAccessToken (/app/src/utils/token.js:37:11)
+    at authenticate (/app/src/middleware/auth.js:23:21)
+    at Layer.handle [as handle_request] (/app/node_modules/express/lib/router/layer.js:95:5)
+    at next (/app/node_modules/express/lib/router/route.js:149:13)
+    at Route.dispatch (/app/node_modules/express/lib/router/route.js:119:3)
+    at Layer.handle [as handle_request] (/app/node_modules/express/lib/router/layer.js:95:5)
+    at /app/node_modules/express/lib/router/index.js:284:15
+    at Function.process_params (/app/node_modules/express/lib/router/index.js:346:12)
+    at next (/app/node_modules/express/lib/router/index.js:280:10)
+    at Function.handle (/app/node_modules/express/lib/router/index.js:175:3)
+2025-11-17 09:41:01 [ERROR]: Authentication error: Invalid or expired token
+Error: Invalid or expired token
+    at verifyAccessToken (/app/src/utils/token.js:37:11)
+    at authenticate (/app/src/middleware/auth.js:23:21)
+    at Layer.handle [as handle_request] (/app/node_modules/express/lib/router/layer.js:95:5)
+    at next (/app/node_modules/express/lib/router/route.js:149:13)
+    at Route.dispatch (/app/node_modules/express/lib/router/route.js:119:3)
+    at Layer.handle [as handle_request] (/app/node_modules/express/lib/router/layer.js:95:5)
+    at /app/node_modules/express/lib/router/index.js:284:15
+    at Function.process_params (/app/node_modules/express/lib/router/index.js:346:12)
+    at next (/app/node_modules/express/lib/router/index.js:280:10)
+    at Function.handle (/app/node_modules/express/lib/router/index.js:175:3)
+2025-11-17 10:47:12 [ERROR]: Authentication error: Invalid or expired token
+Error: Invalid or expired token
+    at verifyAccessToken (/app/src/utils/token.js:37:11)
+    at authenticate (/app/src/middleware/auth.js:23:21)
+    at Layer.handle [as handle_request] (/app/node_modules/express/lib/router/layer.js:95:5)
+    at next (/app/node_modules/express/lib/router/route.js:149:13)
+    at Route.dispatch (/app/node_modules/express/lib/router/route.js:119:3)
+    at Layer.handle [as handle_request] (/app/node_modules/express/lib/router/layer.js:95:5)
+    at /app/node_modules/express/lib/router/index.js:284:15
+    at Function.process_params (/app/node_modules/express/lib/router/index.js:346:12)
+    at next (/app/node_modules/express/lib/router/index.js:280:10)
+    at Function.handle (/app/node_modules/express/lib/router/index.js:175:3)
+2025-11-17 10:47:12 [ERROR]: Authentication error: Invalid or expired token
+Error: Invalid or expired token
+    at verifyAccessToken (/app/src/utils/token.js:37:11)
+    at authenticate (/app/src/middleware/auth.js:23:21)
+    at Layer.handle [as handle_request] (/app/node_modules/express/lib/router/layer.js:95:5)
+    at next (/app/node_modules/express/lib/router/route.js:149:13)
+    at Route.dispatch (/app/node_modules/express/lib/router/route.js:119:3)
+    at Layer.handle [as handle_request] (/app/node_modules/express/lib/router/layer.js:95:5)
+    at /app/node_modules/express/lib/router/index.js:284:15
+    at Function.process_params (/app/node_modules/express/lib/router/index.js:346:12)
+    at next (/app/node_modules/express/lib/router/index.js:280:10)
+    at Function.handle (/app/node_modules/express/lib/router/index.js:175:3)

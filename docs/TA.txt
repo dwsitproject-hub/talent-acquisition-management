@@ -1,0 +1,46 @@
+TA
+
+
+Current Status able to move to Offering if FPTK has been uploaded in the open position and FPTK Status = Received and No FPTK is not blank. but will not applied for SUPER_ADMIN roles.
+
+To Print Form Data Diri in PDF
+
+Settings Remove notification and system
+
+Form Data Diri di make options for Indonesia and Inggris Language
+BPJS Number and NPWP not mandatory
+Source (Knowing us from) = Social Media, LinkedIn, Jobstreet, Reference.
+If Social Media, have another field to input Social Media detail
+If Reference, have another field to input Reference Name
+
+Candidates -> Files, to have upload capability for additional files (max 2MB)
+CV max 2MB
+When create candidates, upload CV is mandatory.
+
+Open Position ->
+to create feature to copy the open position with status Raise FPTK
+Current Status -> to add Hold, Cancel, Re-Open.
+When Current Status On Boarding then Current Status can't change again
+to add FPTK Received Date -> auto filled when FPTK uploaded.
+
+Status under applied candidate -> to remove Offer Declined.
+to also capture the Rejected Status date, and Withdraw Status Date.
+
+Employment Type value change to Contract, Internship, Full Time Employee
+Type Grade -> make it max length 2 digit 
+Grade2 -> Remove it
+Total Request -> Remove it
+Have filter based on Current Status
+Change Open Position Name into Position
+Make area detail appear at front
+have capability to sort by location and area detail
+
+SLA to count from FPTK Received Date until Status change to signing
+
+Reports ->
+to have capability to generate report for Open Position.
+
+ 
+
+
+

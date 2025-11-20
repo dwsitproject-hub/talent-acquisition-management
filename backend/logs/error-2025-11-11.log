@@ -1,0 +1,521 @@
+2025-11-11 01:02:15 [ERROR]: Authentication error: Invalid or expired token
+Error: Invalid or expired token
+    at verifyAccessToken (/app/src/utils/token.js:37:11)
+    at authenticate (/app/src/middleware/auth.js:23:21)
+    at Layer.handle [as handle_request] (/app/node_modules/express/lib/router/layer.js:95:5)
+    at next (/app/node_modules/express/lib/router/route.js:149:13)
+    at Route.dispatch (/app/node_modules/express/lib/router/route.js:119:3)
+    at Layer.handle [as handle_request] (/app/node_modules/express/lib/router/layer.js:95:5)
+    at /app/node_modules/express/lib/router/index.js:284:15
+    at Function.process_params (/app/node_modules/express/lib/router/index.js:346:12)
+    at next (/app/node_modules/express/lib/router/index.js:280:10)
+    at Function.handle (/app/node_modules/express/lib/router/index.js:175:3)
+2025-11-11 01:10:18 [ERROR]: Error: Invalid credentials
+Error: Invalid credentials
+    at Object.login (/app/src/services/authService.js:112:11)
+    at async /app/src/controllers/authController.js:30:18
+2025-11-11 01:13:26 [ERROR]: Error: Invalid credentials
+Error: Invalid credentials
+    at Object.login (/app/src/services/authService.js:112:11)
+    at async /app/src/controllers/authController.js:30:18
+2025-11-11 01:26:23 [ERROR]: Authentication error: Invalid or expired token
+Error: Invalid or expired token
+    at verifyAccessToken (/app/src/utils/token.js:37:11)
+    at authenticate (/app/src/middleware/auth.js:23:21)
+    at Layer.handle [as handle_request] (/app/node_modules/express/lib/router/layer.js:95:5)
+    at next (/app/node_modules/express/lib/router/route.js:149:13)
+    at Route.dispatch (/app/node_modules/express/lib/router/route.js:119:3)
+    at Layer.handle [as handle_request] (/app/node_modules/express/lib/router/layer.js:95:5)
+    at /app/node_modules/express/lib/router/index.js:284:15
+    at Function.process_params (/app/node_modules/express/lib/router/index.js:346:12)
+    at next (/app/node_modules/express/lib/router/index.js:280:10)
+    at Function.handle (/app/node_modules/express/lib/router/index.js:175:3)
+2025-11-11 01:44:53 [ERROR]: Prisma Error: 
+Invalid `prisma.fPTK.create()` invocation:
+
+
+Could not convert argument value Object {"$type": String("DateTime"), "value": String("+045870-01-01T00:00:00.000Z")} to ArgumentValue.
+2025-11-11 01:44:53 [ERROR]: Error: 
+Invalid `prisma.fPTK.create()` invocation:
+
+
+Could not convert argument value Object {"$type": String("DateTime"), "value": String("+045870-01-01T00:00:00.000Z")} to ArgumentValue.
+PrismaClientUnknownRequestError: 
+Invalid `prisma.fPTK.create()` invocation:
+
+
+Could not convert argument value Object {"$type": String("DateTime"), "value": String("+045870-01-01T00:00:00.000Z")} to ArgumentValue.
+    at $n.handleRequestError (/app/node_modules/@prisma/client/runtime/library.js:121:7505)
+    at $n.handleAndLogRequestError (/app/node_modules/@prisma/client/runtime/library.js:121:6623)
+    at $n.request (/app/node_modules/@prisma/client/runtime/library.js:121:6307)
+    at async l (/app/node_modules/@prisma/client/runtime/library.js:130:9633)
+    at async /app/src/services/fptkService.js:271:18
+    at async Proxy._transactionWithCallback (/app/node_modules/@prisma/client/runtime/library.js:130:8000)
+    at async Object.createFPTK (/app/src/services/fptkService.js:270:23)
+    at async /app/src/routes/fptkRoutes.js:20:18
+2025-11-11 01:44:53 [ERROR]: Prisma Error: 
+Invalid `prisma.fPTK.create()` invocation:
+
+
+Could not convert argument value Object {"$type": String("DateTime"), "value": String("+045870-01-01T00:00:00.000Z")} to ArgumentValue.
+2025-11-11 01:44:53 [ERROR]: Error: 
+Invalid `prisma.fPTK.create()` invocation:
+
+
+Could not convert argument value Object {"$type": String("DateTime"), "value": String("+045870-01-01T00:00:00.000Z")} to ArgumentValue.
+PrismaClientUnknownRequestError: 
+Invalid `prisma.fPTK.create()` invocation:
+
+
+Could not convert argument value Object {"$type": String("DateTime"), "value": String("+045870-01-01T00:00:00.000Z")} to ArgumentValue.
+    at $n.handleRequestError (/app/node_modules/@prisma/client/runtime/library.js:121:7505)
+    at $n.handleAndLogRequestError (/app/node_modules/@prisma/client/runtime/library.js:121:6623)
+    at $n.request (/app/node_modules/@prisma/client/runtime/library.js:121:6307)
+    at async l (/app/node_modules/@prisma/client/runtime/library.js:130:9633)
+    at async /app/src/services/fptkService.js:271:18
+    at async Proxy._transactionWithCallback (/app/node_modules/@prisma/client/runtime/library.js:130:8000)
+    at async Object.createFPTK (/app/src/services/fptkService.js:270:23)
+    at async /app/src/routes/fptkRoutes.js:20:18
+2025-11-11 02:27:02 [ERROR]: Authentication error: Invalid or expired token
+Error: Invalid or expired token
+    at verifyAccessToken (/app/src/utils/token.js:37:11)
+    at authenticate (/app/src/middleware/auth.js:23:21)
+    at Layer.handle [as handle_request] (/app/node_modules/express/lib/router/layer.js:95:5)
+    at next (/app/node_modules/express/lib/router/route.js:149:13)
+    at Route.dispatch (/app/node_modules/express/lib/router/route.js:119:3)
+    at Layer.handle [as handle_request] (/app/node_modules/express/lib/router/layer.js:95:5)
+    at /app/node_modules/express/lib/router/index.js:284:15
+    at Function.process_params (/app/node_modules/express/lib/router/index.js:346:12)
+    at next (/app/node_modules/express/lib/router/index.js:280:10)
+    at Function.handle (/app/node_modules/express/lib/router/index.js:175:3)
+2025-11-11 02:27:15 [ERROR]: Prisma Error: 
+Invalid `prisma.fPTK.create()` invocation:
+
+
+Could not convert argument value Object {"$type": String("DateTime"), "value": String("+045870-01-01T00:00:00.000Z")} to ArgumentValue.
+2025-11-11 02:27:15 [ERROR]: Error: 
+Invalid `prisma.fPTK.create()` invocation:
+
+
+Could not convert argument value Object {"$type": String("DateTime"), "value": String("+045870-01-01T00:00:00.000Z")} to ArgumentValue.
+PrismaClientUnknownRequestError: 
+Invalid `prisma.fPTK.create()` invocation:
+
+
+Could not convert argument value Object {"$type": String("DateTime"), "value": String("+045870-01-01T00:00:00.000Z")} to ArgumentValue.
+    at $n.handleRequestError (/app/node_modules/@prisma/client/runtime/library.js:121:7505)
+    at $n.handleAndLogRequestError (/app/node_modules/@prisma/client/runtime/library.js:121:6623)
+    at $n.request (/app/node_modules/@prisma/client/runtime/library.js:121:6307)
+    at async l (/app/node_modules/@prisma/client/runtime/library.js:130:9633)
+    at async /app/src/services/fptkService.js:273:18
+    at async Proxy._transactionWithCallback (/app/node_modules/@prisma/client/runtime/library.js:130:8000)
+    at async Object.createFPTK (/app/src/services/fptkService.js:272:23)
+    at async /app/src/routes/fptkRoutes.js:20:18
+2025-11-11 02:27:15 [ERROR]: Prisma Error: 
+Invalid `prisma.fPTK.create()` invocation:
+
+
+Could not convert argument value Object {"$type": String("DateTime"), "value": String("+045870-01-01T00:00:00.000Z")} to ArgumentValue.
+2025-11-11 02:27:15 [ERROR]: Error: 
+Invalid `prisma.fPTK.create()` invocation:
+
+
+Could not convert argument value Object {"$type": String("DateTime"), "value": String("+045870-01-01T00:00:00.000Z")} to ArgumentValue.
+PrismaClientUnknownRequestError: 
+Invalid `prisma.fPTK.create()` invocation:
+
+
+Could not convert argument value Object {"$type": String("DateTime"), "value": String("+045870-01-01T00:00:00.000Z")} to ArgumentValue.
+    at $n.handleRequestError (/app/node_modules/@prisma/client/runtime/library.js:121:7505)
+    at $n.handleAndLogRequestError (/app/node_modules/@prisma/client/runtime/library.js:121:6623)
+    at $n.request (/app/node_modules/@prisma/client/runtime/library.js:121:6307)
+    at async l (/app/node_modules/@prisma/client/runtime/library.js:130:9633)
+    at async /app/src/services/fptkService.js:273:18
+    at async Proxy._transactionWithCallback (/app/node_modules/@prisma/client/runtime/library.js:130:8000)
+    at async Object.createFPTK (/app/src/services/fptkService.js:272:23)
+    at async /app/src/routes/fptkRoutes.js:20:18
+2025-11-11 02:27:15 [ERROR]: Error: FPTK number already exists
+Error: FPTK number already exists
+    at Object.createFPTK (/app/src/services/fptkService.js:204:13)
+    at async /app/src/routes/fptkRoutes.js:20:18
+2025-11-11 02:28:59 [ERROR]: Error: 
+Invalid `prisma.fPTK.update()` invocation:
+
+{
+  where: {
+    id: "7307c40e-b9b7-4a40-bda9-2022ed0c4e39"
+  },
+  data: {
+    pt: "EUP",
+    noFktk: null,
+    fptkNumber: null,
+    statusFktk: "Pending",
+    division: "Commercial",
+    section: "Commercial",
+    hiringManager: "Clifford",
+    position: "Shipping Manager",
+    positionTitle: "Shipping Manager",
+    department: "Commercial",
+    location: "Head Office",
+    employmentType: "Probation",
+    typeGrade: "7A",
+    grade2: "7",
+    priority: "P1",
+    isPriority: false,
+    priorityByMonthYear: "45986",
+    jobSpecification: "TBC",
+    criteria: "Staff",
+    area: "HO",
+    areaDetail: "Jakarta",
+    additionalOrReplacement: "Additional",
+    replacementName: "",
+    resignReason: "",
+    totalRequest: 1,
+    numberOfPositions: 1,
+    currentStatus: "Interview User",
+    requestDate: new Date("Invalid Date"),
+                 ~~~~~~~~~~~~~~~~~~~~~~~~
+    status: "OPEN",
+    remark: "",
+    requiredSkills: []
+  }
+}
+
+Invalid value for argument `requestDate`: Provided Date object is invalid. Expected Date.
+PrismaClientValidationError: 
+Invalid `prisma.fPTK.update()` invocation:
+
+{
+  where: {
+    id: "7307c40e-b9b7-4a40-bda9-2022ed0c4e39"
+  },
+  data: {
+    pt: "EUP",
+    noFktk: null,
+    fptkNumber: null,
+    statusFktk: "Pending",
+    division: "Commercial",
+    section: "Commercial",
+    hiringManager: "Clifford",
+    position: "Shipping Manager",
+    positionTitle: "Shipping Manager",
+    department: "Commercial",
+    location: "Head Office",
+    employmentType: "Probation",
+    typeGrade: "7A",
+    grade2: "7",
+    priority: "P1",
+    isPriority: false,
+    priorityByMonthYear: "45986",
+    jobSpecification: "TBC",
+    criteria: "Staff",
+    area: "HO",
+    areaDetail: "Jakarta",
+    additionalOrReplacement: "Additional",
+    replacementName: "",
+    resignReason: "",
+    totalRequest: 1,
+    numberOfPositions: 1,
+    currentStatus: "Interview User",
+    requestDate: new Date("Invalid Date"),
+                 ~~~~~~~~~~~~~~~~~~~~~~~~
+    status: "OPEN",
+    remark: "",
+    requiredSkills: []
+  }
+}
+
+Invalid value for argument `requestDate`: Provided Date object is invalid. Expected Date.
+    at wn (/app/node_modules/@prisma/client/runtime/library.js:29:1363)
+    at e.throwValidationError (/app/node_modules/@prisma/client/runtime/library.js:29:10206)
+    at sa (/app/node_modules/@prisma/client/runtime/library.js:29:7746)
+    at aa (/app/node_modules/@prisma/client/runtime/library.js:29:8908)
+    at sa (/app/node_modules/@prisma/client/runtime/library.js:29:8439)
+    at aa (/app/node_modules/@prisma/client/runtime/library.js:29:8908)
+    at mr (/app/node_modules/@prisma/client/runtime/library.js:29:6037)
+    at vn (/app/node_modules/@prisma/client/runtime/library.js:29:5902)
+    at /app/node_modules/@prisma/client/runtime/library.js:130:10186
+    at Object.runInChildSpan (/app/node_modules/@prisma/client/runtime/library.js:121:1509)
+2025-11-11 02:36:45 [ERROR]: Prisma Error: 
+Invalid `prisma.fPTK.create()` invocation:
+
+
+Could not convert argument value Object {"$type": String("DateTime"), "value": String("+045870-01-01T00:00:00.000Z")} to ArgumentValue.
+2025-11-11 02:36:45 [ERROR]: Error: 
+Invalid `prisma.fPTK.create()` invocation:
+
+
+Could not convert argument value Object {"$type": String("DateTime"), "value": String("+045870-01-01T00:00:00.000Z")} to ArgumentValue.
+PrismaClientUnknownRequestError: 
+Invalid `prisma.fPTK.create()` invocation:
+
+
+Could not convert argument value Object {"$type": String("DateTime"), "value": String("+045870-01-01T00:00:00.000Z")} to ArgumentValue.
+    at $n.handleRequestError (/app/node_modules/@prisma/client/runtime/library.js:121:7505)
+    at $n.handleAndLogRequestError (/app/node_modules/@prisma/client/runtime/library.js:121:6623)
+    at $n.request (/app/node_modules/@prisma/client/runtime/library.js:121:6307)
+    at async l (/app/node_modules/@prisma/client/runtime/library.js:130:9633)
+    at async /app/src/services/fptkService.js:273:18
+    at async Proxy._transactionWithCallback (/app/node_modules/@prisma/client/runtime/library.js:130:8000)
+    at async Object.createFPTK (/app/src/services/fptkService.js:272:23)
+    at async /app/src/routes/fptkRoutes.js:20:18
+2025-11-11 02:36:45 [ERROR]: Prisma Error: 
+Invalid `prisma.fPTK.create()` invocation:
+
+
+Could not convert argument value Object {"$type": String("DateTime"), "value": String("+045870-01-01T00:00:00.000Z")} to ArgumentValue.
+2025-11-11 02:36:45 [ERROR]: Error: 
+Invalid `prisma.fPTK.create()` invocation:
+
+
+Could not convert argument value Object {"$type": String("DateTime"), "value": String("+045870-01-01T00:00:00.000Z")} to ArgumentValue.
+PrismaClientUnknownRequestError: 
+Invalid `prisma.fPTK.create()` invocation:
+
+
+Could not convert argument value Object {"$type": String("DateTime"), "value": String("+045870-01-01T00:00:00.000Z")} to ArgumentValue.
+    at $n.handleRequestError (/app/node_modules/@prisma/client/runtime/library.js:121:7505)
+    at $n.handleAndLogRequestError (/app/node_modules/@prisma/client/runtime/library.js:121:6623)
+    at $n.request (/app/node_modules/@prisma/client/runtime/library.js:121:6307)
+    at async l (/app/node_modules/@prisma/client/runtime/library.js:130:9633)
+    at async /app/src/services/fptkService.js:273:18
+    at async Proxy._transactionWithCallback (/app/node_modules/@prisma/client/runtime/library.js:130:8000)
+    at async Object.createFPTK (/app/src/services/fptkService.js:272:23)
+    at async /app/src/routes/fptkRoutes.js:20:18
+2025-11-11 02:36:45 [ERROR]: Error: FPTK number already exists
+Error: FPTK number already exists
+    at Object.createFPTK (/app/src/services/fptkService.js:204:13)
+    at async /app/src/routes/fptkRoutes.js:20:18
+2025-11-11 02:39:28 [ERROR]: Prisma Error: 
+Invalid `prisma.fPTK.create()` invocation:
+
+
+Could not convert argument value Object {"$type": String("DateTime"), "value": String("+045593-01-01T00:00:00.000Z")} to ArgumentValue.
+2025-11-11 02:39:28 [ERROR]: Error: 
+Invalid `prisma.fPTK.create()` invocation:
+
+
+Could not convert argument value Object {"$type": String("DateTime"), "value": String("+045593-01-01T00:00:00.000Z")} to ArgumentValue.
+PrismaClientUnknownRequestError: 
+Invalid `prisma.fPTK.create()` invocation:
+
+
+Could not convert argument value Object {"$type": String("DateTime"), "value": String("+045593-01-01T00:00:00.000Z")} to ArgumentValue.
+    at $n.handleRequestError (/app/node_modules/@prisma/client/runtime/library.js:121:7505)
+    at $n.handleAndLogRequestError (/app/node_modules/@prisma/client/runtime/library.js:121:6623)
+    at $n.request (/app/node_modules/@prisma/client/runtime/library.js:121:6307)
+    at async l (/app/node_modules/@prisma/client/runtime/library.js:130:9633)
+    at async /app/src/services/fptkService.js:273:18
+    at async Proxy._transactionWithCallback (/app/node_modules/@prisma/client/runtime/library.js:130:8000)
+    at async Object.createFPTK (/app/src/services/fptkService.js:272:23)
+    at async /app/src/routes/fptkRoutes.js:20:18
+2025-11-11 02:39:28 [ERROR]: Prisma Error: 
+Invalid `prisma.fPTK.create()` invocation:
+
+
+Could not convert argument value Object {"$type": String("DateTime"), "value": String("+045600-01-01T00:00:00.000Z")} to ArgumentValue.
+2025-11-11 02:39:28 [ERROR]: Error: 
+Invalid `prisma.fPTK.create()` invocation:
+
+
+Could not convert argument value Object {"$type": String("DateTime"), "value": String("+045600-01-01T00:00:00.000Z")} to ArgumentValue.
+PrismaClientUnknownRequestError: 
+Invalid `prisma.fPTK.create()` invocation:
+
+
+Could not convert argument value Object {"$type": String("DateTime"), "value": String("+045600-01-01T00:00:00.000Z")} to ArgumentValue.
+    at $n.handleRequestError (/app/node_modules/@prisma/client/runtime/library.js:121:7505)
+    at $n.handleAndLogRequestError (/app/node_modules/@prisma/client/runtime/library.js:121:6623)
+    at $n.request (/app/node_modules/@prisma/client/runtime/library.js:121:6307)
+    at async l (/app/node_modules/@prisma/client/runtime/library.js:130:9633)
+    at async /app/src/services/fptkService.js:273:18
+    at async Proxy._transactionWithCallback (/app/node_modules/@prisma/client/runtime/library.js:130:8000)
+    at async Object.createFPTK (/app/src/services/fptkService.js:272:23)
+    at async /app/src/routes/fptkRoutes.js:20:18
+2025-11-11 02:39:28 [ERROR]: Prisma Error: 
+Invalid `prisma.fPTK.create()` invocation:
+
+
+Could not convert argument value Object {"$type": String("DateTime"), "value": String("+045833-01-01T00:00:00.000Z")} to ArgumentValue.
+2025-11-11 02:39:28 [ERROR]: Error: 
+Invalid `prisma.fPTK.create()` invocation:
+
+
+Could not convert argument value Object {"$type": String("DateTime"), "value": String("+045833-01-01T00:00:00.000Z")} to ArgumentValue.
+PrismaClientUnknownRequestError: 
+Invalid `prisma.fPTK.create()` invocation:
+
+
+Could not convert argument value Object {"$type": String("DateTime"), "value": String("+045833-01-01T00:00:00.000Z")} to ArgumentValue.
+    at $n.handleRequestError (/app/node_modules/@prisma/client/runtime/library.js:121:7505)
+    at $n.handleAndLogRequestError (/app/node_modules/@prisma/client/runtime/library.js:121:6623)
+    at $n.request (/app/node_modules/@prisma/client/runtime/library.js:121:6307)
+    at async l (/app/node_modules/@prisma/client/runtime/library.js:130:9633)
+    at async /app/src/services/fptkService.js:273:18
+    at async Proxy._transactionWithCallback (/app/node_modules/@prisma/client/runtime/library.js:130:8000)
+    at async Object.createFPTK (/app/src/services/fptkService.js:272:23)
+    at async /app/src/routes/fptkRoutes.js:20:18
+2025-11-11 02:39:28 [ERROR]: Prisma Error: 
+Invalid `prisma.fPTK.create()` invocation:
+
+
+Could not convert argument value Object {"$type": String("DateTime"), "value": String("+045833-01-01T00:00:00.000Z")} to ArgumentValue.
+2025-11-11 02:39:28 [ERROR]: Error: 
+Invalid `prisma.fPTK.create()` invocation:
+
+
+Could not convert argument value Object {"$type": String("DateTime"), "value": String("+045833-01-01T00:00:00.000Z")} to ArgumentValue.
+PrismaClientUnknownRequestError: 
+Invalid `prisma.fPTK.create()` invocation:
+
+
+Could not convert argument value Object {"$type": String("DateTime"), "value": String("+045833-01-01T00:00:00.000Z")} to ArgumentValue.
+    at $n.handleRequestError (/app/node_modules/@prisma/client/runtime/library.js:121:7505)
+    at $n.handleAndLogRequestError (/app/node_modules/@prisma/client/runtime/library.js:121:6623)
+    at $n.request (/app/node_modules/@prisma/client/runtime/library.js:121:6307)
+    at async l (/app/node_modules/@prisma/client/runtime/library.js:130:9633)
+    at async /app/src/services/fptkService.js:273:18
+    at async Proxy._transactionWithCallback (/app/node_modules/@prisma/client/runtime/library.js:130:8000)
+    at async Object.createFPTK (/app/src/services/fptkService.js:272:23)
+    at async /app/src/routes/fptkRoutes.js:20:18
+2025-11-11 02:39:29 [ERROR]: Prisma Error: 
+Invalid `prisma.fPTK.create()` invocation:
+
+
+Could not convert argument value Object {"$type": String("DateTime"), "value": String("+045833-01-01T00:00:00.000Z")} to ArgumentValue.
+2025-11-11 02:39:29 [ERROR]: Error: 
+Invalid `prisma.fPTK.create()` invocation:
+
+
+Could not convert argument value Object {"$type": String("DateTime"), "value": String("+045833-01-01T00:00:00.000Z")} to ArgumentValue.
+PrismaClientUnknownRequestError: 
+Invalid `prisma.fPTK.create()` invocation:
+
+
+Could not convert argument value Object {"$type": String("DateTime"), "value": String("+045833-01-01T00:00:00.000Z")} to ArgumentValue.
+    at $n.handleRequestError (/app/node_modules/@prisma/client/runtime/library.js:121:7505)
+    at $n.handleAndLogRequestError (/app/node_modules/@prisma/client/runtime/library.js:121:6623)
+    at $n.request (/app/node_modules/@prisma/client/runtime/library.js:121:6307)
+    at async l (/app/node_modules/@prisma/client/runtime/library.js:130:9633)
+    at async /app/src/services/fptkService.js:273:18
+    at async Proxy._transactionWithCallback (/app/node_modules/@prisma/client/runtime/library.js:130:8000)
+    at async Object.createFPTK (/app/src/services/fptkService.js:272:23)
+    at async /app/src/routes/fptkRoutes.js:20:18
+2025-11-11 02:39:29 [ERROR]: Prisma Error: 
+Invalid `prisma.fPTK.create()` invocation:
+
+
+Could not convert argument value Object {"$type": String("DateTime"), "value": String("+045870-01-01T00:00:00.000Z")} to ArgumentValue.
+2025-11-11 02:39:29 [ERROR]: Error: 
+Invalid `prisma.fPTK.create()` invocation:
+
+
+Could not convert argument value Object {"$type": String("DateTime"), "value": String("+045870-01-01T00:00:00.000Z")} to ArgumentValue.
+PrismaClientUnknownRequestError: 
+Invalid `prisma.fPTK.create()` invocation:
+
+
+Could not convert argument value Object {"$type": String("DateTime"), "value": String("+045870-01-01T00:00:00.000Z")} to ArgumentValue.
+    at $n.handleRequestError (/app/node_modules/@prisma/client/runtime/library.js:121:7505)
+    at $n.handleAndLogRequestError (/app/node_modules/@prisma/client/runtime/library.js:121:6623)
+    at $n.request (/app/node_modules/@prisma/client/runtime/library.js:121:6307)
+    at async l (/app/node_modules/@prisma/client/runtime/library.js:130:9633)
+    at async /app/src/services/fptkService.js:273:18
+    at async Proxy._transactionWithCallback (/app/node_modules/@prisma/client/runtime/library.js:130:8000)
+    at async Object.createFPTK (/app/src/services/fptkService.js:272:23)
+    at async /app/src/routes/fptkRoutes.js:20:18
+2025-11-11 02:39:29 [ERROR]: Prisma Error: 
+Invalid `prisma.fPTK.create()` invocation:
+
+
+Could not convert argument value Object {"$type": String("DateTime"), "value": String("+045870-01-01T00:00:00.000Z")} to ArgumentValue.
+2025-11-11 02:39:29 [ERROR]: Error: 
+Invalid `prisma.fPTK.create()` invocation:
+
+
+Could not convert argument value Object {"$type": String("DateTime"), "value": String("+045870-01-01T00:00:00.000Z")} to ArgumentValue.
+PrismaClientUnknownRequestError: 
+Invalid `prisma.fPTK.create()` invocation:
+
+
+Could not convert argument value Object {"$type": String("DateTime"), "value": String("+045870-01-01T00:00:00.000Z")} to ArgumentValue.
+    at $n.handleRequestError (/app/node_modules/@prisma/client/runtime/library.js:121:7505)
+    at $n.handleAndLogRequestError (/app/node_modules/@prisma/client/runtime/library.js:121:6623)
+    at $n.request (/app/node_modules/@prisma/client/runtime/library.js:121:6307)
+    at async l (/app/node_modules/@prisma/client/runtime/library.js:130:9633)
+    at async /app/src/services/fptkService.js:273:18
+    at async Proxy._transactionWithCallback (/app/node_modules/@prisma/client/runtime/library.js:130:8000)
+    at async Object.createFPTK (/app/src/services/fptkService.js:272:23)
+    at async /app/src/routes/fptkRoutes.js:20:18
+2025-11-11 02:39:29 [ERROR]: Error: FPTK number already exists
+Error: FPTK number already exists
+    at Object.createFPTK (/app/src/services/fptkService.js:204:13)
+    at async /app/src/routes/fptkRoutes.js:20:18
+2025-11-11 02:53:18 [ERROR]: Error: FPTK number already exists
+Error: FPTK number already exists
+    at Object.createFPTK (/app/src/services/fptkService.js:204:13)
+    at async /app/src/routes/fptkRoutes.js:20:18
+2025-11-11 02:53:18 [ERROR]: Error: FPTK number already exists
+Error: FPTK number already exists
+    at Object.createFPTK (/app/src/services/fptkService.js:204:13)
+    at async /app/src/routes/fptkRoutes.js:20:18
+2025-11-11 02:53:18 [ERROR]: Error: FPTK number already exists
+Error: FPTK number already exists
+    at Object.createFPTK (/app/src/services/fptkService.js:204:13)
+    at async /app/src/routes/fptkRoutes.js:20:18
+2025-11-11 03:02:06 [ERROR]: Error: FPTK number already exists
+Error: FPTK number already exists
+    at Object.createFPTK (/app/src/services/fptkService.js:204:13)
+    at async /app/src/routes/fptkRoutes.js:20:18
+2025-11-11 03:02:06 [ERROR]: Error: FPTK number already exists
+Error: FPTK number already exists
+    at Object.createFPTK (/app/src/services/fptkService.js:204:13)
+    at async /app/src/routes/fptkRoutes.js:20:18
+2025-11-11 03:02:06 [ERROR]: Error: FPTK number already exists
+Error: FPTK number already exists
+    at Object.createFPTK (/app/src/services/fptkService.js:204:13)
+    at async /app/src/routes/fptkRoutes.js:20:18
+2025-11-11 03:02:06 [ERROR]: Error: FPTK number already exists
+Error: FPTK number already exists
+    at Object.createFPTK (/app/src/services/fptkService.js:204:13)
+    at async /app/src/routes/fptkRoutes.js:20:18
+2025-11-11 03:02:06 [ERROR]: Error: FPTK number already exists
+Error: FPTK number already exists
+    at Object.createFPTK (/app/src/services/fptkService.js:204:13)
+    at async /app/src/routes/fptkRoutes.js:20:18
+2025-11-11 03:02:06 [ERROR]: Error: FPTK number already exists
+Error: FPTK number already exists
+    at Object.createFPTK (/app/src/services/fptkService.js:204:13)
+    at async /app/src/routes/fptkRoutes.js:20:18
+2025-11-11 03:02:06 [ERROR]: Error: FPTK number already exists
+Error: FPTK number already exists
+    at Object.createFPTK (/app/src/services/fptkService.js:204:13)
+    at async /app/src/routes/fptkRoutes.js:20:18
+2025-11-11 03:02:06 [ERROR]: Error: FPTK number already exists
+Error: FPTK number already exists
+    at Object.createFPTK (/app/src/services/fptkService.js:204:13)
+    at async /app/src/routes/fptkRoutes.js:20:18
+2025-11-11 07:07:43 [ERROR]: Authentication error: Invalid or expired token
+Error: Invalid or expired token
+    at verifyAccessToken (/app/src/utils/token.js:37:11)
+    at authenticate (/app/src/middleware/auth.js:23:21)
+    at Layer.handle [as handle_request] (/app/node_modules/express/lib/router/layer.js:95:5)
+    at trim_prefix (/app/node_modules/express/lib/router/index.js:328:13)
+    at /app/node_modules/express/lib/router/index.js:286:9
+    at Function.process_params (/app/node_modules/express/lib/router/index.js:346:12)
+    at next (/app/node_modules/express/lib/router/index.js:280:10)
+    at Function.handle (/app/node_modules/express/lib/router/index.js:175:3)
+    at router (/app/node_modules/express/lib/router/index.js:47:12)
+    at Layer.handle [as handle_request] (/app/node_modules/express/lib/router/layer.js:95:5)
+2025-11-11 07:07:43 [ERROR]: Authentication error: Invalid or expired token
+Error: Invalid or expired token
+    at verifyAccessToken (/app/src/utils/token.js:37:11)
+    at authenticate (/app/src/middleware/auth.js:23:21)
+    at Layer.handle [as handle_request] (/app/node_modules/express/lib/router/layer.js:95:5)
+    at next (/app/node_modules/express/lib/router/route.js:149:13)
+    at Route.dispatch (/app/node_modules/express/lib/router/route.js:119:3)
+    at Layer.handle [as handle_request] (/app/node_modules/express/lib/router/layer.js:95:5)
+    at /app/node_modules/express/lib/router/index.js:284:15
+    at Function.process_params (/app/node_modules/express/lib/router/index.js:346:12)
+    at next (/app/node_modules/express/lib/router/index.js:280:10)
+    at Function.handle (/app/node_modules/express/lib/router/index.js:175:3)

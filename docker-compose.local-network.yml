@@ -1,0 +1,33 @@
+version: '3.8'
+
+# Local Network Deployment - Host on your laptop, accessible to others on same network
+# Usage: 
+#   1. Find your laptop IP: ipconfig (Windows) or ifconfig (Linux/Mac)
+#   2. Set MY_LOCAL_IP environment variable: $env:MY_LOCAL_IP="192.168.1.100"
+#   3. Run: docker-compose -f docker-compose.yml -f docker-compose.local-network.yml up -d
+
+services:
+  backend:
+    environment:
+      # Use your laptop's local IP for CORS and frontend URLs
+      FRONTEND_URL: http://${MY_LOCAL_IP:-localhost}:4001
+      CANDIDATE_PORTAL_URL: http://${MY_LOCAL_IP:-localhost}:4002
+      CORS_ORIGIN: http://${MY_LOCAL_IP:-localhost}:4001,http://${MY_LOCAL_IP:-localhost}:4002,http://localhost:4001,http://localhost:4002
+    ports:
+      # Expose on all interfaces (0.0.0.0) so others can access
+      - "0.0.0.0:4000:4000"
+
+  frontend:
+    environment:
+      NEXT_PUBLIC_API_URL: http://${MY_LOCAL_IP:-localhost}:4000/api
+    ports:
+      # Expose on all interfaces (0.0.0.0) so others can access
+      - "0.0.0.0:4001:3000"
+
+  candidate-portal:
+    environment:
+      NEXT_PUBLIC_API_URL: http://${MY_LOCAL_IP:-localhost}:4000/api
+    ports:
+      # Expose on all interfaces (0.0.0.0) so others can access
+      - "0.0.0.0:4002:3000"
+

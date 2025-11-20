@@ -1,0 +1,110 @@
+2025-10-23 01:41:29 [ERROR]: Prisma Error: 
+Invalid `prisma.user.findUnique()` invocation:
+
+
+The column `users.firstName` does not exist in the current database.
+2025-10-23 01:41:29 [ERROR]: Error: 
+Invalid `prisma.user.findUnique()` invocation:
+
+
+The column `users.firstName` does not exist in the current database.
+PrismaClientKnownRequestError: 
+Invalid `prisma.user.findUnique()` invocation:
+
+
+The column `users.firstName` does not exist in the current database.
+    at $n.handleRequestError (/app/node_modules/@prisma/client/runtime/library.js:121:7315)
+    at $n.handleAndLogRequestError (/app/node_modules/@prisma/client/runtime/library.js:121:6623)
+    at $n.request (/app/node_modules/@prisma/client/runtime/library.js:121:6307)
+    at async l (/app/node_modules/@prisma/client/runtime/library.js:130:9633)
+    at async Object.login (/app/src/services/authService.js:70:16)
+    at async /app/src/controllers/authController.js:30:18
+2025-10-23 01:54:14 [ERROR]: Prisma Error: 
+Invalid `prisma.user.findUnique()` invocation:
+
+
+The column `users.firstName` does not exist in the current database.
+2025-10-23 01:54:14 [ERROR]: Error: 
+Invalid `prisma.user.findUnique()` invocation:
+
+
+The column `users.firstName` does not exist in the current database.
+PrismaClientKnownRequestError: 
+Invalid `prisma.user.findUnique()` invocation:
+
+
+The column `users.firstName` does not exist in the current database.
+    at $n.handleRequestError (/app/node_modules/@prisma/client/runtime/library.js:121:7315)
+    at $n.handleAndLogRequestError (/app/node_modules/@prisma/client/runtime/library.js:121:6623)
+    at $n.request (/app/node_modules/@prisma/client/runtime/library.js:121:6307)
+    at async l (/app/node_modules/@prisma/client/runtime/library.js:130:9633)
+    at async Object.login (/app/src/services/authService.js:70:16)
+    at async /app/src/controllers/authController.js:30:18
+2025-10-23 02:05:14 [ERROR]: Error: Invalid credentials
+Error: Invalid credentials
+    at Object.login (/app/src/services/authService.js:112:11)
+    at async /app/src/controllers/authController.js:30:18
+2025-10-23 02:32:32 [ERROR]: Error: Invalid credentials
+Error: Invalid credentials
+    at Object.login (/app/src/services/authService.js:112:11)
+    at async /app/src/controllers/authController.js:30:18
+2025-10-23 02:43:55 [ERROR]: Error: Invalid credentials
+Error: Invalid credentials
+    at Object.login (/app/src/services/authService.js:112:11)
+    at async /app/src/controllers/authController.js:30:18
+2025-10-23 02:47:56 [ERROR]: Error: Invalid credentials
+Error: Invalid credentials
+    at Object.login (/app/src/services/authService.js:112:11)
+    at async /app/src/controllers/authController.js:30:18
+2025-10-23 02:49:09 [ERROR]: Error: Invalid credentials
+Error: Invalid credentials
+    at Object.login (/app/src/services/authService.js:112:11)
+    at async /app/src/controllers/authController.js:30:18
+2025-10-23 02:50:07 [ERROR]: Error: Account is locked. Try again in 15 minutes
+Error: Account is locked. Try again in 15 minutes
+    at Object.login (/app/src/services/authService.js:81:11)
+    at async /app/src/controllers/authController.js:30:18
+2025-10-23 02:50:23 [ERROR]: Error: Account is locked. Try again in 14 minutes
+Error: Account is locked. Try again in 14 minutes
+    at Object.login (/app/src/services/authService.js:81:11)
+    at async /app/src/controllers/authController.js:30:18
+2025-10-23 02:54:51 [ERROR]: Error: Invalid credentials
+Error: Invalid credentials
+    at Object.login (/app/src/services/authService.js:112:11)
+    at async /app/src/controllers/authController.js:30:18
+2025-10-23 07:23:58 [ERROR]: Authentication error: Invalid or expired token
+Error: Invalid or expired token
+    at verifyAccessToken (/app/src/utils/token.js:37:11)
+    at authenticate (/app/src/middleware/auth.js:23:21)
+    at Layer.handle [as handle_request] (/app/node_modules/express/lib/router/layer.js:95:5)
+    at next (/app/node_modules/express/lib/router/route.js:149:13)
+    at Route.dispatch (/app/node_modules/express/lib/router/route.js:119:3)
+    at Layer.handle [as handle_request] (/app/node_modules/express/lib/router/layer.js:95:5)
+    at /app/node_modules/express/lib/router/index.js:284:15
+    at Function.process_params (/app/node_modules/express/lib/router/index.js:346:12)
+    at next (/app/node_modules/express/lib/router/index.js:280:10)
+    at Function.handle (/app/node_modules/express/lib/router/index.js:175:3)
+2025-10-23 07:56:59 [ERROR]: Authentication error: Invalid or expired token
+Error: Invalid or expired token
+    at verifyAccessToken (/app/src/utils/token.js:37:11)
+    at authenticate (/app/src/middleware/auth.js:23:21)
+    at Layer.handle [as handle_request] (/app/node_modules/express/lib/router/layer.js:95:5)
+    at next (/app/node_modules/express/lib/router/route.js:149:13)
+    at Route.dispatch (/app/node_modules/express/lib/router/route.js:119:3)
+    at Layer.handle [as handle_request] (/app/node_modules/express/lib/router/layer.js:95:5)
+    at /app/node_modules/express/lib/router/index.js:284:15
+    at Function.process_params (/app/node_modules/express/lib/router/index.js:346:12)
+    at next (/app/node_modules/express/lib/router/index.js:280:10)
+    at Function.handle (/app/node_modules/express/lib/router/index.js:175:3)
+2025-10-23 08:13:28 [ERROR]: Authentication error: Invalid or expired token
+Error: Invalid or expired token
+    at verifyAccessToken (/app/src/utils/token.js:37:11)
+    at authenticate (/app/src/middleware/auth.js:23:21)
+    at Layer.handle [as handle_request] (/app/node_modules/express/lib/router/layer.js:95:5)
+    at next (/app/node_modules/express/lib/router/route.js:149:13)
+    at Route.dispatch (/app/node_modules/express/lib/router/route.js:119:3)
+    at Layer.handle [as handle_request] (/app/node_modules/express/lib/router/layer.js:95:5)
+    at /app/node_modules/express/lib/router/index.js:284:15
+    at Function.process_params (/app/node_modules/express/lib/router/index.js:346:12)
+    at next (/app/node_modules/express/lib/router/index.js:280:10)
+    at Function.handle (/app/node_modules/express/lib/router/index.js:175:3)

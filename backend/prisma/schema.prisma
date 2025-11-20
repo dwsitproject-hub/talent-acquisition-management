@@ -1,0 +1,962 @@
+// Prisma Schema for KPN Talent Acquisition System
+// PostgreSQL Database Schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ==================== ENUMS ====================
+
+enum UserRole {
+  SUPER_ADMIN
+  CHRO
+  DEPARTMENT_HEAD
+  HRBP
+  TA_TEAM
+  HIRING_MANAGER
+  INTERVIEWER
+  CANDIDATE
+}
+
+enum ApplicationStatus {
+  DRAFT
+  SUBMITTED
+  SCREENING
+  PSYCHOMETRIC_TEST
+  TECHNICAL_TEST
+  INTERVIEW_SCHEDULED
+  INTERVIEW_COMPLETED
+  DOCUMENT_VERIFICATION
+  OFFER_PROPOSED
+  OFFER_APPROVED
+  OFFER_SENT
+  OFFER_ACCEPTED
+  OFFER_REJECTED
+  MEDICAL_CHECKUP_SCHEDULED
+  MEDICAL_CHECKUP_COMPLETED
+  CONTRACT_SENT
+  CONTRACT_SIGNED
+  ONBOARDING
+  HIRED
+  REJECTED
+  WITHDRAWN
+}
+
+enum FPTKStatus {
+  DRAFT
+  APPROVED
+  OPEN
+  PARTIALLY_FILLED
+  FILLED
+  CANCELLED
+  EXPIRED
+}
+
+enum InterviewType {
+  PHONE_SCREEN
+  HR_INTERVIEW
+  TECHNICAL_INTERVIEW
+  MANAGERIAL_INTERVIEW
+  PANEL_INTERVIEW
+  FINAL_INTERVIEW
+}
+
+enum InterviewStatus {
+  SCHEDULED
+  CONFIRMED
+  COMPLETED
+  CANCELLED
+  NO_SHOW
+  RESCHEDULED
+}
+
+enum DocumentType {
+  RESUME
+  COVER_LETTER
+  ID_CARD
+  DIPLOMA
+  TRANSCRIPT
+  CERTIFICATE
+  REFERENCE_LETTER
+  MEDICAL_REPORT
+  PHOTO
+  OTHER
+}
+
+enum DocumentVerificationStatus {
+  PENDING
+  VERIFIED
+  REJECTED
+  EXPIRED
+}
+
+enum OfferStatus {
+  DRAFT
+  PENDING_HRBP_REVIEW
+  PENDING_HEAD_APPROVAL
+  APPROVED
+  REJECTED
+  SENT_TO_CANDIDATE
+  ACCEPTED
+  REJECTED_BY_CANDIDATE
+  NEGOTIATION
+  EXPIRED
+}
+
+enum OnboardingStatus {
+  NOT_STARTED
+  IN_PROGRESS
+  COMPLETED
+  OVERDUE
+}
+
+enum NotificationType {
+  EMAIL
+  WHATSAPP
+  SMS
+  IN_APP
+}
+
+enum AuditAction {
+  CREATE
+  READ
+  UPDATE
+  DELETE
+  LOGIN
+  LOGOUT
+  APPROVE
+  REJECT
+  EXPORT
+}
+
+// ==================== USER MANAGEMENT ====================
+
+model User {
+  id                String    @id @default(uuid())
+  email             String    @unique
+  password          String?   // Null for SSO users
+  firstName         String
+  lastName          String
+  phoneNumber       String?
+  role              UserRole
+  department        String?
+  division          String?
+  pt                String?   // PT (Company) - for HRBP role
+  area              String?   // Area - for HRBP role
+  areaDetail        String?   // Area Detail - for HRBP role
+  isActive          Boolean   @default(true)
+  isEmailVerified   Boolean   @default(false)
+  emailVerifiedAt   DateTime?
+  lastLoginAt       DateTime?
+  failedLoginCount  Int       @default(0)
+  lockedUntil       DateTime?
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+
+  // Relations
+  refreshTokens         RefreshToken[]
+  candidateProfile      Candidate?
+  createdFPTKs          FPTK[]               @relation("CreatedBy")
+  applications          Application[]        @relation("ApplicationsByUser")
+  interviewsAsInterviewer Interview[]        @relation("Interviewer")
+  interviewFeedback     InterviewFeedback[]
+  offersCreated         Offer[]              @relation("OfferCreatedBy")
+  offersApproved        Offer[]              @relation("OfferApprovedBy")
+  auditLogs             AuditLog[]
+  notifications         Notification[]
+  onboardingTasks       OnboardingTask[]     @relation("TaskAssignedTo")
+  menuAccessUpdated     MenuAccess[]         @relation("MenuAccessUpdater")
+
+  @@index([email])
+  @@index([role])
+  @@map("users")
+}
+
+model RefreshToken {
+  id          String   @id @default(uuid())
+  token       String   @unique
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  expiresAt   DateTime
+  createdAt   DateTime @default(now())
+  revokedAt   DateTime?
+  replacedBy  String?
+  ipAddress   String?
+  userAgent   String?
+
+  @@index([userId])
+  @@index([token])
+  @@map("refresh_tokens")
+}
+
+// ==================== CANDIDATE MANAGEMENT ====================
+
+model Candidate {
+  id                String    @id @default(uuid())
+  userId            String    @unique
+  user              User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  // Personal Information (encrypted fields marked with _encrypted)
+  nationalId        String?   @unique // Encrypted
+  dateOfBirth       DateTime?
+  placeOfBirth      String?
+  gender            String?
+  maritalStatus     String?
+  nationality       String?
+  religion          String?
+  bloodType         String?
+  height            Int?      // in cm
+  weight            Int?      // in kg
+  
+  // Tax & Social Security
+  npwpNumber        String?   @unique // Tax ID
+  bpjsJhtNumber     String?   // Employment social security
+  bpjsHealthNumber  String?   // Health insurance
+  bpjsPensionNumber String?   // Pension
+  
+  // Contact Information
+  currentAddress    String?
+  permanentAddress  String?
+  emergencyContact  String?
+  emergencyPhone    String?
+  emergencyRelation String?
+  
+  // Professional Information
+  currentJobTitle   String?
+  currentCompany    String?
+  currentSalary     Decimal?  @db.Decimal(12, 2)
+  expectedSalary    Decimal?  @db.Decimal(12, 2)
+  noticePeriod      Int?      // in days
+  availableFrom     DateTime?
+  
+  // Additional Information
+  drivingLicense    String[]  // Array: ['A', 'C']
+  skills            String[]
+  languages         Json?     // {language: level}
+  linkedinUrl       String?
+  portfolioUrl      String?
+  formDataDiri      Json?
+  
+  // AI Scoring
+  overallScore      Float?    @default(0)
+  aiMatchScore      Json?     // Scores per job application
+  
+  // Privacy & Consent
+  gdprConsent       Boolean   @default(false)
+  gdprConsentDate   DateTime?
+  marketingConsent  Boolean   @default(false)
+  
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+
+  // Relations
+  applications      Application[]
+  documents         Document[]
+  educations        Education[]
+  workExperiences   WorkExperience[]
+  certifications    Certification[]
+  references        Reference[]
+  interviews        Interview[]
+  offers            Offer[]
+  formTokens        CandidateFormToken[]
+  onboarding        Onboarding?
+
+  @@index([nationalId])
+  @@index([userId])
+  @@map("candidates")
+}
+
+model Education {
+  id              String    @id @default(uuid())
+  candidateId     String
+  candidate       Candidate @relation(fields: [candidateId], references: [id], onDelete: Cascade)
+  
+  institution     String
+  degree          String
+  fieldOfStudy    String?
+  startDate       DateTime
+  endDate         DateTime?
+  isCurrent       Boolean   @default(false)
+  grade           String?
+  location        String?
+  achievements    String?
+  
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  @@index([candidateId])
+  @@map("educations")
+}
+
+model WorkExperience {
+  id              String    @id @default(uuid())
+  candidateId     String
+  candidate       Candidate @relation(fields: [candidateId], references: [id], onDelete: Cascade)
+  
+  company         String
+  jobTitle        String
+  startDate       DateTime
+  endDate         DateTime?
+  isCurrent       Boolean   @default(false)
+  location        String?
+  responsibilities String?  @db.Text
+  achievements    String?   @db.Text
+  reasonForLeaving String?
+  startingSalary  Decimal?  @db.Decimal(12, 2)
+  endingSalary    Decimal?  @db.Decimal(12, 2)
+  
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  @@index([candidateId])
+  @@map("work_experiences")
+}
+
+model Certification {
+  id              String    @id @default(uuid())
+  candidateId     String
+  candidate       Candidate @relation(fields: [candidateId], references: [id], onDelete: Cascade)
+  
+  name            String
+  issuingOrg      String
+  issueDate       DateTime
+  expiryDate      DateTime?
+  credentialId    String?
+  credentialUrl   String?
+  
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  @@index([candidateId])
+  @@map("certifications")
+}
+
+model Reference {
+  id              String    @id @default(uuid())
+  candidateId     String
+  candidate       Candidate @relation(fields: [candidateId], references: [id], onDelete: Cascade)
+  
+  name            String
+  company         String?
+  position        String?
+  relationship    String
+  email           String?
+  phone           String
+  address         String?
+  isContactAllowed Boolean  @default(true)
+  
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  @@index([candidateId])
+  @@map("references")
+}
+
+// ==================== FPTK & JOB REQUISITIONS ====================
+
+model FPTK {
+  id                String      @id @default(uuid())
+  fptkNumber        String?     @unique
+  
+  // Basic Information
+  pt                String?     // PT (Company)
+  noFktk            String?     // No FKTK
+  statusFktk        String?     // Status FKTK
+  division          String?     // Division
+  section           String?     // Section
+  hiringManager     String?     // Hiring Manager
+  position          String      // Position
+  
+  // Position Details
+  positionTitle     String      // Same as position for backward compatibility
+  department        String
+  location          String
+  employmentType    String      // Kontrak, Probation, Full-time, Part-time
+  typeGrade         String?     // Type Grade
+  grade2            String?     // Grade2
+  level             String?     // Junior, Senior, Manager, etc.
+  
+  // Priority
+  priority          String?     // P0, P1, P2
+  priorityByMonthYear String?   // Priority by Month-Year (format: YYYY-MM)
+  isPriority        Boolean     @default(false) // Legacy field
+  
+  // Job Details
+  jobSpecification  String?     @db.Text // Job Specification and Qualifications
+  criteria          String?     @db.Text // Criteria
+  
+  // Location Details
+  area              String?     // Area
+  areaDetail        String?     // Area Detail
+  
+  // Replacement Information
+  additionalOrReplacement String? // Additional or Replacement
+  replacementName   String?     // Replacement Name
+  resignReason      String?     @db.Text // Resign Reason
+  
+  // Request Details
+  totalRequest      Int?        // Total Request
+  currentStatus     String?     // Current Status
+  requestDate       DateTime?   // Request Date
+  
+  // FPTK File Information
+  fptkFilePath      String?     // Path to uploaded FPTK file
+  fptkFileName      String?     // Original filename of FPTK file
+  fptkReceiveDate   DateTime?   // Date when FPTK file was received
+  
+  // Legacy Fields (for backward compatibility)
+  numberOfPositions Int         @default(1)
+  filledPositions   Int         @default(0)
+  minEducation      String?
+  minExperience     Int?        // in years
+  requiredSkills    String[]
+  jobDescription    String?     @db.Text
+  responsibilities  String?     @db.Text
+  qualifications    String?     @db.Text
+  salaryRangeMin    Decimal?    @db.Decimal(12, 2)
+  salaryRangeMax    Decimal?    @db.Decimal(12, 2)
+  benefits          String?     @db.Text
+  requestedBy       String?
+  status            FPTKStatus  @default(DRAFT)
+  createdBy         String
+  creator           User        @relation("CreatedBy", fields: [createdBy], references: [id])
+  approvedBy        String?
+  approvedAt        DateTime?
+  targetStartDate   DateTime?
+  expiryDate        DateTime?
+  isPublished       Boolean     @default(false)
+  publishedAt       DateTime?
+  remark            String?     @db.Text
+  
+  createdAt         DateTime    @default(now())
+  updatedAt         DateTime    @updatedAt
+
+  // Relations
+  applications      Application[]
+  statusHistory     FPTKStatusHistory[]
+
+  @@index([fptkNumber])
+  @@index([status])
+  @@index([department])
+  @@index([division])
+  @@index([priority])
+  @@map("fptk")
+}
+
+model FPTKStatusHistory {
+  id              String      @id @default(uuid())
+  fptkId          String
+  fptk            FPTK        @relation(fields: [fptkId], references: [id], onDelete: Cascade)
+  
+  fromStatus      String?
+  toStatus        String      // Current status string (e.g., "Raise FPTK", "CV Hunting", etc.)
+  changedBy       String?
+  reason          String?
+  notes           String?
+  
+  startDate       DateTime?   // When this status started
+  endDate         DateTime?   // When this status ended (null if current)
+  
+  createdAt       DateTime    @default(now())
+  updatedAt       DateTime    @updatedAt
+
+  @@index([fptkId])
+  @@index([toStatus])
+  @@index([createdAt])
+  @@map("fptk_status_history")
+}
+
+// ==================== APPLICATION & RECRUITMENT PIPELINE ====================
+
+model Application {
+  id                String             @id @default(uuid())
+  applicationNumber String             @unique @default(cuid())
+  candidateId       String
+  candidate         Candidate          @relation(fields: [candidateId], references: [id], onDelete: Cascade)
+  fptkId            String
+  fptk              FPTK               @relation(fields: [fptkId], references: [id])
+  
+  status            ApplicationStatus  @default(SUBMITTED)
+  currentStage      Int                @default(1) // 1-9
+  
+  // Sourcing Information
+  source            String?            // LinkedIn, Referral, Job Board, etc.
+  referredBy        String?
+  appliedByUserId   String?
+  appliedBy         User?              @relation("ApplicationsByUser", fields: [appliedByUserId], references: [id])
+  
+  // Scoring & Evaluation
+  aiMatchScore      Float?
+  screeningScore    Float?
+  technicalScore    Float?
+  interviewScore    Float?
+  overallScore      Float?
+  
+  // Timeline Tracking
+  appliedAt         DateTime           @default(now())
+  screenedAt        DateTime?
+  interviewedAt     DateTime?
+  offeredAt         DateTime?
+  hiredAt           DateTime?
+  rejectedAt        DateTime?
+  withdrawnAt       DateTime?
+  
+  // SLA Tracking
+  slaBreached       Boolean            @default(false)
+  slaDaysElapsed    Int                @default(0)
+  
+  // Notes & Comments
+  notes             String?            @db.Text
+  rejectionReason   String?
+  
+  createdAt         DateTime           @default(now())
+  updatedAt         DateTime           @updatedAt
+
+  // Relations
+  statusHistory     ApplicationStatusHistory[]
+  tests             Test[]
+  interviews        Interview[]
+  documents         Document[]
+  offers            Offer[]
+
+  @@index([candidateId])
+  @@index([fptkId])
+  @@index([status])
+  @@index([appliedAt])
+  @@map("applications")
+}
+
+model ApplicationStatusHistory {
+  id              String             @id @default(uuid())
+  applicationId   String
+  application     Application        @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+  
+  fromStatus      ApplicationStatus?
+  toStatus        ApplicationStatus
+  changedBy       String?
+  reason          String?
+  notes           String?
+  
+  createdAt       DateTime           @default(now())
+
+  @@index([applicationId])
+  @@index([createdAt])
+  @@map("application_status_history")
+}
+
+// ==================== TESTS & ASSESSMENTS ====================
+
+model Test {
+  id              String      @id @default(uuid())
+  applicationId   String
+  application     Application @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+  
+  testType        String      // Psychometric, Technical, Language, etc.
+  testName        String
+  provider        String?     // External test provider
+  
+  scheduledAt     DateTime?
+  startedAt       DateTime?
+  completedAt     DateTime?
+  
+  score           Float?
+  maxScore        Float?
+  percentile      Float?
+  passed          Boolean?
+  
+  testUrl         String?
+  resultUrl       String?
+  notes           String?
+  
+  createdAt       DateTime    @default(now())
+  updatedAt       DateTime    @updatedAt
+
+  @@index([applicationId])
+  @@map("tests")
+}
+
+// ==================== INTERVIEWS ====================
+
+model Interview {
+  id              String          @id @default(uuid())
+  applicationId   String
+  application     Application     @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+  candidateId     String
+  candidate       Candidate       @relation(fields: [candidateId], references: [id])
+  
+  interviewType   InterviewType
+  status          InterviewStatus @default(SCHEDULED)
+  round           Int             @default(1)
+  
+  scheduledAt     DateTime
+  duration        Int             // in minutes
+  location        String?
+  meetingLink     String?
+  meetingPassword String?
+  
+  interviewerId   String?
+  interviewer     User?           @relation("Interviewer", fields: [interviewerId], references: [id])
+  interviewerName String?         // Store interviewer name as string when no matching user found
+  panelMembers    String[]        // Array of user IDs
+  
+  notes           String?         @db.Text
+  feedback        InterviewFeedback[]
+  
+  confirmedAt     DateTime?
+  completedAt     DateTime?
+  cancelledAt     DateTime?
+  cancellationReason String?
+  
+  createdAt       DateTime        @default(now())
+  updatedAt       DateTime        @updatedAt
+
+  @@index([applicationId])
+  @@index([candidateId])
+  @@index([interviewerId])
+  @@index([scheduledAt])
+  @@map("interviews")
+}
+
+model InterviewFeedback {
+  id              String    @id @default(uuid())
+  interviewId     String
+  interview       Interview @relation(fields: [interviewId], references: [id], onDelete: Cascade)
+  interviewerId   String
+  interviewer     User      @relation(fields: [interviewerId], references: [id])
+  
+  technicalSkills Int?      // 1-5 rating
+  communication   Int?
+  problemSolving  Int?
+  cultureFit      Int?
+  overallRating   Int?
+  
+  strengths       String?   @db.Text
+  weaknesses      String?   @db.Text
+  recommendation  String    // Strongly Recommend, Recommend, Neutral, Not Recommend
+  comments        String?   @db.Text
+  
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  @@index([interviewId])
+  @@index([interviewerId])
+  @@map("interview_feedback")
+}
+
+// ==================== DOCUMENTS ====================
+
+model Document {
+  id              String                      @id @default(uuid())
+  candidateId     String?
+  candidate       Candidate?                  @relation(fields: [candidateId], references: [id], onDelete: Cascade)
+  applicationId   String?
+  application     Application?                @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+  
+  documentType    DocumentType
+  fileName        String
+  originalName    String
+  fileSize        Int                         // in bytes
+  mimeType        String
+  fileUrl         String
+  
+  verificationStatus DocumentVerificationStatus @default(PENDING)
+  verifiedBy      String?
+  verifiedAt      DateTime?
+  verificationNotes String?
+  
+  expiryDate      DateTime?
+  
+  // Security
+  isEncrypted     Boolean                     @default(false)
+  virusScanned    Boolean                     @default(false)
+  scanResult      String?
+  
+  uploadedAt      DateTime                    @default(now())
+  updatedAt       DateTime                    @updatedAt
+
+  @@index([candidateId])
+  @@index([applicationId])
+  @@index([documentType])
+  @@map("documents")
+}
+
+model CandidateFormToken {
+  id          String    @id @default(uuid())
+  candidateId String
+  candidate   Candidate @relation(fields: [candidateId], references: [id], onDelete: Cascade)
+  token       String    @unique
+  expiresAt   DateTime
+  submittedAt DateTime?
+  createdAt   DateTime  @default(now())
+
+  @@index([candidateId])
+  @@map("candidate_form_tokens")
+}
+
+// ==================== OFFERS ====================
+
+model Offer {
+  id              String      @id @default(uuid())
+  offerNumber     String      @unique @default(cuid())
+  applicationId   String
+  application     Application @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+  candidateId     String
+  candidate       Candidate   @relation(fields: [candidateId], references: [id])
+  
+  status          OfferStatus @default(DRAFT)
+  
+  // Position Details
+  jobTitle        String
+  department      String
+  location        String
+  startDate       DateTime
+  
+  // Compensation
+  basicSalary     Decimal     @db.Decimal(12, 2)
+  allowances      Json?       // {transport: 1000000, meal: 500000}
+  bonusStructure  String?     @db.Text
+  totalPackage    Decimal     @db.Decimal(12, 2)
+  
+  // Benefits
+  benefits        String[]
+  
+  // Contract Terms
+  employmentType  String      // Permanent, Contract, Probation
+  contractDuration Int?       // in months
+  probationPeriod Int?        // in months
+  noticePeriod    Int?        // in days
+  
+  // Workflow
+  createdBy       String
+  creator         User        @relation("OfferCreatedBy", fields: [createdBy], references: [id])
+  hrbpReviewedBy  String?
+  hrbpReviewedAt  DateTime?
+  approvedBy      String?
+  approver        User?       @relation("OfferApprovedBy", fields: [approvedBy], references: [id])
+  approvedAt      DateTime?
+  rejectionReason String?
+  
+  // Candidate Interaction
+  sentToCandidate DateTime?
+  viewedByCandidate DateTime?
+  respondedAt     DateTime?
+  candidateResponse String?   // Accept, Reject, Negotiate
+  counterOffer    Decimal?    @db.Decimal(12, 2)
+  negotiationNotes String?    @db.Text
+  
+  // Documents
+  offerLetterUrl  String?
+  contractUrl     String?
+  signedContractUrl String?
+  
+  expiryDate      DateTime?
+  
+  createdAt       DateTime    @default(now())
+  updatedAt       DateTime    @updatedAt
+
+  @@index([applicationId])
+  @@index([candidateId])
+  @@index([status])
+  @@map("offers")
+}
+
+// ==================== ONBOARDING ====================
+
+model Onboarding {
+  id              String            @id @default(uuid())
+  candidateId     String            @unique
+  candidate       Candidate         @relation(fields: [candidateId], references: [id], onDelete: Cascade)
+  
+  status          OnboardingStatus  @default(NOT_STARTED)
+  startDate       DateTime
+  expectedEndDate DateTime
+  completedDate   DateTime?
+  
+  progress        Int               @default(0) // Percentage 0-100
+  
+  buddyId         String?           // Mentor/buddy assigned
+  
+  notes           String?           @db.Text
+  
+  createdAt       DateTime          @default(now())
+  updatedAt       DateTime          @updatedAt
+
+  // Relations
+  tasks           OnboardingTask[]
+
+  @@index([candidateId])
+  @@index([status])
+  @@map("onboarding")
+}
+
+model OnboardingTask {
+  id              String            @id @default(uuid())
+  onboardingId    String
+  onboarding      Onboarding        @relation(fields: [onboardingId], references: [id], onDelete: Cascade)
+  
+  taskName        String
+  description     String?           @db.Text
+  category        String            // Documentation, IT Setup, Training, etc.
+  
+  assignedTo      String?
+  assignee        User?             @relation("TaskAssignedTo", fields: [assignedTo], references: [id])
+  
+  dueDate         DateTime?
+  completedDate   DateTime?
+  isCompleted     Boolean           @default(false)
+  isMandatory     Boolean           @default(true)
+  
+  documentUrl     String?
+  notes           String?
+  
+  createdAt       DateTime          @default(now())
+  updatedAt       DateTime          @updatedAt
+
+  @@index([onboardingId])
+  @@index([assignedTo])
+  @@map("onboarding_tasks")
+}
+
+// ==================== NOTIFICATIONS ====================
+
+model Notification {
+  id              String            @id @default(uuid())
+  userId          String
+  user            User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  type            NotificationType
+  channel         String            // email, whatsapp, sms, push
+  
+  subject         String
+  message         String            @db.Text
+  data            Json?             // Additional metadata
+  
+  isSent          Boolean           @default(false)
+  sentAt          DateTime?
+  
+  isRead          Boolean           @default(false)
+  readAt          DateTime?
+  
+  expiresAt       DateTime?
+  
+  createdAt       DateTime          @default(now())
+
+  @@index([userId])
+  @@index([isSent])
+  @@index([isRead])
+  @@index([createdAt])
+  @@map("notifications")
+}
+
+// ==================== AUDIT LOGGING ====================
+
+model AuditLog {
+  id              String      @id @default(uuid())
+  userId          String?
+  user            User?       @relation(fields: [userId], references: [id])
+  
+  action          AuditAction
+  entity          String      // Table/model name
+  entityId        String?
+  
+  oldValues       Json?
+  newValues       Json?
+  
+  ipAddress       String?
+  userAgent       String?
+  
+  createdAt       DateTime    @default(now())
+
+  @@index([userId])
+  @@index([entity, entityId])
+  @@index([createdAt])
+  @@map("audit_logs")
+}
+
+// ==================== REPORTS & ANALYTICS ====================
+
+model RecruitmentMetric {
+  id              String    @id @default(uuid())
+  
+  date            DateTime
+  department      String?
+  
+  // Funnel Metrics
+  totalApplications Int     @default(0)
+  screened        Int       @default(0)
+  interviewed     Int       @default(0)
+  offered         Int       @default(0)
+  hired           Int       @default(0)
+  rejected        Int       @default(0)
+  withdrawn       Int       @default(0)
+  
+  // Time Metrics
+  avgTimeToScreen Float?    // in days
+  avgTimeToInterview Float?
+  avgTimeToOffer  Float?
+  avgTimeToHire   Float?
+  
+  // Source Effectiveness
+  sourceCounts    Json?     // {linkedin: 100, referral: 50}
+  sourceHireRate  Json?
+  
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  @@index([date])
+  @@index([department])
+  @@map("recruitment_metrics")
+}
+
+// ==================== MASTER DATA ====================
+
+model MasterDivision {
+  id                String    @id @default(uuid())
+  divisionName      String
+  sectionName       String
+  headOfDivisionName String
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+
+  @@unique([divisionName, sectionName])
+  @@index([divisionName])
+  @@map("master_divisions")
+}
+
+model MasterOfficeLocation {
+  id                String    @id @default(uuid())
+  pt                String
+  area              String
+  areaDetail        String
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+
+  @@unique([pt, area, areaDetail])
+  @@index([pt])
+  @@index([area])
+  @@map("master_office_locations")
+}
+
+// ==================== MENU ACCESS MANAGEMENT ====================
+
+model MenuAccess {
+  id                String    @id @default(uuid())
+  menuPath          String    @unique // e.g., '/', '/fptk', '/candidates', '/team'
+  menuLabel         String    // e.g., 'Dashboard', 'Position', 'Candidates', 'Team'
+  visibleRoles      String[]  // Array of roles that can see this menu
+  createRoles       String[]  // Array of roles that can create
+  editRoles         String[]  // Array of roles that can edit
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+  updatedBy         String?   // User ID who last updated
+  updater           User?     @relation("MenuAccessUpdater", fields: [updatedBy], references: [id])
+
+  @@index([menuPath])
+  @@map("menu_access")
+}
+

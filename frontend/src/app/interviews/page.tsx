@@ -1,0 +1,206 @@
+'use client'
+
+import { useEffect, useState } from 'react'
+import { useAuth } from '@/contexts/AuthContext'
+import { useRouter } from 'next/navigation'
+import Layout from '@/components/Layout/Layout'
+import { Interview } from '@/types'
+import { PlusIcon, MagnifyingGlassIcon, CalendarDaysIcon, ClockIcon, MapPinIcon, VideoCameraIcon } from '@heroicons/react/24/outline'
+
+export default function InterviewsPage() {
+  const { isAuthenticated, isLoading } = useAuth()
+  const router = useRouter()
+  const [interviews, setInterviews] = useState<Interview[]>([])
+  const [loading, setLoading] = useState(true)
+  const [searchTerm, setSearchTerm] = useState('')
+  const [statusFilter, setStatusFilter] = useState('all')
+
+  useEffect(() => {
+    if (!isLoading && !isAuthenticated) {
+      router.push('/login')
+    }
+  }, [isAuthenticated, isLoading, router])
+
+  useEffect(() => {
+    // TODO: Fetch interviews from API
+    // This will be implemented when the backend API endpoints are ready
+    setLoading(false)
+  }, [])
+
+  if (isLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-indigo-600"></div>
+      </div>
+    )
+  }
+
+  if (!isAuthenticated) {
+    return null
+  }
+
+  const filteredInterviews = interviews.filter(interview => {
+    const interviewWithApplication = interview as any
+    const matchesSearch = 
+      interviewWithApplication.application?.candidate?.user?.firstName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      interviewWithApplication.application?.candidate?.user?.lastName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      interviewWithApplication.application?.fptk?.title?.toLowerCase().includes(searchTerm.toLowerCase())
+    
+    const matchesStatus = statusFilter === 'all' || interview.status === statusFilter
+    
+    return matchesSearch && matchesStatus
+  })
+
+  const getStatusColor = (status: string) => {
+    switch (status) {
+      case 'scheduled':
+        return 'bg-blue-100 text-blue-800'
+      case 'in_progress':
+        return 'bg-yellow-100 text-yellow-800'
+      case 'completed':
+        return 'bg-green-100 text-green-800'
+      case 'cancelled':
+        return 'bg-red-100 text-red-800'
+      case 'rescheduled':
+        return 'bg-purple-100 text-purple-800'
+      default:
+        return 'bg-gray-100 text-gray-800'
+    }
+  }
+
+  const getTypeIcon = (type: string) => {
+    switch (type) {
+      case 'video_call':
+        return <VideoCameraIcon className="h-5 w-5" />
+      case 'in_person':
+        return <MapPinIcon className="h-5 w-5" />
+      default:
+        return <CalendarDaysIcon className="h-5 w-5" />
+    }
+  }
+
+  return (
+    <Layout>
+      <div>
+        <div className="mb-8">
+          <div className="flex justify-between items-center">
+            <div>
+              <h1 className="text-2xl font-bold text-gray-900">Interviews</h1>
+              <p className="mt-1 text-sm text-gray-500">
+                Manage interview schedules and track interview progress
+              </p>
+            </div>
+            <button className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500">
+              <PlusIcon className="h-4 w-4 mr-2" />
+              Schedule Interview
+            </button>
+          </div>
+        </div>
+
+        {/* Search and Filters */}
+        <div className="mb-6 space-y-4 sm:space-y-0 sm:flex sm:items-center sm:space-x-4">
+          <div className="relative flex-1">
+            <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+              <MagnifyingGlassIcon className="h-5 w-5 text-gray-400" />
+            </div>
+            <input
+              type="text"
+              placeholder="Search interviews..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="block w-full pl-10 pr-3 py-2 border border-gray-300 rounded-md leading-5 bg-white placeholder-gray-500 focus:outline-none focus:placeholder-gray-400 focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
+            />
+          </div>
+          <select
+            value={statusFilter}
+            onChange={(e) => setStatusFilter(e.target.value)}
+            className="block w-full sm:w-auto px-3 py-2 border border-gray-300 rounded-md leading-5 bg-white focus:outline-none focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
+          >
+            <option value="all">All Status</option>
+            <option value="scheduled">Scheduled</option>
+            <option value="in_progress">In Progress</option>
+            <option value="completed">Completed</option>
+            <option value="cancelled">Cancelled</option>
+            <option value="rescheduled">Rescheduled</option>
+          </select>
+        </div>
+
+        {/* Interviews List */}
+        <div className="bg-white shadow overflow-hidden sm:rounded-md">
+          {loading ? (
+            <div className="p-6 text-center">
+              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600 mx-auto"></div>
+              <p className="mt-2 text-sm text-gray-500">Loading interviews...</p>
+            </div>
+          ) : filteredInterviews.length === 0 ? (
+            <div className="p-6 text-center">
+              <CalendarDaysIcon className="mx-auto h-12 w-12 text-gray-400" />
+              <h3 className="mt-2 text-sm font-medium text-gray-900">No interviews</h3>
+              <p className="mt-1 text-sm text-gray-500">
+                Get started by scheduling a new interview.
+              </p>
+              <div className="mt-6">
+                <button className="inline-flex items-center px-4 py-2 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500">
+                  <PlusIcon className="h-4 w-4 mr-2" />
+                  Schedule Interview
+                </button>
+              </div>
+            </div>
+          ) : (
+            <ul className="divide-y divide-gray-200">
+              {filteredInterviews.map((interview) => (
+                <li key={interview.id}>
+                  <div className="px-4 py-4 flex items-center justify-between hover:bg-gray-50">
+                    <div className="flex items-center flex-1">
+                      <div className="flex-shrink-0">
+                        <div className="h-10 w-10 rounded-full bg-indigo-100 flex items-center justify-center">
+                          {getTypeIcon(interview.type)}
+                        </div>
+                      </div>
+                      <div className="ml-4 flex-1">
+                        <div className="flex items-center justify-between">
+                          <div>
+                            <p className="text-sm font-medium text-gray-900">
+                              {(interview as any).application?.candidate?.user?.firstName || 'N/A'} {(interview as any).application?.candidate?.user?.lastName || ''}
+                            </p>
+                            <p className="text-sm text-gray-500">{(interview as any).application?.fptk?.title || 'N/A'}</p>
+                          </div>
+                          <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getStatusColor(interview.status)}`}>
+                            {interview.status.replace('_', ' ')}
+                          </span>
+                        </div>
+                        <div className="mt-1 flex items-center text-sm text-gray-500">
+                          <CalendarDaysIcon className="h-4 w-4 mr-1" />
+                          <span>{new Date(interview.scheduledAt).toLocaleDateString()}</span>
+                          <ClockIcon className="h-4 w-4 ml-3 mr-1" />
+                          <span>{new Date(interview.scheduledAt).toLocaleTimeString()}</span>
+                          {interview.location && (
+                            <>
+                              <MapPinIcon className="h-4 w-4 ml-3 mr-1" />
+                              <span>{interview.location}</span>
+                            </>
+                          )}
+                        </div>
+                        <div className="mt-1 text-sm text-gray-500">
+                          <p>Duration: {interview.duration} minutes • Type: {interview.type.replace('_', ' ')}</p>
+                        </div>
+                      </div>
+                    </div>
+                    <div className="flex items-center space-x-2 ml-4">
+                      <button className="text-indigo-600 hover:text-indigo-900 text-sm font-medium">
+                        View
+                      </button>
+                      <button className="text-gray-400 hover:text-gray-600 text-sm font-medium">
+                        Edit
+                      </button>
+                    </div>
+                  </div>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+      </div>
+    </Layout>
+  )
+}

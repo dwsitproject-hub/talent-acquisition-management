@@ -1,0 +1,213 @@
+2025-11-07 01:39:27 [ERROR]: Authentication error: Invalid or expired token
+Error: Invalid or expired token
+    at verifyAccessToken (/app/src/utils/token.js:37:11)
+    at authenticate (/app/src/middleware/auth.js:23:21)
+    at Layer.handle [as handle_request] (/app/node_modules/express/lib/router/layer.js:95:5)
+    at next (/app/node_modules/express/lib/router/route.js:149:13)
+    at Route.dispatch (/app/node_modules/express/lib/router/route.js:119:3)
+    at Layer.handle [as handle_request] (/app/node_modules/express/lib/router/layer.js:95:5)
+    at /app/node_modules/express/lib/router/index.js:284:15
+    at Function.process_params (/app/node_modules/express/lib/router/index.js:346:12)
+    at next (/app/node_modules/express/lib/router/index.js:280:10)
+    at Function.handle (/app/node_modules/express/lib/router/index.js:175:3)
+2025-11-07 01:57:01 [ERROR]: Authentication error: Invalid or expired token
+Error: Invalid or expired token
+    at verifyAccessToken (/app/src/utils/token.js:37:11)
+    at authenticate (/app/src/middleware/auth.js:23:21)
+    at Layer.handle [as handle_request] (/app/node_modules/express/lib/router/layer.js:95:5)
+    at next (/app/node_modules/express/lib/router/route.js:149:13)
+    at Route.dispatch (/app/node_modules/express/lib/router/route.js:119:3)
+    at Layer.handle [as handle_request] (/app/node_modules/express/lib/router/layer.js:95:5)
+    at /app/node_modules/express/lib/router/index.js:284:15
+    at Function.process_params (/app/node_modules/express/lib/router/index.js:346:12)
+    at next (/app/node_modules/express/lib/router/index.js:280:10)
+    at Function.handle (/app/node_modules/express/lib/router/index.js:175:3)
+2025-11-07 01:57:01 [ERROR]: Authentication error: Invalid or expired token
+Error: Invalid or expired token
+    at verifyAccessToken (/app/src/utils/token.js:37:11)
+    at authenticate (/app/src/middleware/auth.js:23:21)
+    at Layer.handle [as handle_request] (/app/node_modules/express/lib/router/layer.js:95:5)
+    at next (/app/node_modules/express/lib/router/route.js:149:13)
+    at Route.dispatch (/app/node_modules/express/lib/router/route.js:119:3)
+    at Layer.handle [as handle_request] (/app/node_modules/express/lib/router/layer.js:95:5)
+    at /app/node_modules/express/lib/router/index.js:284:15
+    at Function.process_params (/app/node_modules/express/lib/router/index.js:346:12)
+    at next (/app/node_modules/express/lib/router/index.js:280:10)
+    at Function.handle (/app/node_modules/express/lib/router/index.js:175:3)
+2025-11-07 03:49:51 [ERROR]: Authentication error: Invalid or expired token
+Error: Invalid or expired token
+    at verifyAccessToken (/app/src/utils/token.js:37:11)
+    at authenticate (/app/src/middleware/auth.js:23:21)
+    at Layer.handle [as handle_request] (/app/node_modules/express/lib/router/layer.js:95:5)
+    at next (/app/node_modules/express/lib/router/route.js:149:13)
+    at Route.dispatch (/app/node_modules/express/lib/router/route.js:119:3)
+    at Layer.handle [as handle_request] (/app/node_modules/express/lib/router/layer.js:95:5)
+    at /app/node_modules/express/lib/router/index.js:284:15
+    at Function.process_params (/app/node_modules/express/lib/router/index.js:346:12)
+    at next (/app/node_modules/express/lib/router/index.js:280:10)
+    at Function.handle (/app/node_modules/express/lib/router/index.js:175:3)
+2025-11-07 06:28:49 [ERROR]: Authentication error: Invalid or expired token
+Error: Invalid or expired token
+    at verifyAccessToken (/app/src/utils/token.js:37:11)
+    at authenticate (/app/src/middleware/auth.js:23:21)
+    at Layer.handle [as handle_request] (/app/node_modules/express/lib/router/layer.js:95:5)
+    at next (/app/node_modules/express/lib/router/route.js:149:13)
+    at Route.dispatch (/app/node_modules/express/lib/router/route.js:119:3)
+    at Layer.handle [as handle_request] (/app/node_modules/express/lib/router/layer.js:95:5)
+    at /app/node_modules/express/lib/router/index.js:284:15
+    at Function.process_params (/app/node_modules/express/lib/router/index.js:346:12)
+    at next (/app/node_modules/express/lib/router/index.js:280:10)
+    at Function.handle (/app/node_modules/express/lib/router/index.js:175:3)
+2025-11-07 06:28:49 [ERROR]: Authentication error: Invalid or expired token
+Error: Invalid or expired token
+    at verifyAccessToken (/app/src/utils/token.js:37:11)
+    at authenticate (/app/src/middleware/auth.js:23:21)
+    at Layer.handle [as handle_request] (/app/node_modules/express/lib/router/layer.js:95:5)
+    at next (/app/node_modules/express/lib/router/route.js:149:13)
+    at Route.dispatch (/app/node_modules/express/lib/router/route.js:119:3)
+    at Layer.handle [as handle_request] (/app/node_modules/express/lib/router/layer.js:95:5)
+    at /app/node_modules/express/lib/router/index.js:284:15
+    at Function.process_params (/app/node_modules/express/lib/router/index.js:346:12)
+    at next (/app/node_modules/express/lib/router/index.js:280:10)
+    at Function.handle (/app/node_modules/express/lib/router/index.js:175:3)
+2025-11-07 13:59:46 [ERROR]: Redis connection error: NOAUTH Authentication required.
+ReplyError: NOAUTH Authentication required.
+    at parseError (D:\Cursor\Talent Acquisition Management\backend\node_modules\redis-parser\lib\parser.js:179:12)
+    at parseType (D:\Cursor\Talent Acquisition Management\backend\node_modules\redis-parser\lib\parser.js:302:14)
+2025-11-07 13:59:46 [ERROR]: Redis connection error: NOAUTH Authentication required.
+ReplyError: NOAUTH Authentication required.
+    at parseError (D:\Cursor\Talent Acquisition Management\backend\node_modules\redis-parser\lib\parser.js:179:12)
+    at parseType (D:\Cursor\Talent Acquisition Management\backend\node_modules\redis-parser\lib\parser.js:302:14)
+2025-11-07 13:59:48 [ERROR]: Redis connection error: NOAUTH Authentication required.
+ReplyError: NOAUTH Authentication required.
+    at parseError (D:\Cursor\Talent Acquisition Management\backend\node_modules\redis-parser\lib\parser.js:179:12)
+    at parseType (D:\Cursor\Talent Acquisition Management\backend\node_modules\redis-parser\lib\parser.js:302:14)
+2025-11-07 13:59:48 [ERROR]: Redis connection error: NOAUTH Authentication required.
+ReplyError: NOAUTH Authentication required.
+    at parseError (D:\Cursor\Talent Acquisition Management\backend\node_modules\redis-parser\lib\parser.js:179:12)
+    at parseType (D:\Cursor\Talent Acquisition Management\backend\node_modules\redis-parser\lib\parser.js:302:14)
+2025-11-07 13:59:48 [ERROR]: Connection error: Authentication failed against database server at `localhost`, the provided database credentials for `tas_user` are not valid.
+
+Please make sure to provide valid database credentials for the database server at `localhost`.
+PrismaClientInitializationError: Authentication failed against database server at `localhost`, the provided database credentials for `tas_user` are not valid.
+
+Please make sure to provide valid database credentials for the database server at `localhost`.
+    at t (D:\Cursor\Talent Acquisition Management\backend\node_modules\@prisma\client\runtime\library.js:112:2488)
+    at async testConnections (D:\Cursor\Talent Acquisition Management\backend\src\server.js:42:5)
+    at async startServer (D:\Cursor\Talent Acquisition Management\backend\src\server.js:57:25)
+2025-11-07 14:14:24 [ERROR]: Redis connection error: NOAUTH Authentication required.
+ReplyError: NOAUTH Authentication required.
+    at parseError (D:\Cursor\Talent Acquisition Management\backend\node_modules\redis-parser\lib\parser.js:179:12)
+    at parseType (D:\Cursor\Talent Acquisition Management\backend\node_modules\redis-parser\lib\parser.js:302:14)
+2025-11-07 14:14:24 [ERROR]: Redis connection error: NOAUTH Authentication required.
+ReplyError: NOAUTH Authentication required.
+    at parseError (D:\Cursor\Talent Acquisition Management\backend\node_modules\redis-parser\lib\parser.js:179:12)
+    at parseType (D:\Cursor\Talent Acquisition Management\backend\node_modules\redis-parser\lib\parser.js:302:14)
+2025-11-07 14:14:24 [ERROR]: Redis connection error: NOAUTH Authentication required.
+ReplyError: NOAUTH Authentication required.
+    at parseError (D:\Cursor\Talent Acquisition Management\backend\node_modules\redis-parser\lib\parser.js:179:12)
+    at parseType (D:\Cursor\Talent Acquisition Management\backend\node_modules\redis-parser\lib\parser.js:302:14)
+2025-11-07 14:14:24 [ERROR]: Connection error: Authentication failed against database server at `localhost`, the provided database credentials for `tas_user` are not valid.
+
+Please make sure to provide valid database credentials for the database server at `localhost`.
+PrismaClientInitializationError: Authentication failed against database server at `localhost`, the provided database credentials for `tas_user` are not valid.
+
+Please make sure to provide valid database credentials for the database server at `localhost`.
+    at t (D:\Cursor\Talent Acquisition Management\backend\node_modules\@prisma\client\runtime\library.js:112:2488)
+    at async testConnections (D:\Cursor\Talent Acquisition Management\backend\src\server.js:42:5)
+    at async startServer (D:\Cursor\Talent Acquisition Management\backend\src\server.js:57:25)
+2025-11-07 14:15:34 [ERROR]: Connection error: Authentication failed against database server at `localhost`, the provided database credentials for `tas_user` are not valid.
+
+Please make sure to provide valid database credentials for the database server at `localhost`.
+PrismaClientInitializationError: Authentication failed against database server at `localhost`, the provided database credentials for `tas_user` are not valid.
+
+Please make sure to provide valid database credentials for the database server at `localhost`.
+    at t (D:\Cursor\Talent Acquisition Management\backend\node_modules\@prisma\client\runtime\library.js:112:2488)
+    at async testConnections (D:\Cursor\Talent Acquisition Management\backend\src\server.js:42:5)
+    at async startServer (D:\Cursor\Talent Acquisition Management\backend\src\server.js:57:25)
+2025-11-07 14:15:38 [ERROR]: Database connection error:
+2025-11-07 14:15:48 [ERROR]: Database connection error:
+2025-11-07 14:15:48 [ERROR]: Please check your DATABASE_URL in .env file
+2025-11-07 14:15:48 [ERROR]: Expected format: postgresql://user:password@host:port/database?schema=public
+2025-11-07 14:15:48 [ERROR]: Failed to connect to required services
+2025-11-07 14:15:57 [ERROR]: Database connection error:
+2025-11-07 14:15:57 [ERROR]: Please check your DATABASE_URL in .env file
+2025-11-07 14:15:57 [ERROR]: Expected format: postgresql://user:password@host:port/database?schema=public
+2025-11-07 14:15:57 [ERROR]: Failed to connect to required services
+2025-11-07 14:16:21 [ERROR]: Database connection error:
+2025-11-07 14:16:22 [ERROR]: Database connection error:
+2025-11-07 14:16:22 [ERROR]: Please check your DATABASE_URL in .env file
+2025-11-07 14:16:22 [ERROR]: Expected format: postgresql://user:password@host:port/database?schema=public
+2025-11-07 14:16:22 [ERROR]: Failed to connect to required services
+2025-11-07 07:29:16 [ERROR]: Authentication error: Invalid or expired token
+Error: Invalid or expired token
+    at verifyAccessToken (/app/src/utils/token.js:37:11)
+    at authenticate (/app/src/middleware/auth.js:23:21)
+    at Layer.handle [as handle_request] (/app/node_modules/express/lib/router/layer.js:95:5)
+    at next (/app/node_modules/express/lib/router/route.js:149:13)
+    at Route.dispatch (/app/node_modules/express/lib/router/route.js:119:3)
+    at Layer.handle [as handle_request] (/app/node_modules/express/lib/router/layer.js:95:5)
+    at /app/node_modules/express/lib/router/index.js:284:15
+    at Function.process_params (/app/node_modules/express/lib/router/index.js:346:12)
+    at next (/app/node_modules/express/lib/router/index.js:280:10)
+    at Function.handle (/app/node_modules/express/lib/router/index.js:175:3)
+2025-11-07 08:28:44 [ERROR]: Authentication error: Invalid or expired token
+Error: Invalid or expired token
+    at verifyAccessToken (/app/src/utils/token.js:37:11)
+    at authenticate (/app/src/middleware/auth.js:23:21)
+    at Layer.handle [as handle_request] (/app/node_modules/express/lib/router/layer.js:95:5)
+    at next (/app/node_modules/express/lib/router/route.js:149:13)
+    at Route.dispatch (/app/node_modules/express/lib/router/route.js:119:3)
+    at Layer.handle [as handle_request] (/app/node_modules/express/lib/router/layer.js:95:5)
+    at /app/node_modules/express/lib/router/index.js:284:15
+    at Function.process_params (/app/node_modules/express/lib/router/index.js:346:12)
+    at next (/app/node_modules/express/lib/router/index.js:280:10)
+    at Function.handle (/app/node_modules/express/lib/router/index.js:175:3)
+2025-11-07 08:50:12 [ERROR]: Authentication error: Invalid or expired token
+Error: Invalid or expired token
+    at verifyAccessToken (/app/src/utils/token.js:37:11)
+    at authenticate (/app/src/middleware/auth.js:23:21)
+    at Layer.handle [as handle_request] (/app/node_modules/express/lib/router/layer.js:95:5)
+    at next (/app/node_modules/express/lib/router/route.js:149:13)
+    at Route.dispatch (/app/node_modules/express/lib/router/route.js:119:3)
+    at Layer.handle [as handle_request] (/app/node_modules/express/lib/router/layer.js:95:5)
+    at /app/node_modules/express/lib/router/index.js:284:15
+    at Function.process_params (/app/node_modules/express/lib/router/index.js:346:12)
+    at next (/app/node_modules/express/lib/router/index.js:280:10)
+    at Function.handle (/app/node_modules/express/lib/router/index.js:175:3)
+2025-11-07 09:25:54 [ERROR]: Authentication error: Invalid or expired token
+Error: Invalid or expired token
+    at verifyAccessToken (/app/src/utils/token.js:37:11)
+    at authenticate (/app/src/middleware/auth.js:23:21)
+    at Layer.handle [as handle_request] (/app/node_modules/express/lib/router/layer.js:95:5)
+    at next (/app/node_modules/express/lib/router/route.js:149:13)
+    at Route.dispatch (/app/node_modules/express/lib/router/route.js:119:3)
+    at Layer.handle [as handle_request] (/app/node_modules/express/lib/router/layer.js:95:5)
+    at /app/node_modules/express/lib/router/index.js:284:15
+    at Function.process_params (/app/node_modules/express/lib/router/index.js:346:12)
+    at next (/app/node_modules/express/lib/router/index.js:280:10)
+    at Function.handle (/app/node_modules/express/lib/router/index.js:175:3)
+2025-11-07 10:00:21 [ERROR]: Authentication error: Invalid or expired token
+Error: Invalid or expired token
+    at verifyAccessToken (/app/src/utils/token.js:37:11)
+    at authenticate (/app/src/middleware/auth.js:23:21)
+    at Layer.handle [as handle_request] (/app/node_modules/express/lib/router/layer.js:95:5)
+    at next (/app/node_modules/express/lib/router/route.js:149:13)
+    at Route.dispatch (/app/node_modules/express/lib/router/route.js:119:3)
+    at Layer.handle [as handle_request] (/app/node_modules/express/lib/router/layer.js:95:5)
+    at /app/node_modules/express/lib/router/index.js:284:15
+    at Function.process_params (/app/node_modules/express/lib/router/index.js:346:12)
+    at next (/app/node_modules/express/lib/router/index.js:280:10)
+    at Function.handle (/app/node_modules/express/lib/router/index.js:175:3)
+2025-11-07 10:00:21 [ERROR]: Authentication error: Invalid or expired token
+Error: Invalid or expired token
+    at verifyAccessToken (/app/src/utils/token.js:37:11)
+    at authenticate (/app/src/middleware/auth.js:23:21)
+    at Layer.handle [as handle_request] (/app/node_modules/express/lib/router/layer.js:95:5)
+    at next (/app/node_modules/express/lib/router/route.js:149:13)
+    at Route.dispatch (/app/node_modules/express/lib/router/route.js:119:3)
+    at Layer.handle [as handle_request] (/app/node_modules/express/lib/router/layer.js:95:5)
+    at /app/node_modules/express/lib/router/index.js:284:15
+    at Function.process_params (/app/node_modules/express/lib/router/index.js:346:12)
+    at next (/app/node_modules/express/lib/router/index.js:280:10)
+    at Function.handle (/app/node_modules/express/lib/router/index.js:175:3)

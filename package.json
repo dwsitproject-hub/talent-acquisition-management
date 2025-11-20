@@ -1,0 +1,14 @@
+{
+  "name": "talent-acquisition-management",
+  "version": "1.0.0",
+  "description": "Talent Acquisition Management System",
+  "main": "index.js",
+  "scripts": {
+    "read-doc": "node read_documents.js"
+  },
+  "dependencies": {
+    "mammoth": "^1.6.0",
+    "xlsx": "^0.18.5"
+  }
+}
+
