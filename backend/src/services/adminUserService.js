@@ -100,34 +100,28 @@ async function createUser(data) {
   const mappedRole = mapRoleToEnum(role);
   logger.info(`Creating user with role: "${role}" -> mapped to: "${mappedRole}"`);
   
-  // Use raw SQL to avoid Prisma enum case sensitivity issues
-  // Escape single quotes in string values
-  const escapeSql = (str) => (str || '').replace(/'/g, "''");
-  const sql = `
-    INSERT INTO users (id, email, password, "firstName", "lastName", "phoneNumber", role, division, department, pt, area, "areaDetail", "isActive", "isEmailVerified", "emailVerifiedAt", "createdAt", "updatedAt")
-    VALUES (
-      gen_random_uuid(),
-      '${escapeSql(email)}',
-      '${escapeSql(hashed)}',
-      '${escapeSql(firstName)}',
-      '${escapeSql(lastName)}',
-      ${phone ? `'${escapeSql(phone)}'` : 'NULL'},
-      '${escapeSql(mappedRole)}'::userrole,
-      ${division ? `'${escapeSql(division)}'` : 'NULL'},
-      ${sectionName ? `'${escapeSql(sectionName)}'` : 'NULL'},
-      ${pt ? `'${escapeSql(pt)}'` : 'NULL'},
-      ${area ? `'${escapeSql(area)}'` : 'NULL'},
-      ${areaDetail ? `'${escapeSql(areaDetail)}'` : 'NULL'},
-      true,
-      true,
-      NOW(),
-      NOW(),
-      NOW()
-    )
-    RETURNING *
-  `;
-  const result = await prisma.$queryRawUnsafe(sql);
-  return mapUser(result[0]);
+  // Use Prisma client to avoid enum type name mismatch issues
+  // Prisma handles enum mapping correctly
+  const user = await prisma.user.create({
+    data: {
+      email,
+      password: hashed,
+      firstName,
+      lastName,
+      phoneNumber: phone || null,
+      role: mappedRole, // Prisma will map enum correctly
+      division: division || null,
+      department: sectionName || null,
+      pt: pt || null,
+      area: area || null,
+      areaDetail: areaDetail || null,
+      isActive: true,
+      isEmailVerified: true,
+      emailVerifiedAt: new Date(),
+    },
+  });
+  
+  return mapUser(user);
 }
 
 async function updateUser(id, data) {
