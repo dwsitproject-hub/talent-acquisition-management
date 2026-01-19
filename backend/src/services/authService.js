@@ -315,6 +315,7 @@ async function updateCurrentUser(userId, data) {
       email: true,
       firstName: true,
       lastName: true,
+      phoneNumber: true,
       role: true,
       department: true,
       division: true,
