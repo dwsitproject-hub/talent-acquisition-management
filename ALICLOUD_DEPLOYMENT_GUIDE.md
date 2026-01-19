@@ -1958,6 +1958,148 @@ curl -I http://147.139.176.70:8080
 | NGINX not listening on 8080 | Check `HTTP_PORT` in `.env.production` and NGINX config |
 | Works locally but not from browser | Check AliCloud Security Group rules |
 | **Frontend build stuck/slow** | See troubleshooting section below |
+| **Frontend server failed to start** | See troubleshooting section below |
+
+**Frontend Server Failed to Start:**
+
+If the frontend is not accessible or containers are not running:
+
+1. **Check container status:**
+   ```bash
+   cd /opt/tas-production
+   docker compose -p tas-production ps
+   
+   # Check specific containers
+   docker ps -a | grep -E "(tas_frontend|tas_nginx|tas_candidate)"
+   ```
+
+2. **Check container logs for errors:**
+   ```bash
+   # Frontend container logs
+   docker compose -p tas-production logs --tail=50 frontend
+   
+   # NGINX container logs
+   docker compose -p tas-production logs --tail=50 nginx
+   
+   # Candidate portal logs
+   docker compose -p tas-production logs --tail=50 candidate-portal
+   
+   # All logs together
+   docker compose -p tas-production logs --tail=100
+   ```
+
+3. **Check if containers are restarting (crash loop):**
+   ```bash
+   # Check restart count
+   docker compose -p tas-production ps
+   
+   # If showing "Restarting", check why
+   docker inspect tas_frontend | grep -A 10 "State"
+   docker inspect tas_nginx | grep -A 10 "State"
+   ```
+
+4. **Verify environment variables are set:**
+   ```bash
+   # Check if .env.production exists and has required variables
+   cd /opt/tas-production
+   cat .env.production | grep -E "(NEXT_PUBLIC_API_URL|HTTP_PORT|HTTPS_PORT)"
+   
+   # Check if variables are exported
+   echo "NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-NOT SET}"
+   echo "HTTP_PORT: ${HTTP_PORT:-NOT SET}"
+   ```
+
+5. **Try starting containers manually to see errors:**
+   ```bash
+   cd /opt/tas-production
+   
+   # Stop all containers first
+   docker compose -f docker-compose.frontend.yml -p tas-production down
+   
+   # Start with verbose output (not detached)
+   docker compose -f docker-compose.frontend.yml -p tas-production --env-file .env.production up
+   # Press Ctrl+C after seeing errors
+   ```
+
+6. **Check if build completed successfully:**
+   ```bash
+   # Check if frontend image exists
+   docker images | grep tas-production
+   
+   # If image doesn't exist, rebuild
+   docker compose -f docker-compose.frontend.yml -p tas-production --env-file .env.production build frontend
+   ```
+
+7. **Check network connectivity:**
+   ```bash
+   # Verify network exists
+   docker network ls | grep tas_network
+   
+   # If network doesn't exist, create it
+   docker network create tas_network
+   ```
+
+8. **Common fixes:**
+
+   **If frontend container exits immediately:**
+   ```bash
+   # Check if build artifacts exist
+   docker compose -p tas-production exec frontend ls -la /app/.next 2>/dev/null || echo "Container not running"
+   
+   # Rebuild if needed
+   docker compose -f docker-compose.frontend.yml -p tas-production --env-file .env.production build --no-cache frontend
+   docker compose -f docker-compose.frontend.yml -p tas-production --env-file .env.production up -d frontend
+   ```
+
+   **If NGINX fails to start:**
+   ```bash
+   # Check NGINX config syntax
+   docker compose -p tas-production exec nginx nginx -t 2>/dev/null || echo "Container not running"
+   
+   # Verify config file exists
+   ls -la /opt/tas-production/nginx/nginx.network.conf
+   
+   # Restart NGINX
+   docker compose -p tas-production restart nginx
+   ```
+
+   **If port 8080 is already in use:**
+   ```bash
+   # Check what's using port 8080
+   netstat -tulpn | grep 8080
+   ss -tulpn | grep 8080
+   
+   # Stop conflicting service or change HTTP_PORT in .env.production
+   ```
+
+9. **Full restart procedure:**
+   ```bash
+   cd /opt/tas-production
+   
+   # Stop everything
+   docker compose -f docker-compose.frontend.yml -p tas-production down
+   
+   # Pull latest code
+   git pull origin main
+   
+   # Export environment variables
+   export HTTP_PORT="$(grep '^HTTP_PORT=' .env.production | cut -d= -f2- | sed 's/#.*$//' | xargs)"
+   export HTTPS_PORT="$(grep '^HTTPS_PORT=' .env.production | cut -d= -f2- | sed 's/#.*$//' | xargs)"
+   export NEXT_PUBLIC_API_URL="$(grep '^NEXT_PUBLIC_API_URL=' .env.production | cut -d= -f2- | sed 's/#.*$//' | xargs)"
+   
+   # Rebuild and start
+   docker compose -f docker-compose.frontend.yml -p tas-production --env-file .env.production build --no-cache
+   docker compose -f docker-compose.frontend.yml -p tas-production --env-file .env.production up -d
+   
+   # Wait a few seconds
+   sleep 5
+   
+   # Check status
+   docker compose -p tas-production ps
+   
+   # Check logs
+   docker compose -p tas-production logs --tail=30
+   ```
 
 **Frontend Build Stuck or Very Slow:**
 
