@@ -2082,10 +2082,16 @@ If the frontend is not accessible or containers are not running:
    # Pull latest code
    git pull origin main
    
-   # Export environment variables
+   # ⚠️ CRITICAL: Export environment variables BEFORE running docker compose
+   # Docker Compose needs these in the shell environment for variable substitution
    export HTTP_PORT="$(grep '^HTTP_PORT=' .env.production | cut -d= -f2- | sed 's/#.*$//' | xargs)"
    export HTTPS_PORT="$(grep '^HTTPS_PORT=' .env.production | cut -d= -f2- | sed 's/#.*$//' | xargs)"
    export NEXT_PUBLIC_API_URL="$(grep '^NEXT_PUBLIC_API_URL=' .env.production | cut -d= -f2- | sed 's/#.*$//' | xargs)"
+   
+   # Verify variables are exported
+   echo "HTTP_PORT: ${HTTP_PORT:-NOT SET}"
+   echo "HTTPS_PORT: ${HTTPS_PORT:-NOT SET}"
+   echo "NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-NOT SET}"
    
    # Rebuild and start
    docker compose -f docker-compose.frontend.yml -p tas-production --env-file .env.production build --no-cache
