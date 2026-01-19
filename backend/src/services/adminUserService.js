@@ -128,27 +128,61 @@ async function updateUser(id, data) {
   // Map role to enum value
   const mappedRole = mapRoleToEnum(data.role);
   
+  // Helper to convert empty strings to null
+  const toNullIfEmpty = (value) => {
+    if (value === undefined || value === null || value === '') {
+      return null;
+    }
+    return String(value).trim() || null;
+  };
+  
   // Use Prisma client to avoid enum type name mismatch issues
   // Prisma handles enum mapping correctly
   const updateData = {
     firstName: data.firstName,
     lastName: data.lastName,
     email: data.email,
-    phoneNumber: data.phone || null,
+    phoneNumber: toNullIfEmpty(data.phone),
     role: mappedRole, // Prisma will map enum correctly
-    division: data.division || null,
-    department: data.sectionName || null,
-    pt: data.pt || null,
-    area: data.area || null,
-    areaDetail: data.areaDetail || null,
+    division: toNullIfEmpty(data.division),
+    department: toNullIfEmpty(data.sectionName),
+    pt: toNullIfEmpty(data.pt),
+    area: toNullIfEmpty(data.area),
+    areaDetail: toNullIfEmpty(data.areaDetail),
   };
   
-  const user = await prisma.user.update({
-    where: { id },
-    data: updateData,
+  logger.info(`Updating user ${id} with data:`, {
+    division: updateData.division,
+    department: updateData.department,
+    role: updateData.role,
   });
   
-  return mapUser(user);
+  try {
+    // Check if user exists first
+    const existingUser = await prisma.user.findUnique({
+      where: { id },
+    });
+    
+    if (!existingUser) {
+      throw new Error(`User with id ${id} not found`);
+    }
+    
+    const user = await prisma.user.update({
+      where: { id },
+      data: updateData,
+    });
+    
+    logger.info(`Successfully updated user ${id}`);
+    return mapUser(user);
+  } catch (error) {
+    logger.error(`Error updating user ${id}:`, {
+      message: error.message,
+      code: error.code,
+      meta: error.meta,
+      stack: error.stack,
+    });
+    throw error;
+  }
 }
 
 async function updateStatus(id, isActive) {
