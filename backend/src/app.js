@@ -51,8 +51,44 @@ app.use(helmet({
 // CORS configuration
 const allowedOrigins = (process.env.CORS_ORIGIN || 'http://localhost:4001,http://localhost:4002')
   .split(',')
-  .map(origin => origin.trim())
-  .filter(origin => origin.length > 0);
+  .map((origin) => origin.trim())
+  .filter((origin) => origin.length > 0);
+
+function normalizeOrigin(value) {
+  return String(value || '').trim().replace(/\/+$/, '');
+}
+
+function parseOriginToUrl(value) {
+  try {
+    return new URL(normalizeOrigin(value));
+  } catch (e) {
+    return null;
+  }
+}
+
+// Support entries with or without an explicit port. If the allowed entry omits a port,
+// we allow any port for that host+protocol (useful behind reverse proxies like :8080).
+const allowedOriginMatchers = allowedOrigins
+  .map((allowed) => {
+    const allowedUrl = parseOriginToUrl(allowed);
+    if (!allowedUrl) {
+      const normalized = normalizeOrigin(allowed);
+      return (incoming) => normalizeOrigin(incoming) === normalized;
+    }
+
+    const allowedProtocol = allowedUrl.protocol;
+    const allowedHostname = allowedUrl.hostname;
+    const allowedPort = allowedUrl.port; // '' means "no explicit port in config"
+
+    return (incoming) => {
+      const incomingUrl = parseOriginToUrl(incoming);
+      if (!incomingUrl) return false;
+      if (incomingUrl.protocol !== allowedProtocol) return false;
+      if (incomingUrl.hostname !== allowedHostname) return false;
+      if (allowedPort && incomingUrl.port !== allowedPort) return false;
+      return true;
+    };
+  });
 
 const corsOptions = {
   origin: function (origin, callback) {
@@ -61,8 +97,8 @@ const corsOptions = {
       return callback(null, true);
     }
     
-    // Check if origin is in allowed list
-    if (allowedOrigins.indexOf(origin) !== -1) {
+    // Check if origin is in allowed list (supports "any port" when config omits a port)
+    if (allowedOriginMatchers.some((m) => m(origin))) {
       callback(null, true);
     } else {
       logger.warn(`CORS blocked request from origin: ${origin}`);
