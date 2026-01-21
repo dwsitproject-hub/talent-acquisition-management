@@ -91,7 +91,10 @@ async function login(email, password, metadata = {}) {
 
   if (!isValidPassword) {
     // Increment failed login count
-    const failedCount = user.failedLoginCount + 1;
+    // Be defensive: older/dirty data or partial selects can yield null/undefined.
+    // Prisma will reject NaN, so normalize to a number first.
+    const currentFailedLoginCount = Number(user.failedLoginCount ?? 0) || 0;
+    const failedCount = currentFailedLoginCount + 1;
     const lockoutThreshold = parseInt(process.env.ACCOUNT_LOCKOUT_THRESHOLD) || 5;
     const lockoutDuration = parseInt(process.env.ACCOUNT_LOCKOUT_DURATION) || 900000; // 15 minutes
 
