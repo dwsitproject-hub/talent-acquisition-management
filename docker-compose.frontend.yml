@@ -20,10 +20,9 @@ services:
       # Limit Node.js memory to prevent excessive usage
       NODE_OPTIONS: --max-old-space-size=512
     # Resource limits to prevent 100% CPU usage
-    # Note: These limits require Docker Compose v2+ or Docker Engine 19.03+
+    # Note: Using Docker Compose v3.8 compatible syntax
     cpus: '1.0'           # Limit to 1 CPU core
-    memory: 1g            # Limit to 1GB RAM
-    mem_reservation: 512m # Reserve 512MB RAM (optional)
+    mem_limit: 1g         # Limit to 1GB RAM
     networks:
       - tas_network
 
@@ -41,10 +40,9 @@ services:
       # Limit Node.js memory to prevent excessive usage
       NODE_OPTIONS: --max-old-space-size=512
     # Resource limits to prevent 100% CPU usage
-    # Note: These limits require Docker Compose v2+ or Docker Engine 19.03+
+    # Note: Using Docker Compose v3.8 compatible syntax
     cpus: '1.0'           # Limit to 1 CPU core
-    memory: 1g            # Limit to 1GB RAM
-    mem_reservation: 512m # Reserve 512MB RAM (optional)
+    mem_limit: 1g         # Limit to 1GB RAM
     networks:
       - tas_network
 
