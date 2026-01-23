@@ -601,7 +601,15 @@ export default function FPTKPage() {
         let failedCount = 0
         const apiFailedItems: any[] = []
 
-        for (const fptkData of result.success as any[]) {
+        // Process uploads with a small delay to prevent overwhelming the backend
+        for (let i = 0; i < result.success.length; i++) {
+          const fptkData = result.success[i] as any
+          
+          // Add small delay between requests (50ms) to prevent rate limiting and backend overload
+          if (i > 0) {
+            await new Promise(resolve => setTimeout(resolve, 50))
+          }
+          
           try {
             const status = mapUiStatusToDbStatus((fptkData as any).status, 'DRAFT')
             const rowNumber = (fptkData as any)._rowNumber || 'unknown'
@@ -687,6 +695,9 @@ export default function FPTKPage() {
               } else if (statusCode === 409) {
                 // Conflict - usually means duplicate FPTK number
                 errorMessages = [errorData?.message || 'FPTK number already exists']
+              } else if (statusCode === 503) {
+                // Service Unavailable - backend is down or overloaded
+                errorMessages = ['Service temporarily unavailable - backend server may be overloaded. Please try again in a few moments or upload in smaller batches.']
               } else if (statusCode === 500) {
                 errorMessages = ['Internal server error - please try again or contact support']
               } else {
