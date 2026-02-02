@@ -26,6 +26,13 @@ services:
     # Note: Using Docker Compose v3.8 compatible syntax
     cpus: '1.0'           # Limit to 1 CPU core
     mem_limit: 1g         # Limit to 1GB RAM
+    # Healthcheck to detect when frontend becomes unresponsive
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:3000 || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
     networks:
       tas_network:
         aliases:
@@ -52,6 +59,13 @@ services:
     # Note: Using Docker Compose v3.8 compatible syntax
     cpus: '1.0'           # Limit to 1 CPU core
     mem_limit: 1g         # Limit to 1GB RAM
+    # Healthcheck to detect when candidate-portal becomes unresponsive
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:3000 || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
     networks:
       tas_network:
         aliases:
