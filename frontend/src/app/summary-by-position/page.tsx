@@ -127,7 +127,7 @@ export default function SummaryByPositionPage() {
 
         // SLA bucket based on FPTK Receive Date (fallback to requestDate if receiveDate not available)
         // Use same logic as dashboard: fptkReceiveDate || requestDate
-        const referenceDate = job.fptkReceiveDate || job.fptkReceiveDate || job.requestDate || job.createdAt
+        const referenceDate = job.fptkReceiveDate || job.requestDate || job.createdAt
         let slaBucket = '-'
         if (referenceDate) {
           const dateObj = new Date(referenceDate)
