@@ -100,22 +100,55 @@ export default function ViewJobPostingModal({ isOpen, onClose, jobPosting, onSta
       // If no applications found, try to find candidates by positionAppliedFor (legacy fallback)
       if (candidates.length === 0 && jobPosting.title) {
         try {
+          console.log('🔍 No applications found, searching candidates by positionAppliedFor for:', jobPosting.title)
           const response = await CandidatesAPI.getAll({}, { page: 1, limit: 1000 })
           const allCandidates = response.data || []
+          console.log('📋 Total candidates loaded:', allCandidates.length)
           
           // Find candidates who have this position in their positionAppliedFor
           const matchingCandidates = allCandidates.filter((candidate: any) => {
-            const positionAppliedFor = candidate.positionAppliedFor || []
-            const positionArray = Array.isArray(positionAppliedFor) 
-              ? positionAppliedFor 
-              : (positionAppliedFor ? [positionAppliedFor] : [])
+            // Parse positionAppliedFor from different possible locations
+            let positionAppliedFor: string[] = []
             
-            // Check if position title matches (case-insensitive, trim whitespace)
-            const positionTitle = (jobPosting.title || '').trim()
-            return positionArray.some((pos: string) => 
-              (pos || '').trim().toLowerCase() === positionTitle.toLowerCase()
-            )
+            // Check direct field
+            if (candidate.positionAppliedFor !== undefined && candidate.positionAppliedFor !== null) {
+              positionAppliedFor = Array.isArray(candidate.positionAppliedFor) 
+                ? candidate.positionAppliedFor 
+                : [String(candidate.positionAppliedFor)]
+            }
+            
+            // Check languages field (where it's actually stored in backend)
+            if (positionAppliedFor.length === 0 && candidate.languages) {
+              const languagesData = typeof candidate.languages === 'string'
+                ? JSON.parse(candidate.languages || '{}')
+                : (candidate.languages || {})
+              
+              if (languagesData.positionAppliedFor) {
+                positionAppliedFor = Array.isArray(languagesData.positionAppliedFor)
+                  ? languagesData.positionAppliedFor
+                  : [String(languagesData.positionAppliedFor)]
+              }
+            }
+            
+            // Normalize position title for comparison
+            const positionTitle = (jobPosting.title || '').trim().toLowerCase()
+            const matches = positionAppliedFor.some((pos: string) => {
+              const normalizedPos = (pos || '').trim().toLowerCase()
+              const isMatch = normalizedPos === positionTitle
+              if (isMatch) {
+                console.log('✅ Match found:', pos, '===', jobPosting.title)
+              }
+              return isMatch
+            })
+            
+            if (matches) {
+              console.log('🎯 Candidate matched:', candidate.id, candidate.user?.firstName, candidate.user?.lastName, 'Positions:', positionAppliedFor)
+            }
+            
+            return matches
           })
+          
+          console.log('📊 Matching candidates found:', matchingCandidates.length)
 
           // Map to applied candidates format
           candidates = matchingCandidates.map((candidate: any) => {
