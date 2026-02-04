@@ -101,8 +101,30 @@ export default function ViewJobPostingModal({ isOpen, onClose, jobPosting, onSta
       if (candidates.length === 0 && jobPosting.title) {
         try {
           console.log('🔍 No applications found, searching candidates by positionAppliedFor for:', jobPosting.title)
-          const response = await CandidatesAPI.getAll({}, { page: 1, limit: 1000 })
-          const allCandidates = response.data || []
+          
+          // Load candidates with pagination (API max limit is 100)
+          let allCandidates: any[] = []
+          let page = 1
+          const limit = 100
+          let hasMore = true
+          
+          while (hasMore) {
+            const response = await CandidatesAPI.getAll({}, { page, limit })
+            const candidatesData = response.data || []
+            allCandidates = [...allCandidates, ...candidatesData]
+            
+            // Check if there are more pages
+            const totalPages = response.pagination?.totalPages || 1
+            hasMore = page < totalPages
+            page++
+            
+            // Safety limit to prevent infinite loops
+            if (page > 50) {
+              console.warn('⚠️ Reached maximum page limit (50). Some candidates may not be loaded.')
+              break
+            }
+          }
+          
           console.log('📋 Total candidates loaded:', allCandidates.length)
           
           // Find candidates who have this position in their positionAppliedFor
