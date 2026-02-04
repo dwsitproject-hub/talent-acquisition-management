@@ -441,7 +441,7 @@ export default function ViewJobPostingModal({ isOpen, onClose, jobPosting, onSta
                   const fixedMilestones = [
                     'Raise FPTK',
                     'CV Hunting (Sourcing Candidate)',
-                    'Piskotest & Technical Test',
+                    'Psikotest & Technical Test',
                     'Interview User',
                     'Offering Process',
                     'Medical Check Up (MCU)',

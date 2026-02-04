@@ -43,7 +43,7 @@ const mapUiStatusToDbStatus = (value?: string, fallback?: string) => {
     'partially_filled': 'PARTIALLY_FILLED',
     'raise fptk': 'DRAFT',
     'cv hunting (sourcing candidate)': 'OPEN',
-    'piskotest & technical test': 'OPEN',
+    'psikotest & technical test': 'OPEN',
     'interview user': 'OPEN',
     'offering process': 'OPEN',
     'medical check up (mcu)': 'OPEN',

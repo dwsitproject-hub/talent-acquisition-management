@@ -11,7 +11,7 @@ const PRIORITY_OPTIONS = ['P0', 'P1', 'P2', 'Normal']
 const STATUS_OPTIONS = [
   'Raise FPTK',
   'CV Hunting (Sourcing Candidate)',
-  'Piskotest & Technical Test',
+  'Psikotest & Technical Test',
   'Interview User',
   'Offering Process',
   'Medical Check Up (MCU)',

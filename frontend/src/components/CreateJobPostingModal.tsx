@@ -1420,7 +1420,7 @@ export default function CreateJobPostingModal({ isOpen, onClose, onSave, editing
               >
                 <option value="Raise FPTK">Raise FPTK</option>
                 <option value="CV Hunting (Sourcing Candidate)">CV Hunting (Sourcing Candidate)</option>
-                <option value="Piskotest & Technical Test">Piskotest & Technical Test</option>
+                <option value="Psikotest & Technical Test">Psikotest & Technical Test</option>
                 <option value="Interview User">Interview User</option>
                 <option value="Offering Process">Offering Process</option>
                 <option value="Medical Check Up (MCU)">Medical Check Up (MCU)</option>
