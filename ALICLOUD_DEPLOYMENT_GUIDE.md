@@ -4054,36 +4054,794 @@ docker compose -p tas-production logs -f nginx
 
 #### Testing Environment
 
+**Manual Backup:**
+
 ```bash
 # On testing backend server
 cd /opt/tas-testing
 docker compose -p tas-testing exec postgres pg_dump -U tas_user tas_db > backup_testing_$(date +%Y%m%d_%H%M%S).sql
 ```
 
+**Automated Daily Backup:**
+
+See the Production Environment section below for automated backup setup instructions. The same script can be adapted for testing by changing the project name and environment variables.
+
 #### Production Environment
 
+**Manual Backup:**
+
+**Location:** Backups are stored in `/opt/backups/tas-production/` (centralized backup location outside the project directory).
+
 ```bash
-# On production backend server (using project name)
+# On production backend server
 cd /opt/tas-production
-docker compose -p tas-production exec postgres pg_dump -U tas_user tas_db > backup_production_$(date +%Y%m%d_%H%M%S).sql
+
+# Create backup directory if it doesn't exist
+mkdir -p /opt/backups/tas-production
+
+# Run backup to centralized backups directory
+docker compose -p tas-production exec postgres pg_dump -U tas_user tas_db > /opt/backups/tas-production/backup_production_$(date +%Y%m%d_%H%M%S).sql
+
+# Backup file location: /opt/backups/tas-production/backup_production_YYYYMMDD_HHMMSS.sql
+```
+
+**Move existing backups to new location (if you have backups in project directory):**
+
+```bash
+# Create centralized backup directory
+mkdir -p /opt/backups/tas-production
+
+# Move existing backup files from project root to centralized location
+mv /opt/tas-production/backup_production_*.sql /opt/backups/tas-production/ 2>/dev/null || echo "No backups to move from project root"
+
+# Move existing backups from old backups/ subdirectory (if any)
+mv /opt/tas-production/backups/backup_production_*.sql /opt/backups/tas-production/ 2>/dev/null || echo "No backups to move from old backups directory"
+
+# Verify backups are in the right place
+ls -lh /opt/backups/tas-production/
+```
+
+**⚠️ Troubleshooting Manual Backup:**
+
+If the command appears to do nothing (no output), this is normal - the output is redirected to a file. However, if no file is created, check the following:
+
+**1. Verify the backup file was created:**
+
+```bash
+# Check in centralized backup directory
+ls -lh /opt/backups/tas-production/backup_production_*.sql
+
+# Check the most recent backup
+ls -lt /opt/backups/tas-production/backup_production_*.sql | head -1
+```
+
+**2. Check if PostgreSQL container is running:**
+
+```bash
+# Check container status
+docker compose -p tas-production ps postgres
+
+# Should show "Up" status
+```
+
+**3. Test PostgreSQL connection:**
+
+```bash
+# Test if you can connect to PostgreSQL
+docker compose -p tas-production exec postgres psql -U tas_user -d tas_db -c "SELECT version();"
+```
+
+**4. Run backup with error output visible:**
+
+```bash
+# Run backup and show any errors (output still goes to file, but errors go to stderr)
+docker compose -p tas-production exec postgres pg_dump -U tas_user tas_db > backup_production_$(date +%Y%m%d_%H%M%S).sql 2>&1
+
+# Or run without redirecting to see progress (backup will print to terminal)
+docker compose -p tas-production exec postgres pg_dump -U tas_user tas_db
+```
+
+**5. Check for permission issues:**
+
+```bash
+# Check current directory permissions
+ls -ld /opt/tas-production
+
+# Check if you can write to the directory
+touch /opt/tas-production/test_write.txt && rm /opt/tas-production/test_write.txt && echo "Write permission OK"
+```
+
+**6. Run backup with verbose output:**
+
+```bash
+# Create backup directory first
+mkdir -p /opt/backups/tas-production
+
+# Run with verbose flag to see what's happening (saves to centralized backup directory)
+docker compose -p tas-production exec postgres pg_dump -U tas_user -d tas_db -v > /opt/backups/tas-production/backup_production_$(date +%Y%m%d_%H%M%S).sql 2>&1
+
+# Check the file size (should be > 0 if backup succeeded)
+ls -lh /opt/backups/tas-production/backup_production_*.sql | tail -1
+```
+
+**7. Alternative: Run backup inside container and copy out:**
+
+```bash
+# Run backup inside container first
+docker compose -p tas-production exec postgres pg_dump -U tas_user tas_db > /tmp/backup_$(date +%Y%m%d_%H%M%S).sql
+
+# Copy from container to host (if needed)
+docker compose -p tas-production cp postgres:/tmp/backup_*.sql ./
+```
+
+**Common Issues:**
+
+- **No file created**: Check PostgreSQL container is running and database exists
+- **Permission denied**: Ensure you have write permissions in `/opt/tas-production`
+- **Empty file**: Database might be empty, or connection failed (check logs)
+- **Command hangs**: PostgreSQL might be busy or locked (check container logs)
+
+**Check PostgreSQL logs if backup fails:**
+
+```bash
+# View PostgreSQL container logs
+docker compose -p tas-production logs --tail=50 postgres
+```
+
+**Automated Daily Backup with Auto-Cleanup:**
+
+**Step 1: Create Backup Script**
+
+Create an automated backup script that runs daily at 7pm and automatically deletes backups older than 14 days:
+
+```bash
+# On production backend server
+cd /opt/tas-production
+
+# Create centralized backup directory if it doesn't exist
+mkdir -p /opt/backups/tas-production
+
+# Create the backup script
+cat > scripts/backup-database.sh << 'EOF'
+#!/bin/bash
+# Automated database backup script for TAS Production
+# Creates daily backups and removes backups older than 14 days
+
+set -e
+
+# Configuration
+BACKUP_DIR="/opt/backups/tas-production"
+PROJECT_NAME="tas-production"
+DB_USER="tas_user"
+DB_NAME="tas_db"
+RETENTION_DAYS=14
+
+# Log file
+LOG_FILE="${BACKUP_DIR}/backup.log"
+
+# Function to log messages
+log() {
+    echo "[$(date '+%Y-%m-%d %H:%M:%S')] $1" | tee -a "$LOG_FILE"
+}
+
+# Ensure backup directory exists
+mkdir -p "$BACKUP_DIR"
+
+# Change to project directory
+cd /opt/tas-production
+
+# Generate backup filename with timestamp
+BACKUP_FILE="${BACKUP_DIR}/backup_production_$(date +%Y%m%d_%H%M%S).sql"
+
+log "Starting database backup..."
+
+# Perform backup
+if docker compose -p "$PROJECT_NAME" exec -T postgres pg_dump -U "$DB_USER" "$DB_NAME" > "$BACKUP_FILE" 2>>"$LOG_FILE"; then
+    # Get backup file size
+    BACKUP_SIZE=$(du -h "$BACKUP_FILE" | cut -f1)
+    log "✅ Backup completed successfully: $BACKUP_FILE (Size: $BACKUP_SIZE)"
+    
+    # Compress the backup to save space (optional but recommended)
+    log "Compressing backup..."
+    if command -v gzip >/dev/null 2>&1; then
+        gzip "$BACKUP_FILE"
+        BACKUP_FILE="${BACKUP_FILE}.gz"
+        BACKUP_SIZE=$(du -h "$BACKUP_FILE" | cut -f1)
+        log "✅ Backup compressed: $BACKUP_FILE (Size: $BACKUP_SIZE)"
+    fi
+else
+    log "❌ Backup failed! Check logs for details."
+    exit 1
+fi
+
+# Clean up old backups (older than RETENTION_DAYS)
+log "Cleaning up backups older than $RETENTION_DAYS days..."
+DELETED_COUNT=0
+DELETED_SIZE=0
+
+# Find and delete old backup files (both .sql and .sql.gz)
+while IFS= read -r old_backup; do
+    if [ -f "$old_backup" ]; then
+        FILE_SIZE=$(du -b "$old_backup" | cut -f1)
+        DELETED_SIZE=$((DELETED_SIZE + FILE_SIZE))
+        rm -f "$old_backup"
+        DELETED_COUNT=$((DELETED_COUNT + 1))
+        log "  Deleted: $(basename "$old_backup")"
+    fi
+done < <(find "$BACKUP_DIR" -name "backup_production_*.sql*" -type f -mtime +$RETENTION_DAYS)
+
+if [ $DELETED_COUNT -gt 0 ]; then
+    DELETED_SIZE_MB=$(echo "scale=2; $DELETED_SIZE / 1024 / 1024" | bc)
+    log "✅ Cleanup completed: Deleted $DELETED_COUNT backup(s), freed ${DELETED_SIZE_MB}MB"
+else
+    log "✅ Cleanup completed: No old backups to delete"
+fi
+
+# Show current backup status
+CURRENT_BACKUPS=$(find "$BACKUP_DIR" -name "backup_production_*.sql*" -type f | wc -l)
+TOTAL_SIZE=$(du -sh "$BACKUP_DIR" | cut -f1)
+log "📊 Backup status: $CURRENT_BACKUPS backup(s) in $BACKUP_DIR (Total size: $TOTAL_SIZE)"
+
+log "Backup process completed successfully"
+EOF
+
+# Make script executable
+chmod +x scripts/backup-database.sh
+
+# Test the script manually first
+echo "Testing backup script..."
+./scripts/backup-database.sh
+```
+
+**Step 2: Set Up Cron Job for Daily Backup at 7pm GMT+7 (WIB)**
+
+**⚠️ Timezone Note:** The server runs in UTC, but we want backups at 7 PM GMT+7 (WIB - Waktu Indonesia Barat). Since GMT+7 is 7 hours ahead of UTC:
+- **7 PM GMT+7 = 12:00 PM (noon) UTC**
+- Cron jobs use the server's timezone (UTC), so we schedule for **12:00 UTC**
+
+```bash
+# On production backend server
+# Edit crontab
+crontab -e
+
+# Add this line to run backup daily at 12:00 UTC (which is 7:00 PM GMT+7 / WIB)
+# The script will automatically log to /opt/backups/tas-production/backup.log
+0 12 * * * /opt/tas-production/scripts/backup-database.sh >> /opt/backups/tas-production/cron.log 2>&1
+
+# Save and exit (Ctrl+X, then Y, then Enter for nano)
+```
+
+**Step 3: Verify Cron Job is Set Up**
+
+```bash
+# List all cron jobs
+crontab -l
+
+# Should show:
+# 0 12 * * * /opt/tas-production/scripts/backup-database.sh >> /opt/backups/tas-production/cron.log 2>&1
+# This runs at 12:00 UTC = 7:00 PM GMT+7 (WIB)
+```
+
+**Step 4: Test the Backup Script Manually**
+
+```bash
+# Run the script manually to verify it works
+cd /opt/tas-production
+./scripts/backup-database.sh
+
+# Check if backup was created
+ls -lh backups/
+
+# Check backup log
+tail -20 backups/backup.log
+```
+
+**Step 5: Monitor Backup Status**
+
+```bash
+# View recent backup logs
+tail -50 /opt/backups/tas-production/backup.log
+
+# View cron execution logs
+tail -50 /opt/backups/tas-production/cron.log
+
+# List all backups
+ls -lh /opt/backups/tas-production/backup_production_*.sql*
+
+# Check backup count and total size
+echo "Backup count: $(find /opt/backups/tas-production -name 'backup_production_*.sql*' | wc -l)"
+du -sh /opt/backups/tas-production/
+```
+
+**Backup Script Features:**
+
+- ✅ **Daily automated backups** at 7:00 PM GMT+7 (WIB) / 12:00 UTC
+- ✅ **Automatic compression** (saves disk space)
+- ✅ **Auto-cleanup** of backups older than 14 days
+- ✅ **Detailed logging** to `/opt/backups/tas-production/backup.log`
+- ✅ **Error handling** with exit codes
+- ✅ **Backup statistics** (count, size, cleanup info)
+
+**Backup File Format:**
+
+- **Uncompressed:** `backup_production_YYYYMMDD_HHMMSS.sql`
+- **Compressed:** `backup_production_YYYYMMDD_HHMMSS.sql.gz` (if gzip is available)
+
+**Backup Retention:**
+
+- Backups are automatically deleted after **14 days**
+- Retention period can be changed by modifying `RETENTION_DAYS` in the script
+
+**Troubleshooting:**
+
+**If backup fails:**
+
+```bash
+# Check PostgreSQL container is running
+docker compose -p tas-production ps postgres
+
+# Check backup script permissions
+ls -l /opt/tas-production/scripts/backup-database.sh
+
+# Run script manually to see errors
+/opt/tas-production/scripts/backup-database.sh
+
+# Check logs
+tail -50 /opt/backups/tas-production/backup.log
+```
+
+**If cron job doesn't run:**
+
+```bash
+# Check cron service is running
+systemctl status cron
+
+# Check cron logs
+grep CRON /var/log/syslog | tail -20
+
+# Verify cron job syntax
+crontab -l
+
+# Test cron job manually
+/opt/tas-production/scripts/backup-database.sh
+```
+
+**If backups are not being deleted:**
+
+```bash
+# Check if find command works
+find /opt/backups/tas-production -name "backup_production_*.sql*" -type f -mtime +14
+
+# Manually delete old backups (if needed)
+find /opt/backups/tas-production -name "backup_production_*.sql*" -type f -mtime +14 -delete
+
+# Verify deletion
+ls -lh /opt/backups/tas-production/
 ```
 
 ### Restore Database
 
+#### Local Environment (Windows)
+
+**⚠️ Important: Check your .env file location first:**
+
+```powershell
+# Check if .env.local exists in root directory
+Test-Path ".env.local"
+
+# Check if .env exists in backend folder
+Test-Path "backend\.env"
+
+# Check if .env.local exists in backend folder
+Test-Path "backend\.env.local"
+```
+
+**For uncompressed backup (.sql file):**
+
+**If .env file is in root directory:**
+```powershell
+# PowerShell - .env.local in root
+Get-Content backup_production_20241120_120000.sql | docker compose --env-file .env.local exec -T postgres psql -U tas_user tas_db
+```
+
+**If .env file is in backend folder:**
+```powershell
+# PowerShell - .env in backend folder
+Get-Content backup_production_20241120_120000.sql | docker compose --env-file backend\.env exec -T postgres psql -U tas_user tas_db
+
+# Or if it's .env.local in backend folder
+Get-Content backup_production_20241120_120000.sql | docker compose --env-file backend\.env.local exec -T postgres psql -U tas_user tas_db
+```
+
+**If you're not sure which .env file to use:**
+```powershell
+# List all .env files in the project
+Get-ChildItem -Recurse -Filter ".env*" | Select-Object FullName
+
+# Use the one that matches your local setup
+# Common locations:
+# - .env.local (root directory)
+# - backend\.env (backend folder)
+# - backend\.env.local (backend folder)
+```
+
+**For compressed backup (.sql.gz file) - Option 1: Extract first, then restore:**
+
+```powershell
+# PowerShell - Extract the .gz file first
+# Method 1: Using 7-Zip (if installed)
+& "C:\Program Files\7-Zip\7z.exe" x backup_production_20241120_120000.sql.gz
+
+# Method 2: Using PowerShell Expand-Archive (if file is .zip, not .gz)
+# For .gz files, you'll need 7-Zip or WSL
+
+# After extraction, restore the .sql file
+# If .env is in root:
+Get-Content backup_production_20241120_120000.sql | docker compose --env-file .env.local exec -T postgres psql -U tas_user tas_db
+
+# If .env is in backend folder:
+Get-Content backup_production_20241120_120000.sql | docker compose --env-file backend\.env exec -T postgres psql -U tas_user tas_db
+```
+
+**For compressed backup (.sql.gz file) - Option 2: Use WSL (Windows Subsystem for Linux):**
+
+```bash
+# In WSL terminal
+cd /mnt/d/Cursor/Talent\ Acquisition\ Management\ -\ Production
+
+# If .env.local is in root:
+gunzip -c scripts/backup_production_20241120_120000.sql.gz | docker compose --env-file .env.local exec -T postgres psql -U tas_user tas_db
+
+# If .env is in backend folder:
+gunzip -c scripts/backup_production_20241120_120000.sql.gz | docker compose --env-file backend/.env exec -T postgres psql -U tas_user tas_db
+```
+
+**For compressed backup (.sql.gz file) - Option 3: Use Docker container with gzip:**
+
+```powershell
+# PowerShell - Use a temporary container with gzip to decompress
+# If .env.local is in root:
+docker run --rm -i -v ${PWD}:/backup alpine/gzip -dc /backup/scripts/backup_production_20241120_120000.sql.gz | docker compose --env-file .env.local exec -T postgres psql -U tas_user tas_db
+
+# If .env is in backend folder:
+docker run --rm -i -v ${PWD}:/backup alpine/gzip -dc /backup/scripts/backup_production_20241120_120000.sql.gz | docker compose --env-file backend\.env exec -T postgres psql -U tas_user tas_db
+```
+
+**For compressed backup (.sql.gz file) - Option 4: Extract using PowerShell (requires .NET):**
+
+```powershell
+# PowerShell - Using .NET GZipStream (works natively in PowerShell)
+$inputFile = "scripts\backup_production_20241120_120000.sql.gz"
+$outputFile = "scripts\backup_production_20241120_120000.sql"
+
+$input = New-Object System.IO.FileStream $inputFile, ([IO.FileMode]::Open), ([IO.FileAccess]::Read), ([IO.FileShare]::Read)
+$gzipStream = New-Object System.IO.Compression.GzipStream $input, ([IO.Compression.CompressionMode]::Decompress)
+$output = New-Object System.IO.FileStream $outputFile, ([IO.FileMode]::Create), ([IO.FileAccess]::Write), ([IO.FileShare]::None)
+$gzipStream.CopyTo($output)
+$output.Close()
+$gzipStream.Close()
+$input.Close()
+
+# Now restore the extracted file
+# If .env.local is in root:
+Get-Content $outputFile | docker compose --env-file .env.local exec -T postgres psql -U tas_user tas_db
+
+# If .env is in backend folder:
+Get-Content $outputFile | docker compose --env-file backend\.env exec -T postgres psql -U tas_user tas_db
+```
+
+**⚠️ Troubleshooting Local Restore on Windows:**
+
+**Error: "The system cannot find the file specified" or "error during connect: open //./pipe/dockerDesktopLinuxEngine"**
+
+This error means **Docker Desktop is not running**. Follow these steps:
+
+**1. Check if Docker Desktop is running:**
+
+```powershell
+# Check Docker status
+docker ps
+
+# If you get an error, Docker Desktop is not running
+```
+
+**2. Start Docker Desktop:**
+
+- Open **Docker Desktop** from the Start menu or system tray
+- Wait for Docker Desktop to fully start (whale icon in system tray should be steady, not animating)
+- You'll see "Docker Desktop is running" in the system tray when ready
+
+**3. Verify Docker is running:**
+
+```powershell
+# Test Docker connection
+docker ps
+
+# Should show running containers (or empty list if no containers running)
+# If this works, Docker is ready
+```
+
+**4. Check if local services are running:**
+
+```powershell
+# Check if PostgreSQL container is running
+# Use the correct .env file path (adjust if your .env is in backend folder)
+docker compose --env-file .env.local ps postgres
+# OR if .env is in backend folder:
+# docker compose --env-file backend\.env ps postgres
+
+# If container is not running, start it first:
+docker compose --env-file .env.local up -d postgres
+# OR if .env is in backend folder:
+# docker compose --env-file backend\.env up -d postgres
+
+# Wait a few seconds for PostgreSQL to be ready
+Start-Sleep -Seconds 5
+```
+
+**5. Retry the restore command:**
+
+```powershell
+# After Docker Desktop is running and PostgreSQL container is up, retry restore
+# Use the correct .env file path (see below if you get "couldn't find env file" error)
+Get-Content "scripts\backup_production_20260210_103614.sql" | docker compose --env-file .env.local exec -T postgres psql -U tas_user tas_db
+```
+
+**Error: "couldn't find env file: D:\...\.env" or "couldn't find env file: .env.local"**
+
+This error means the `.env` file is not in the expected location. Follow these steps:
+
+**1. Find your .env file location:**
+
+```powershell
+# Check common locations
+Test-Path ".env.local"           # Root directory
+Test-Path "backend\.env"         # Backend folder
+Test-Path "backend\.env.local"   # Backend folder with .local
+Test-Path ".env"                 # Root directory (alternative name)
+
+# Or search for all .env files
+Get-ChildItem -Recurse -Filter ".env*" | Select-Object FullName
+```
+
+**2. Use the correct path in your restore command:**
+
+```powershell
+# If .env.local is in root:
+Get-Content "scripts\backup_production_20260210_103614.sql" | docker compose --env-file .env.local exec -T postgres psql -U tas_user tas_db
+
+# If .env is in backend folder:
+Get-Content "scripts\backup_production_20260210_103614.sql" | docker compose --env-file backend\.env exec -T postgres psql -U tas_user tas_db
+
+# If .env.local is in backend folder:
+Get-Content "scripts\backup_production_20260210_103614.sql" | docker compose --env-file backend\.env.local exec -T postgres psql -U tas_user tas_db
+```
+
+**3. Alternative: Copy .env file to root (if needed):**
+
+```powershell
+# If you prefer to use .env.local in root, copy it from backend folder
+Copy-Item "backend\.env" ".env.local"
+
+# Then use the standard command
+Get-Content "scripts\backup_production_20260210_103614.sql" | docker compose --env-file .env.local exec -T postgres psql -U tas_user tas_db
+```
+
+**Alternative: Start all local services first:**
+
+```powershell
+# Navigate to project directory
+cd "D:\Cursor\Talent Acquisition Management - Production"
+
+# Determine your .env file location first
+$envFile = if (Test-Path ".env.local") { ".env.local" } elseif (Test-Path "backend\.env") { "backend\.env" } else { "backend\.env.local" }
+Write-Host "Using env file: $envFile"
+
+# Start all services (if not already running)
+docker compose --env-file $envFile up -d
+
+# Wait for services to be ready
+Start-Sleep -Seconds 10
+
+# Verify PostgreSQL is running
+docker compose --env-file $envFile ps postgres
+
+# Now restore the backup
+Get-Content "scripts\backup_production_20260210_103614.sql" | docker compose --env-file $envFile exec -T postgres psql -U tas_user tas_db
+```
+
+**Common Issues:**
+
+- **Docker Desktop not installed**: Download from https://www.docker.com/products/docker-desktop/
+- **Docker Desktop starting slowly**: Wait 1-2 minutes after opening Docker Desktop
+- **WSL 2 not enabled**: Docker Desktop requires WSL 2 on Windows. Enable it in Windows Features or install WSL 2
+- **Containers not running**: Start them with `docker compose --env-file .env.local up -d`
+
+**Error: "unknown docker command: 'compose postgres'"**
+
+This error occurs when PowerShell misinterprets the command. Use one of these fixes:
+
+**Fix 1: Use Out-File instead of redirection (Recommended):**
+
+```powershell
+# Use Out-File for PowerShell
+$backupFile = "backup_local_$(Get-Date -Format 'yyyyMMdd_HHmmss').sql"
+docker compose --env-file $envFile exec postgres pg_dump -U tas_user tas_db | Out-File -FilePath $backupFile -Encoding utf8
+```
+
+**Fix 2: Use cmd.exe for redirection:**
+
+```powershell
+# Use cmd /c to run with cmd.exe redirection
+$backupFile = "backup_local_$(Get-Date -Format 'yyyyMMdd_HHmmss').sql"
+cmd /c "docker compose --env-file $envFile exec postgres pg_dump -U tas_user tas_db > $backupFile"
+```
+
+**Fix 3: Use Start-Process with redirection:**
+
+```powershell
+# Alternative method
+$backupFile = "backup_local_$(Get-Date -Format 'yyyyMMdd_HHmmss').sql"
+$command = "docker compose --env-file $envFile exec postgres pg_dump -U tas_user tas_db"
+Invoke-Expression "$command | Out-File -FilePath $backupFile -Encoding utf8"
+```
+
+**Fix 4: Verify $envFile variable is set:**
+
+```powershell
+# Check if variable is set correctly
+$envFile = if (Test-Path ".env.local") { ".env.local" } elseif (Test-Path "backend\.env") { "backend\.env" } else { "backend\.env.local" }
+Write-Host "envFile = $envFile"
+
+# Test the command without redirection first
+docker compose --env-file $envFile exec postgres pg_dump -U tas_user tas_db --version
+```
+
+**Error: "already exists" or "duplicate key value violates unique constraint"**
+
+This error occurs when trying to restore a backup to a database that already has data. The backup script tries to create tables/types that already exist. You have two options:
+
+**Option 1: Drop and recreate the database (Clean Restore - Recommended for local development):**
+
+```powershell
+# Determine your .env file location
+$envFile = if (Test-Path ".env.local") { ".env.local" } elseif (Test-Path "backend\.env") { "backend\.env" } else { "backend\.env.local" }
+Write-Host "Using env file: $envFile"
+
+# Optional: Backup current database first (safety measure)
+$backupFile = "backup_local_$(Get-Date -Format 'yyyyMMdd_HHmmss').sql"
+Write-Host "Creating backup: $backupFile"
+docker compose --env-file $envFile exec postgres pg_dump -U tas_user tas_db | Out-File -FilePath $backupFile -Encoding utf8
+
+# Connect to PostgreSQL and drop the database
+Write-Host "Dropping existing database..."
+docker compose --env-file $envFile exec postgres psql -U tas_user -d postgres -c "DROP DATABASE IF EXISTS tas_db;"
+
+# Recreate the database
+Write-Host "Creating new database..."
+docker compose --env-file $envFile exec postgres psql -U tas_user -d postgres -c "CREATE DATABASE tas_db;"
+
+# Now restore the backup (should work without errors)
+Write-Host "Restoring backup..."
+Get-Content "scripts\backup_production_20260210_103614.sql" | docker compose --env-file $envFile exec -T postgres psql -U tas_user tas_db
+Write-Host "✅ Restore completed!"
+```
+
+**Option 2: Use pg_restore with --clean flag (if backup is in custom format):**
+
+If your backup was created with `pg_dump -Fc` (custom format), you can use:
+
+```powershell
+# This only works if backup is in .dump or custom format, not plain SQL
+docker compose --env-file $envFile exec -T postgres pg_restore --clean --if-exists -U tas_user -d tas_db < backup_production_20241120_120000.dump
+```
+
+**Option 3: Restore to a new database (if you want to keep existing data):**
+
+```powershell
+# Create a new database for the backup
+docker compose --env-file $envFile exec postgres psql -U tas_user -d postgres -c "CREATE DATABASE tas_db_backup;"
+
+# Restore to the new database
+Get-Content "scripts\backup_production_20260210_103614.sql" | docker compose --env-file $envFile exec -T postgres psql -U tas_user tas_db_backup
+
+# Later, you can compare or migrate data between databases
+```
+
+**⚠️ WARNING:** Option 1 will **DELETE ALL EXISTING DATA** in your local database. Only use this if you want to completely replace your local database with the production backup.
+
+**For a safer approach (keep existing data):**
+
+```powershell
+# Determine your .env file location first
+$envFile = if (Test-Path ".env.local") { ".env.local" } elseif (Test-Path "backend\.env") { "backend\.env" } else { "backend\.env.local" }
+Write-Host "Using env file: $envFile"
+
+# 1. Backup your current local database first
+# PowerShell: Use Out-File or redirect with proper syntax
+$backupFile = "backup_local_$(Get-Date -Format 'yyyyMMdd_HHmmss').sql"
+docker compose --env-file $envFile exec postgres pg_dump -U tas_user tas_db | Out-File -FilePath $backupFile -Encoding utf8
+
+# Alternative method (if Out-File doesn't work):
+# docker compose --env-file $envFile exec postgres pg_dump -U tas_user tas_db > $backupFile
+
+# Verify backup was created
+if (Test-Path $backupFile) {
+    Write-Host "✅ Backup created: $backupFile"
+    $fileSize = (Get-Item $backupFile).Length / 1KB
+    Write-Host "   Size: $([math]::Round($fileSize, 2)) KB"
+} else {
+    Write-Host "❌ Backup failed - file not created"
+    exit 1
+}
+
+# 2. Then drop and restore production backup
+docker compose --env-file $envFile exec postgres psql -U tas_user -d postgres -c "DROP DATABASE IF EXISTS tas_db;"
+docker compose --env-file $envFile exec postgres psql -U tas_user -d postgres -c "CREATE DATABASE tas_db;"
+Get-Content "scripts\backup_production_20260210_103614.sql" | docker compose --env-file $envFile exec -T postgres psql -U tas_user tas_db
+```
+
 #### Testing Environment
+
+**⚠️ IMPORTANT:** Restoring a backup to a database that already has data will cause "already exists" errors. Only restore to an empty database or use the clean restore method below.
 
 ```bash
 # On testing backend server
 cd /opt/tas-testing
+
+# Standard restore (will fail if database has existing data)
+cat backup_testing_20241120_120000.sql | docker compose -p tas-testing exec -T postgres psql -U tas_user tas_db
+```
+
+**Clean Restore (Drop and recreate database - USE WITH CAUTION):**
+
+```bash
+# ⚠️ WARNING: This will DELETE ALL EXISTING DATA in the database!
+
+# 1. Backup current database first (safety measure)
+docker compose -p tas-testing exec postgres pg_dump -U tas_user tas_db > backup_before_restore_$(date +%Y%m%d_%H%M%S).sql
+
+# 2. Drop and recreate database
+docker compose -p tas-testing exec postgres psql -U tas_user -d postgres -c "DROP DATABASE IF EXISTS tas_db;"
+docker compose -p tas-testing exec postgres psql -U tas_user -d postgres -c "CREATE DATABASE tas_db;"
+
+# 3. Restore the backup
 cat backup_testing_20241120_120000.sql | docker compose -p tas-testing exec -T postgres psql -U tas_user tas_db
 ```
 
 #### Production Environment
 
+**⚠️ IMPORTANT:** Restoring a backup to a database that already has data will cause "already exists" errors. Only restore to an empty database or use the clean restore method below.
+
+**For uncompressed backup:**
 ```bash
 # On production backend server (using project name)
 cd /opt/tas-production
-cat backup_production_20241120_120000.sql | docker compose -p tas-production exec -T postgres psql -U tas_user tas_db
+
+# Restore from centralized backup location
+cat /opt/backups/tas-production/backup_production_20241120_120000.sql | docker compose -p tas-production exec -T postgres psql -U tas_user tas_db
+```
+
+**For compressed backup (if using gzip):**
+```bash
+gunzip -c /opt/backups/tas-production/backup_production_20241120_120000.sql.gz | docker compose -p tas-production exec -T postgres psql -U tas_user tas_db
+```
+
+**Clean Restore (Drop and recreate database - USE WITH CAUTION):**
+
+```bash
+# ⚠️ WARNING: This will DELETE ALL EXISTING DATA in the database!
+# Only use this if you want to completely replace the database with the backup
+
+# 1. Backup current database first (safety measure)
+docker compose -p tas-production exec postgres pg_dump -U tas_user tas_db > /opt/backups/tas-production/backup_before_restore_$(date +%Y%m%d_%H%M%S).sql
+
+# 2. Drop and recreate database
+docker compose -p tas-production exec postgres psql -U tas_user -d postgres -c "DROP DATABASE IF EXISTS tas_db;"
+docker compose -p tas-production exec postgres psql -U tas_user -d postgres -c "CREATE DATABASE tas_db;"
+
+# 3. Restore the backup
+cat /opt/backups/tas-production/backup_production_20241120_120000.sql | docker compose -p tas-production exec -T postgres psql -U tas_user tas_db
 ```
 
 ### Switch Between Environments
@@ -4308,8 +5066,14 @@ Keep a record of which ports are used by which applications:
    # Required files:
    # - fullchain.pem (certificate + intermediate chain)
    # - privkey.pem (private key)
+   # 
+   # NOTE: If you get "same file" error, the file is already in the correct location.
+   # Just verify it exists and set permissions (see below).
    cp /path/to/your/fullchain.pem ssl/
    cp /path/to/your/privkey.pem ssl/
+   
+   # Verify files exist
+   ls -la ssl/fullchain.pem ssl/privkey.pem
    
    # Set correct permissions
    chmod 644 ssl/fullchain.pem
@@ -4369,10 +5133,318 @@ Keep a record of which ports are used by which applications:
    
    **Troubleshooting SSL Issues:**
    
+   **Connection Timeout (Port 8443 not accessible):**
+   
+   If you get `Connection timed out` when testing HTTPS, follow these steps:
+   
+   **1. Test Local Connectivity (from server itself):**
+   
+   ```bash
+   # Test if NGINX is listening locally
+   curl -k https://localhost:8443/health
+   curl -k https://127.0.0.1:8443/health
+   
+   # If this works, the issue is firewall/security group, not NGINX
+   ```
+   
+   **2. Check if NGINX Container is Running:**
+   
+   ```bash
+   cd /opt/tas-production
+   
+   # Check container status
+   docker compose -f docker-compose.frontend.yml -p tas-production ps nginx
+   
+   # Check if container is listening on port 8443
+   docker compose -f docker-compose.frontend.yml -p tas-production exec nginx netstat -tulpn | grep 443
+   
+   # Check Docker port mapping
+   docker ps --filter "name=tas_nginx" --format "table {{.Names}}\t{{.Ports}}"
+   # Should show: 0.0.0.0:8443->443/tcp
+   ```
+   
+   **3. Check Host Port Binding:**
+   
+   ```bash
+   # Check if port 8443 is listening on the host
+   netstat -tulpn | grep 8443
+   # OR
+   ss -tulpn | grep 8443
+   # OR
+   lsof -i :8443
+   
+   # Should show NGINX or docker-proxy listening on 0.0.0.0:8443
+   ```
+   
+   **4. Check UFW Firewall (if enabled):**
+   
+   ```bash
+   # Check if port 8443 is allowed
+   ufw status verbose | grep 8443
+   
+   # If not listed, add it:
+   ufw allow 8443/tcp
+   ufw reload
+   
+   # Verify it's now allowed
+   ufw status numbered | grep 8443
+   ```
+   
+   **5. ⚠️ CRITICAL: Check AliCloud Security Group**
+   
+   The most common cause of connection timeout is that AliCloud Security Group is blocking port 8443:
+   
+   1. **Log in to AliCloud Console**
+      - Go to [AliCloud Console](https://ecs.console.alibabacloud.com/)
+      - Navigate to **Elastic Compute Service (ECS)** → **Instances**
+   
+   2. **Find your frontend server (ECS-App)**
+      - IP: `147.139.176.70`
+      - Click on the instance name
+   
+   3. **Open Security Groups:**
+      - Click on the **Security Groups** tab
+      - Click **Configure Rules** or **Add Rule**
+   
+   4. **Add Inbound Rule for HTTPS:**
+      - **Action:** Allow
+      - **Protocol Type:** TCP
+      - **Port Range:** `8443/8443` (or just `8443`)
+      - **Authorization Object:** 
+        - **Option 1 (Recommended):** `0.0.0.0/0` (allows from anywhere)
+        - **Option 2 (More Secure):** Your specific IP or IP range
+      - **Description:** `TAS NGINX HTTPS (Port 8443)`
+      - **Priority:** Leave as default (usually `1`)
+   
+   5. **Save** and wait 1-2 minutes for changes to take effect
+   
+   6. **Verify the rule appears** in the inbound rules list
+   
+   **6. Check NGINX Configuration:**
+   
+   ```bash
+   cd /opt/tas-production
+   
+   # Check NGINX config inside container
+   docker compose -f docker-compose.frontend.yml -p tas-production exec nginx cat /etc/nginx/nginx.conf | grep -A 10 "listen 443"
+   
+   # Should show: listen 443 ssl http2;
+   
+   # Check SSL certificate paths
+   docker compose -f docker-compose.frontend.yml -p tas-production exec nginx ls -la /etc/nginx/ssl/
+   
+   # Should show: fullchain.pem and privkey.pem
+   ```
+   
+   **7. Check NGINX Logs for SSL Errors:**
+   
+   ```bash
+   docker compose -f docker-compose.frontend.yml -p tas-production logs --tail=50 nginx | grep -i ssl
+   ```
+   
+   **8. Verify Environment Variable:**
+   
+   ```bash
+   # Check HTTPS_PORT is set correctly
+   grep HTTPS_PORT .env.production
+   
+   # Should show: HTTPS_PORT=8443
+   ```
+   
+   **9. Restart NGINX After Changes:**
+   
+   ```bash
+   cd /opt/tas-production
+   
+   # Test NGINX configuration
+   docker compose -f docker-compose.frontend.yml -p tas-production exec nginx nginx -t
+   
+   # Restart NGINX
+   docker compose -f docker-compose.frontend.yml -p tas-production restart nginx
+   
+   # Check logs
+   docker compose -f docker-compose.frontend.yml -p tas-production logs --tail=20 nginx
+   ```
+   
+   **10. Check Network ACL (VPC Network):**
+   
+   If your ECS instance is in a VPC, Network ACLs can also block traffic:
+   
+   1. **Log in to AliCloud Console**
+      - Go to [AliCloud Console](https://ecs.console.alibabacloud.com/)
+      - Navigate to **VPC** → **Network ACLs**
+   
+   2. **Find the Network ACL attached to your subnet:**
+      
+      **Option A: From VPC page:**
+      - On the VPC details page, click **Resource Management** tab (or look for **Subnets** section)
+      - Find the subnet where your ECS instance (147.139.176.70) is located
+      - Note the Network ACL ID/Name attached to that subnet
+      
+      **Option B: Direct navigation:**
+      - Go to **VPC** → **Subnets**
+      - Filter by your VPC ID or search for subnet containing IP `147.139.176.70`
+      - Click on the subnet to see details
+      - Note the Network ACL ID/Name attached to that subnet
+      
+      **Option C: From ECS instance:**
+      - Go to **ECS** → **Instances** → Your instance (147.139.176.70)
+      - Check **Network** or **Network Interface** section
+      - Find the subnet ID/name
+      - Then go to **VPC** → **Subnets** → Find that subnet
+      - Note the Network ACL attached to it
+      
+      **Option D: Check Network ACLs directly (if you can't find subnet):**
+      - Go directly to **VPC** → **Network ACLs**
+      - Check each Network ACL's **Inbound Rules**
+      - Look for rules that might block port 8443
+   
+   3. **Check Network ACL Rules:**
+      - Go back to **VPC** → **Network ACLs**
+      - Click on the Network ACL attached to your subnet
+      - Check **Inbound Rules** tab
+      - Look for rules that might block port 8443
+      - If there's a default deny rule, you need to add an explicit allow rule for port 8443
+   
+   4. **Add Network ACL Rule (if needed):**
+      - Click **Add Inbound Rule**
+      - **Action:** Allow
+      - **Protocol:** TCP
+      - **Port Range:** `8443/8443` or `8443`
+      - **Source:** `0.0.0.0/0`
+      - **Description:** `TAS HTTPS Port 8443`
+      - **Priority:** Set appropriately (lower number = higher priority)
+      - **Save**
+   
+   **Note:** Network ACLs are evaluated before Security Groups. If Network ACL denies traffic, Security Group rules won't matter.
+   
+   **11. Check Security Group Flow Logs:**
+   
+   Security Group flow logs can show if connections are being blocked:
+   
+   1. **Enable Flow Logs (if not already enabled):**
+      - Go to **VPC** → **Flow Logs** (or **Log Service** → **Flow Logs**)
+      - Click **Create Flow Log**
+      - **Resource Type:** Select **Security Group**
+      - **Resource:** Select your security group
+      - **Logstore:** Create or select a logstore
+      - **Project:** Select or create a project
+      - **Save**
+   
+   2. **View Flow Logs:**
+      - Go to **Log Service** → **Project** → Your project → **Logstore**
+      - Search for logs related to port 8443
+      - Look for entries showing `action: reject` or `action: drop`
+      - Check the `srcaddr`, `dstaddr`, `dstport` fields
+   
+   3. **Query Flow Logs:**
+      - Use this query to find blocked connections on port 8443:
+      ```
+      dstport: 8443 AND action: reject
+      ```
+      - Or to see all traffic on port 8443:
+      ```
+      dstport: 8443
+      ```
+   
+   **Alternative: Check via CLI (if available):**
+   ```bash
+   # If you have AliCloud CLI installed
+   aliyun ecs DescribeSecurityGroupAttribute --SecurityGroupId <your-security-group-id>
+   ```
+   
+   **12. Verify Port 8080 vs 8443 Difference:**
+   
+   Since port 8080 works but 8443 doesn't, compare the exact rule formats:
+   
+   1. In Security Group rules, check:
+      - Port 8080 rule: What exact format? (`8080/8080` or just `8080`?)
+      - Port 8443 rule: Does it match exactly?
+      - Are both rules in the same security group?
+      - Do both have the same priority?
+   
+   2. **Try copying the exact port 8080 rule format for 8443:**
+      - Delete the 8443 rule
+      - Add a new rule using the EXACT same format as the 8080 rule
+      - Only change the port number from 8080 to 8443
+      - Wait 2-3 minutes and test again
+   
+   **13. Rule Propagation Delay:**
+   
+   If the security group rules are identical but one port works and another doesn't:
+   
+   1. **Wait longer:** Security group rule changes can take 5-10 minutes to fully propagate
+   2. **Check when the rule was added:** If 8443 rule was just added, wait 5-10 minutes and test again
+   3. **Rule order matters:** Try moving the 8443 rule to a different position (delete and re-add it)
+   
+   **14. Check for Load Balancer or Other Network Components:**
+   
+   If there's a load balancer, NAT gateway, or other network component in front:
+   
+   1. **Check Load Balancer (if exists):**
+      - Go to **SLB (Server Load Balancer)** → **Instances**
+      - Check if there's a load balancer forwarding to your ECS instance
+      - Verify the load balancer listener allows port 8443
+      - Check load balancer security group rules
+   
+   2. **Check NAT Gateway:**
+      - Go to **VPC** → **NAT Gateways**
+      - If there's a NAT gateway, check its rules
+   
+   3. **Check if ECS has Public IP vs EIP:**
+      - Verify the instance has a public IP or Elastic IP
+      - Check if the IP `147.139.176.70` is directly assigned or goes through NAT
+   
+   **15. Test with Different External Sources:**
+   
+   Rule propagation can vary by region/source:
+   
+   1. Test from different geographic locations
+   2. Test from different ISPs
+   3. Use multiple online port checkers:
+      - https://www.yougetsignal.com/tools/open-ports/
+      - https://www.canyouseeme.org/
+      - https://portchecker.co/
+   
+   **16. Verify Rule is Actually Applied:**
+   
+   Sometimes rules appear correct but aren't actually applied:
+   
+   1. **Delete and recreate the rule:**
+      - Delete the 8443 rule completely
+      - Wait 1 minute
+      - Add it again with exact same settings as 8080
+      - Wait 5-10 minutes
+      - Test again
+   
+   2. **Check rule ID/timestamp:**
+      - Note when the 8080 rule was created vs 8443 rule
+      - If 8443 was created recently, wait longer
+   
+   3. **Try a different port temporarily:**
+      - Add rule for port 8444
+      - Change `HTTPS_PORT=8444` in `.env.production`
+      - Restart NGINX
+      - Test if 8444 works
+      - This helps isolate if it's port-specific or rule-specific
+   
+   **17. Check AliCloud Account/Region Limitations:**
+   
+   Some AliCloud accounts or regions may have restrictions:
+   
+   1. Check if there are any account-level firewall rules
+   2. Check if the region has any special requirements
+   3. Contact AliCloud support if everything else checks out
+   
+   **Other Common Issues:**
+   
    - **Certificate not found**: Ensure `fullchain.pem` and `privkey.pem` exist in `ssl/` directory
    - **Permission denied**: Check file permissions (`chmod 644 fullchain.pem`, `chmod 600 privkey.pem`)
-   - **Port not accessible**: Check AliCloud Security Group allows `HTTPS_PORT` (default: 8443)
    - **Redirect loop**: Verify `HTTPS_PORT` matches the port in the redirect URL in `nginx.network.conf`
+   - **SSL handshake error**: Check certificate validity and expiration date
+   - **Port works locally but not externally**: Usually indicates Security Group or Network ACL blocking
+   - **Identical rules but one port works and another doesn't**: Usually indicates rule propagation delay or account/region-specific restrictions
+   - **Port works locally but not externally**: Usually indicates Security Group or Network ACL blocking
 
 3. **Monitoring**:
    - Set up log rotation

@@ -67,6 +67,10 @@ export default function EditJobPostingModal({
   const [fptkFileError, setFptkFileError] = useState<string>('')
   const [fptkReceiveDate, setFptkReceiveDate] = useState<string>('')
   const [hiringManagerOptions, setHiringManagerOptions] = useState<Array<{firstName: string, lastName: string}>>([])
+  const [teamMembers, setTeamMembers] = useState<Array<{id: string, firstName: string, lastName: string, email: string}>>([])
+  const [interviewerSuggestions, setInterviewerSuggestions] = useState<Array<{id: string, name: string, email: string}>>([])
+  const [showInterviewerSuggestions, setShowInterviewerSuggestions] = useState<Record<string, boolean>>({})
+  const interviewerInputRefs = useRef<Record<string, HTMLInputElement | null>>({})
   const fptkFileInputRef = useRef<HTMLInputElement>(null)
 
   const mapAppliedStatusLabel = (status?: string) => {
@@ -245,8 +249,26 @@ export default function EditJobPostingModal({
       }
     }
 
+    const loadTeamMembers = async () => {
+      try {
+        const users = await AdminUsersAPI.list('', '') // Load all users
+        if (isMounted) {
+          setTeamMembers(users.map((u: any) => ({
+            id: u.id,
+            firstName: u.firstName || '',
+            lastName: u.lastName || '',
+            email: u.email || ''
+          })))
+        }
+      } catch (error) {
+        console.error('Error loading team members:', error)
+        setTeamMembers([])
+      }
+    }
+
     loadDivisions()
     loadHiringManagers()
+    loadTeamMembers()
 
     return () => {
       isMounted = false
@@ -442,12 +464,35 @@ export default function EditJobPostingModal({
         setAppliedCandidates([])
       }
 
-      // Load candidates from API
+      // Load candidates from API with pagination (same logic as ViewJobPostingModal)
       const loadCandidates = async () => {
         try {
-          const response = await CandidatesAPI.getAll({}, { page: 1, limit: 100 })
-          const rawCandidates = response.data || []
-          const mappedCandidates = rawCandidates.map(mapApiCandidate).filter((c: any) => c !== null)
+          // Load candidates with pagination (API max limit is 100)
+          let allCandidates: any[] = []
+          let page = 1
+          const limit = 100
+          let hasMore = true
+          
+          while (hasMore) {
+            const response = await CandidatesAPI.getAll({}, { page, limit })
+            const candidatesData = response.data || []
+            allCandidates = [...allCandidates, ...candidatesData]
+            
+            // Check if there are more pages
+            const totalPages = response.pagination?.totalPages || 1
+            hasMore = page < totalPages
+            page++
+            
+            // Safety limit to prevent infinite loops
+            if (page > 50) {
+              console.warn('⚠️ Reached maximum page limit (50). Some candidates may not be loaded.')
+              break
+            }
+          }
+          
+          console.log('📋 Total candidates loaded in EditJobPostingModal:', allCandidates.length)
+          
+          const mappedCandidates = allCandidates.map(mapApiCandidate).filter((c: any) => c !== null)
           setAllCandidates(mappedCandidates)
           return mappedCandidates
         } catch (error) {
@@ -470,42 +515,96 @@ export default function EditJobPostingModal({
         const appliedIds = new Set(enrichedFromJob.map((candidate: any) => candidate.id))
 
         // Load real applied candidates for this specific open position (fallback for legacy data)
+        // Use the same comprehensive matching logic as ViewJobPostingModal
         const legacyApplied = candidates
           .filter((candidate: any) => {
-            const appliedField = (candidate as any).positionAppliedFor
-            const hasAppliedToThis = Array.isArray(appliedField)
-              ? appliedField.includes(jobPosting.title)
-              : appliedField === jobPosting.title
+            // Parse positionAppliedFor from different possible locations (same as ViewJobPostingModal)
+            let positionAppliedFor: string[] = []
+            
+            // Check direct field
+            if (candidate.positionAppliedFor !== undefined && candidate.positionAppliedFor !== null) {
+              positionAppliedFor = Array.isArray(candidate.positionAppliedFor) 
+                ? candidate.positionAppliedFor 
+                : [String(candidate.positionAppliedFor)]
+            }
+            
+            // Check languages field (where it's actually stored in backend)
+            if (positionAppliedFor.length === 0 && candidate.languages) {
+              const languagesData = typeof candidate.languages === 'string'
+                ? JSON.parse(candidate.languages || '{}')
+                : (candidate.languages || {})
+              
+              if (languagesData.positionAppliedFor) {
+                positionAppliedFor = Array.isArray(languagesData.positionAppliedFor)
+                  ? languagesData.positionAppliedFor
+                  : [String(languagesData.positionAppliedFor)]
+              }
+            }
+            
+            // Normalize position title for comparison
+            const positionTitle = (jobPosting.title || '').trim().toLowerCase()
+            const hasAppliedToThis = positionAppliedFor.some((pos: string) => {
+              const normalizedPos = (pos || '').trim().toLowerCase()
+              return normalizedPos === positionTitle
+            })
+            
+            // Also check currentPosition as fallback
             const currentPositionMatch =
-              candidate.professionalInfo && candidate.professionalInfo.currentPosition === jobPosting.title
+              candidate.professionalInfo && 
+              (candidate.professionalInfo.currentPosition || '').trim().toLowerCase() === positionTitle
+            
             return hasAppliedToThis || currentPositionMatch
           })
           .filter((candidate: any) => !appliedIds.has(candidate.id))
-          .map((candidate: any) =>
-            mergeAppliedCandidateData(
+          .map((candidate: any) => {
+            // Use the same mapping logic as ViewJobPostingModal for consistency
+            const user = candidate.user || {}
+            const formDataDiri = typeof candidate.formDataDiri === 'string' 
+              ? JSON.parse(candidate.formDataDiri || '{}') 
+              : (candidate.formDataDiri || {})
+            const languagesData = typeof candidate.languages === 'string'
+              ? JSON.parse(candidate.languages || '{}')
+              : (candidate.languages || {})
+
+            const fullName = [user.firstName, user.lastName].filter(Boolean).join(' ') ||
+              formDataDiri?.fullName || candidate.fullName || candidate.name ||
+              `Candidate ${candidate.id?.slice(0, 6) || ''}`
+
+            const email = user.email || candidate.email || formDataDiri?.email || ''
+            const skills = Array.isArray(candidate.skills)
+              ? candidate.skills
+              : Array.isArray(languagesData?.skills)
+                ? languagesData.skills
+                : candidate.professionalInfo?.skills || []
+
+            return mergeAppliedCandidateData(
               {
                 id: candidate.id,
                 candidateId: candidate.id,
-                fullName: candidate.fullName,
-                name:
-                  candidate.fullName ||
-                  `${candidate.personalInfo.firstName} ${candidate.personalInfo.lastName}`.trim(),
-                email: candidate.email || candidate.contactInfo.email,
-                status: candidate.status || 'Applied',
-                appliedDate: candidate.createdAt,
-                skills: candidate.skills || candidate.professionalInfo?.skills || [],
-                experience: parseInt(
-                  candidate.yearsOfExperience || candidate.professionalInfo?.experience || 0
-                ),
+                fullName,
+                name: fullName,
+                email,
+                phone: user.phoneNumber || '',
+                status: 'Applied',
+                backendStatus: 'SUBMITTED',
+                appliedDate: candidate.createdAt || new Date().toISOString(),
+                rejectedDate: null,
+                withdrawDate: null,
+                source: 'Manual',
+                skills,
+                experience: languagesData?.yearsOfExperience || candidate.yearsOfExperience || candidate.professionalInfo?.experience || 0,
+                yearsOfExperience: languagesData?.yearsOfExperience || candidate.yearsOfExperience || candidate.professionalInfo?.experience || 0,
+                division: user.division || candidate.division || null,
                 jobPostingId: jobPosting.id,
                 interviews: candidate.interviews || [],
               },
               candidate
             )
-          )
+          })
 
         legacyApplied.forEach((candidate: any) => appliedIds.add(candidate.id))
 
+        console.log('📊 Applied candidates found in EditJobPostingModal:', enrichedFromJob.length, 'from jobPosting,', legacyApplied.length, 'from positionAppliedFor')
         setAppliedCandidates([...enrichedFromJob, ...legacyApplied])
 
         // Generate suggested candidates based on division and skills
@@ -2275,34 +2374,190 @@ export default function EditJobPostingModal({
                                 </button>
                               </div>
                               
-                              {/* Interviewer */}
-                              <div style={{ marginBottom: '8px' }}>
+                              {/* Interviewer with Autocomplete */}
+                              <div style={{ marginBottom: '8px', position: 'relative' }}>
                                 <label style={{ fontSize: '11px', fontWeight: '500', color: '#374151', marginBottom: '4px', display: 'block' }}>
                                   Interviewer
                                 </label>
-                                <input
-                                  type="text"
-                                  value={interview.interviewer || ''}
-                                  onChange={(e) => {
-                                    setAppliedCandidates(prev => prev.map(c => {
-                                      const matches = (c.id === candidate.id) || (c.candidateId === candidate.id) || (c.id === candidate.candidateId) || (c.candidateId === candidate.candidateId)
-                                      if (!matches) return c
-                                      const currentInterviews = [...(c.interviews || [])]
-                                      if (!currentInterviews[interviewIndex]) {
-                                        currentInterviews[interviewIndex] = { interviewer: '', date: '', time: '', results: '' }
-                                      }
-                                      currentInterviews[interviewIndex] = { ...currentInterviews[interviewIndex], interviewer: e.target.value }
-                                      return { ...c, interviews: currentInterviews }
-                                    }))
-                                  }}
-                                  style={{
-                                    width: '100%',
-                                    padding: '4px 6px',
-                                    border: '1px solid #d1d5db',
-                                    borderRadius: '4px',
-                                    fontSize: '11px'
-                                  }}
-                                />
+                                {(() => {
+                                  const candidateKey = `${candidate.id || candidate.candidateId}_${interviewIndex}`
+                                  const currentValue = interview.interviewer || ''
+                                  const showSuggestions = showInterviewerSuggestions[candidateKey] && currentValue.length > 0
+                                  
+                                  // Filter team members based on input
+                                  const filteredSuggestions = currentValue.length > 0
+                                    ? teamMembers
+                                        .filter((member) => {
+                                          const fullName = `${member.firstName} ${member.lastName}`.trim().toLowerCase()
+                                          const firstName = (member.firstName || '').toLowerCase()
+                                          const lastName = (member.lastName || '').toLowerCase()
+                                          const email = (member.email || '').toLowerCase()
+                                          const searchTerm = currentValue.toLowerCase()
+                                          
+                                          return fullName.includes(searchTerm) ||
+                                                 firstName.includes(searchTerm) ||
+                                                 lastName.includes(searchTerm) ||
+                                                 email.includes(searchTerm)
+                                        })
+                                        .slice(0, 5) // Limit to 5 suggestions
+                                        .map((member) => ({
+                                          id: member.id,
+                                          name: `${member.firstName} ${member.lastName}`.trim() || member.email,
+                                          email: member.email
+                                        }))
+                                    : []
+                                  
+                                  return (
+                                    <div style={{ position: 'relative' }}>
+                                      <input
+                                        ref={(el) => {
+                                          interviewerInputRefs.current[candidateKey] = el
+                                        }}
+                                        type="text"
+                                        value={currentValue}
+                                        onChange={(e) => {
+                                          const value = e.target.value
+                                          setAppliedCandidates(prev => prev.map(c => {
+                                            const matches = (c.id === candidate.id) || (c.candidateId === candidate.id) || (c.id === candidate.candidateId) || (c.candidateId === candidate.candidateId)
+                                            if (!matches) return c
+                                            const currentInterviews = [...(c.interviews || [])]
+                                            if (!currentInterviews[interviewIndex]) {
+                                              currentInterviews[interviewIndex] = { interviewer: '', date: '', time: '', results: '' }
+                                            }
+                                            currentInterviews[interviewIndex] = { ...currentInterviews[interviewIndex], interviewer: value }
+                                            return { ...c, interviews: currentInterviews }
+                                          }))
+                                          
+                                          // Filter team members based on new input value
+                                          if (value.length > 0) {
+                                            const newFilteredSuggestions = teamMembers
+                                              .filter((member) => {
+                                                const fullName = `${member.firstName} ${member.lastName}`.trim().toLowerCase()
+                                                const firstName = (member.firstName || '').toLowerCase()
+                                                const lastName = (member.lastName || '').toLowerCase()
+                                                const email = (member.email || '').toLowerCase()
+                                                const searchTerm = value.toLowerCase()
+                                                
+                                                return fullName.includes(searchTerm) ||
+                                                       firstName.includes(searchTerm) ||
+                                                       lastName.includes(searchTerm) ||
+                                                       email.includes(searchTerm)
+                                              })
+                                              .slice(0, 5)
+                                            
+                                            // Show suggestions if there are matches
+                                            if (newFilteredSuggestions.length > 0) {
+                                              setShowInterviewerSuggestions(prev => ({ ...prev, [candidateKey]: true }))
+                                            } else {
+                                              setShowInterviewerSuggestions(prev => ({ ...prev, [candidateKey]: false }))
+                                            }
+                                          } else {
+                                            setShowInterviewerSuggestions(prev => ({ ...prev, [candidateKey]: false }))
+                                          }
+                                        }}
+                                        onFocus={() => {
+                                          if (currentValue.length > 0) {
+                                            const newFilteredSuggestions = teamMembers
+                                              .filter((member) => {
+                                                const fullName = `${member.firstName} ${member.lastName}`.trim().toLowerCase()
+                                                const firstName = (member.firstName || '').toLowerCase()
+                                                const lastName = (member.lastName || '').toLowerCase()
+                                                const email = (member.email || '').toLowerCase()
+                                                const searchTerm = currentValue.toLowerCase()
+                                                
+                                                return fullName.includes(searchTerm) ||
+                                                       firstName.includes(searchTerm) ||
+                                                       lastName.includes(searchTerm) ||
+                                                       email.includes(searchTerm)
+                                              })
+                                              .slice(0, 5)
+                                            
+                                            if (newFilteredSuggestions.length > 0) {
+                                              setShowInterviewerSuggestions(prev => ({ ...prev, [candidateKey]: true }))
+                                            }
+                                          }
+                                        }}
+                                        onBlur={(e) => {
+                                          // Delay hiding suggestions to allow click on suggestion
+                                          setTimeout(() => {
+                                            setShowInterviewerSuggestions(prev => ({ ...prev, [candidateKey]: false }))
+                                          }, 200)
+                                        }}
+                                        placeholder="Type interviewer name or email..."
+                                        style={{
+                                          width: '100%',
+                                          padding: '4px 6px',
+                                          border: '1px solid #d1d5db',
+                                          borderRadius: '4px',
+                                          fontSize: '11px'
+                                        }}
+                                      />
+                                      {showSuggestions && filteredSuggestions.length > 0 && (
+                                        <div style={{
+                                          position: 'absolute',
+                                          top: '100%',
+                                          left: 0,
+                                          right: 0,
+                                          zIndex: 1000,
+                                          backgroundColor: 'white',
+                                          border: '1px solid #d1d5db',
+                                          borderRadius: '4px',
+                                          marginTop: '2px',
+                                          boxShadow: '0 4px 6px rgba(0, 0, 0, 0.1)',
+                                          maxHeight: '150px',
+                                          overflowY: 'auto'
+                                        }}>
+                                          {filteredSuggestions.map((suggestion, idx) => (
+                                            <div
+                                              key={suggestion.id || idx}
+                                              onClick={() => {
+                                                const selectedName = suggestion.name
+                                                setAppliedCandidates(prev => prev.map(c => {
+                                                  const matches = (c.id === candidate.id) || (c.candidateId === candidate.id) || (c.id === candidate.candidateId) || (c.candidateId === candidate.candidateId)
+                                                  if (!matches) return c
+                                                  const currentInterviews = [...(c.interviews || [])]
+                                                  if (!currentInterviews[interviewIndex]) {
+                                                    currentInterviews[interviewIndex] = { interviewer: '', date: '', time: '', results: '' }
+                                                  }
+                                                  currentInterviews[interviewIndex] = { ...currentInterviews[interviewIndex], interviewer: selectedName }
+                                                  return { ...c, interviews: currentInterviews }
+                                                }))
+                                                setShowInterviewerSuggestions(prev => ({ ...prev, [candidateKey]: false }))
+                                              }}
+                                              onMouseDown={(e) => {
+                                                // Prevent blur event from firing before click
+                                                e.preventDefault()
+                                              }}
+                                              style={{
+                                                padding: '6px 8px',
+                                                cursor: 'pointer',
+                                                fontSize: '11px',
+                                                borderBottom: idx < filteredSuggestions.length - 1 ? '1px solid #e5e7eb' : 'none',
+                                                backgroundColor: '#ffffff',
+                                                transition: 'background-color 0.15s'
+                                              }}
+                                              onMouseEnter={(e) => {
+                                                e.currentTarget.style.backgroundColor = '#f3f4f6'
+                                              }}
+                                              onMouseLeave={(e) => {
+                                                e.currentTarget.style.backgroundColor = '#ffffff'
+                                              }}
+                                            >
+                                              <div style={{ fontWeight: '500', color: '#111827' }}>
+                                                {suggestion.name}
+                                              </div>
+                                              {suggestion.email && (
+                                                <div style={{ fontSize: '10px', color: '#6b7280', marginTop: '2px' }}>
+                                                  {suggestion.email}
+                                                </div>
+                                              )}
+                                            </div>
+                                          ))}
+                                        </div>
+                                      )}
+                                    </div>
+                                  )
+                                })()}
                               </div>
                               
                               {/* Date and Time */}
