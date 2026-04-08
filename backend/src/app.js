@@ -143,9 +143,6 @@ if (process.env.NODE_ENV === 'development') {
 // Static files (for uploaded documents)
 app.use('/uploads', express.static(path.join(__dirname, '../uploads')));
 
-// Apply rate limiting to all routes
-app.use(generalLimiter);
-
 // Health check endpoint (no auth required)
 app.get('/health', (req, res) => {
   res.json({
@@ -158,6 +155,8 @@ app.get('/health', (req, res) => {
 });
 
 // API routes
+// Apply rate limiting to API routes (excludes /api/auth via limiter skip logic)
+app.use('/api', generalLimiter);
 app.use('/api/auth', authRoutes);
 app.use('/api/candidates', candidateRoutes);
 app.use('/api/fptk', fptkRoutes);
