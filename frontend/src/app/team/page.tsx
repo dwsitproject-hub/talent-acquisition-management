@@ -38,6 +38,8 @@ export default function TeamPage() {
   const [showPassword, setShowPassword] = useState(false)
   const [defaultPassword, setDefaultPassword] = useState('DefaultPassword123!')
   const [showDefaultPassword, setShowDefaultPassword] = useState(false)
+  const [uploadingUsers, setUploadingUsers] = useState(false)
+  const [uploadResult, setUploadResult] = useState<any | null>(null)
 const [newMember, setNewMember] = useState({
     firstName: '',
     lastName: '',
@@ -117,7 +119,7 @@ const routes: Array<{
   },
   {
     path: '/team',
-    label: 'Team',
+    label: 'User Management',
     defaults: {
       visibleRoles: ['SUPER_ADMIN','TA_TEAM'],
       permissions: { create: ['SUPER_ADMIN','TA_TEAM'], edit: ['SUPER_ADMIN','TA_TEAM'] },
@@ -289,21 +291,24 @@ const handleSaveMenuAccess = async () => {
       setLoading(true)
       const members = await AdminUsersAPI.list()
       // Map API response to TeamMember format
-      const mappedMembers: TeamMember[] = members.map((m: any) => ({
-        id: m.id,
-        firstName: m.firstName,
-        lastName: m.lastName,
-        email: m.email,
-        phone: m.phoneNumber,
-        role: m.role,
-        division: m.division || '',
-        sectionName: m.sectionName,
-        isActive: m.isActive,
-        lastLoginAt: m.lastLoginAt,
-        pt: m.pt || '',
-        area: m.area || '',
-        areaDetail: m.areaDetail || '',
-      }))
+      const mappedMembers: TeamMember[] = (members || [])
+        .map((m: any) => ({
+          id: m.id,
+          firstName: m.firstName,
+          lastName: m.lastName,
+          email: m.email,
+          phone: m.phoneNumber,
+          role: m.role,
+          division: m.division || '',
+          sectionName: m.sectionName,
+          isActive: m.isActive,
+          lastLoginAt: m.lastLoginAt,
+          pt: m.pt || '',
+          area: m.area || '',
+          areaDetail: m.areaDetail || '',
+        }))
+        // Candidates are managed via Candidate flows/portal, not User Management.
+        .filter((m: TeamMember) => m.role !== 'CANDIDATE')
       setTeamMembers(mappedMembers)
     } catch (error) {
       console.error('Error loading team members:', error)
@@ -603,21 +608,132 @@ const handleSaveMenuAccess = async () => {
         <div className="mb-8">
           <div className="flex justify-between items-center">
             <div>
-              <h1 className="text-2xl font-bold text-gray-900">Team Management</h1>
+              <h1 className="text-2xl font-bold text-gray-900">User Management</h1>
               <p className="mt-1 text-sm text-gray-500">
-                Manage team members and their roles in the recruitment system
+                Manage users and their roles in the recruitment system
               </p>
             </div>
-            <button
-              disabled={!canCreateTeam}
-              onClick={() => canCreateTeam && setIsAddOpen(true)}
-              className={`inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white ${canCreateTeam ? 'bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500' : 'bg-gray-300 cursor-not-allowed'}`}
-            >
-              <PlusIcon className="h-4 w-4 mr-2" />
-              Add Team Member
-            </button>
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={async () => {
+                  try {
+                    const blob = await AdminUsersAPI.downloadTemplate('xlsx')
+                    const url = window.URL.createObjectURL(blob)
+                    const a = document.createElement('a')
+                    a.href = url
+                    a.download = 'user-management-upload-template.xlsx'
+                    document.body.appendChild(a)
+                    a.click()
+                    a.remove()
+                    window.URL.revokeObjectURL(url)
+                  } catch (e: any) {
+                    console.error('Download template failed:', e)
+                    alert(e.response?.data?.message || 'Failed to download template')
+                  }
+                }}
+                className="inline-flex items-center px-3 py-2 border border-gray-300 shadow-sm text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50"
+              >
+                Download Template
+              </button>
+
+              <label
+                className={`inline-flex items-center px-3 py-2 border border-gray-300 shadow-sm text-sm font-medium rounded-md ${
+                  canCreateTeam ? 'text-gray-700 bg-white hover:bg-gray-50 cursor-pointer' : 'text-gray-400 bg-gray-100 cursor-not-allowed'
+                }`}
+              >
+                <input
+                  type="file"
+                  accept=".xlsx,.csv"
+                  className="hidden"
+                  disabled={!canCreateTeam || uploadingUsers}
+                  onChange={async (e) => {
+                    const file = e.target.files?.[0]
+                    e.target.value = ''
+                    if (!file) return
+                    if (!canCreateTeam) return
+                    setUploadingUsers(true)
+                    setUploadResult(null)
+                    try {
+                      const res = await AdminUsersAPI.bulkUpload(file)
+                      setUploadResult(res?.data || res)
+                      await loadTeamMembers()
+                    } catch (err: any) {
+                      console.error('Bulk upload failed:', err)
+                      alert(err.response?.data?.message || 'Bulk upload failed')
+                    } finally {
+                      setUploadingUsers(false)
+                    }
+                  }}
+                />
+                {uploadingUsers ? 'Uploading...' : 'Upload Excel'}
+              </label>
+
+              <button
+                disabled={!canCreateTeam}
+                onClick={() => canCreateTeam && setIsAddOpen(true)}
+                className={`inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white ${canCreateTeam ? 'bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500' : 'bg-gray-300 cursor-not-allowed'}`}
+              >
+                <PlusIcon className="h-4 w-4 mr-2" />
+                Add User
+              </button>
+            </div>
           </div>
         </div>
+
+        {uploadResult && (
+          <div className="mb-6 bg-white shadow rounded-lg p-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <h3 className="text-sm font-semibold text-gray-900">Upload Result</h3>
+                <p className="text-xs text-gray-500">
+                  Total: <span className="font-semibold">{uploadResult.total ?? 0}</span> • Succeeded:{' '}
+                  <span className="font-semibold text-green-700">{uploadResult.created ?? 0}</span> • Errors:{' '}
+                  <span className="font-semibold text-red-700">{uploadResult.failed ?? 0}</span>
+                </p>
+              </div>
+              <button
+                type="button"
+                className="text-sm text-gray-500 hover:text-gray-700"
+                onClick={() => setUploadResult(null)}
+              >
+                Dismiss
+              </button>
+            </div>
+
+            {Array.isArray(uploadResult.errors) && uploadResult.errors.length > 0 && (
+              <div className="mt-3 overflow-x-auto">
+                <table className="min-w-full divide-y divide-gray-200">
+                  <thead className="bg-gray-50">
+                    <tr>
+                      <th className="px-3 py-2 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">
+                        Row
+                      </th>
+                      <th className="px-3 py-2 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">
+                        Email
+                      </th>
+                      <th className="px-3 py-2 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">
+                        Error
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody className="bg-white divide-y divide-gray-200">
+                    {uploadResult.errors.slice(0, 50).map((er: any, idx: number) => (
+                      <tr key={idx}>
+                        <td className="px-3 py-2 text-sm text-gray-900">{er.row}</td>
+                        <td className="px-3 py-2 text-sm text-gray-900">{er.email || '-'}</td>
+                        <td className="px-3 py-2 text-sm text-red-700">{er.message}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+                {uploadResult.errors.length > 50 && (
+                  <p className="mt-2 text-xs text-gray-500">Showing first 50 errors.</p>
+                )}
+              </div>
+            )}
+          </div>
+        )}
 
         {/* Search and Filters */}
         <div className="mb-6 space-y-4 sm:space-y-0 sm:flex sm:items-center sm:space-x-4">
@@ -627,7 +743,7 @@ const handleSaveMenuAccess = async () => {
             </div>
             <input
               type="text"
-              placeholder="Search team members..."
+              placeholder="Search users..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
               className="block w-full pl-10 pr-3 py-2 border border-gray-300 rounded-md leading-5 bg-white placeholder-gray-500 focus:outline-none focus:placeholder-gray-400 focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
@@ -652,14 +768,14 @@ const handleSaveMenuAccess = async () => {
           {loading ? (
             <div className="p-6 text-center">
               <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600 mx-auto"></div>
-              <p className="mt-2 text-sm text-gray-500">Loading team members...</p>
+              <p className="mt-2 text-sm text-gray-500">Loading users...</p>
             </div>
           ) : filteredMembers.length === 0 ? (
             <div className="p-6 text-center">
               <UserGroupIcon className="mx-auto h-12 w-12 text-gray-400" />
-              <h3 className="mt-2 text-sm font-medium text-gray-900">No team members</h3>
+              <h3 className="mt-2 text-sm font-medium text-gray-900">No users</h3>
               <p className="mt-1 text-sm text-gray-500">
-                Get started by adding team members to the system.
+                Get started by adding users to the system.
               </p>
               <div className="mt-6">
                 <button
@@ -668,7 +784,7 @@ const handleSaveMenuAccess = async () => {
                   className={`inline-flex items-center px-4 py-2 border border-transparent shadow-sm text-sm font-medium rounded-md text-white ${canCreateTeam ? 'bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500' : 'bg-gray-300 cursor-not-allowed'}`}
                 >
                   <PlusIcon className="h-4 w-4 mr-2" />
-                  Add Team Member
+                  Add User
                 </button>
               </div>
             </div>
@@ -892,7 +1008,7 @@ const handleSaveMenuAccess = async () => {
           }}>
             <div className="bg-white rounded-lg shadow-xl w-full max-w-lg mx-4" onClick={(e) => e.stopPropagation()}>
               <div className="px-6 py-4 border-b flex justify-between items-center">
-                <h2 className="text-lg font-semibold text-gray-900">Add Team Member</h2>
+                <h2 className="text-lg font-semibold text-gray-900">Add User</h2>
                 <button className="text-gray-500 hover:text-gray-700" onClick={() => {
                   setIsAddOpen(false)
                   setValidationErrors({})
@@ -1155,7 +1271,7 @@ const handleSaveMenuAccess = async () => {
           }}>
             <div className="bg-white rounded-lg shadow-xl w-full max-w-lg mx-4" onClick={(e) => e.stopPropagation()}>
               <div className="px-6 py-4 border-b flex justify-between items-center">
-                <h2 className="text-lg font-semibold text-gray-900">Edit Team Member</h2>
+                <h2 className="text-lg font-semibold text-gray-900">Edit User</h2>
                 <button className="text-gray-500 hover:text-gray-700" onClick={() => {
                   setIsEditOpen(false)
                   setValidationErrors({})

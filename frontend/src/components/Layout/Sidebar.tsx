@@ -25,7 +25,7 @@ const baseNavigation = [
   { name: 'Position', href: '/fptk', icon: BriefcaseIcon },
   { name: 'Summary by Position', href: '/summary-by-position', icon: ChartBarIcon },
   { name: 'Reports', href: '/reports', icon: ChartBarIcon },
-  { name: 'Team', href: '/team', icon: UserGroupIcon },
+  { name: 'User Management', href: '/team', icon: UserGroupIcon },
 ]
 
 const masterNavigation = [

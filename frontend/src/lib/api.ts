@@ -145,6 +145,21 @@ export const AdminUsersAPI = {
     const res = await api.post(`/admin/users/${id}/reset-password`, { newPassword })
     return res.data
   },
+  async downloadTemplate(format: 'csv' | 'xlsx' = 'xlsx') {
+    const res = await api.get('/admin/users/bulk-template', {
+      params: { format },
+      responseType: 'blob',
+    })
+    return res.data as Blob
+  },
+  async bulkUpload(file: File) {
+    const formData = new FormData()
+    formData.append('file', file)
+    const res = await api.post('/admin/users/bulk-upload', formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    })
+    return res.data
+  },
 }
 
 // Menu Access Management APIs

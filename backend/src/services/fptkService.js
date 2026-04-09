@@ -11,14 +11,15 @@ const UI_STATUS_TO_APP_STATUS_MAP = {
   'interview scheduled': 'INTERVIEW_SCHEDULED',
   'interviewed': 'INTERVIEW_COMPLETED',
   'interview completed': 'INTERVIEW_COMPLETED',
+  'assessment': 'TECHNICAL_TEST',
   'document verification': 'DOCUMENT_VERIFICATION',
   'offer proposed': 'OFFER_PROPOSED',
   'offer approved': 'OFFER_APPROVED',
   'offer sent': 'OFFER_SENT',
-  'offer extended': 'OFFER_PROPOSED',
   'offer accepted': 'OFFER_ACCEPTED',
   'offer declined': 'OFFER_REJECTED',
   'offer rejected': 'OFFER_REJECTED',
+  'mcu': 'MEDICAL_CHECKUP_COMPLETED',
   'medical checkup scheduled': 'MEDICAL_CHECKUP_SCHEDULED',
   'medical checkup completed': 'MEDICAL_CHECKUP_COMPLETED',
   'contract sent': 'CONTRACT_SENT',
@@ -27,6 +28,7 @@ const UI_STATUS_TO_APP_STATUS_MAP = {
   'onboarding': 'ONBOARDING',
   'hired': 'HIRED',
   'rejected': 'REJECTED',
+  'rejected (failed interview / assessment)': 'REJECTED',
   'withdrawn': 'WITHDRAWN',
 };
 
@@ -98,10 +100,21 @@ function normalizeAppliedCandidates(appliedCandidatesInput) {
   if (!appliedCandidatesInput) return [];
   const map = new Map();
 
-  const pushCandidate = (candidateId, payload = {}) => {
-    if (!candidateId) return;
-    map.set(candidateId, {
-      candidateId,
+  const makeKey = (payload = {}) => {
+    const candidateId = payload.candidateId || payload.id || null;
+    const email = (payload.email || '').toString().trim().toLowerCase();
+    if (candidateId) return `id:${candidateId}`;
+    if (email) return `email:${email}`;
+    return null;
+  };
+
+  const pushCandidate = (payload = {}) => {
+    const key = makeKey(payload);
+    if (!key) return;
+    map.set(key, {
+      candidateId: payload.candidateId || payload.id || null,
+      email: payload.email ? payload.email.toString().trim().toLowerCase() : null,
+      fullName: payload.fullName || payload.name || null,
       status: payload.status,
       appliedAt: payload.appliedAt || payload.appliedDate || payload.appliedOn,
       source: payload.source,
@@ -115,17 +128,112 @@ function normalizeAppliedCandidates(appliedCandidatesInput) {
     appliedCandidatesInput.forEach((item) => {
       if (!item) return;
       if (typeof item === 'string') {
-        pushCandidate(item);
+        pushCandidate({ candidateId: item });
       } else if (typeof item === 'object') {
-        const candidateId = item.candidateId || item.id;
-        pushCandidate(candidateId, item);
+        pushCandidate(item);
       }
     });
   } else if (typeof appliedCandidatesInput === 'string') {
-    pushCandidate(appliedCandidatesInput);
+    pushCandidate({ candidateId: appliedCandidatesInput });
   }
 
   return Array.from(map.values());
+}
+
+function normalizeName(value) {
+  return String(value || '')
+    .trim()
+    .toLowerCase()
+    .replace(/\s+/g, ' ');
+}
+
+function httpError(statusCode, message) {
+  const err = new Error(message);
+  err.statusCode = statusCode;
+  return err;
+}
+
+async function resolveCandidateIdTx(tx, { candidateId, email, fullName }) {
+  if (candidateId) return candidateId;
+  const normalizedEmail = (email || '').toString().trim().toLowerCase();
+  if (!normalizedEmail) return null;
+
+  const candidate = await tx.candidate.findFirst({
+    where: { user: { email: normalizedEmail } },
+    select: {
+      id: true,
+      user: { select: { firstName: true, lastName: true, email: true } },
+      formDataDiri: true,
+      languages: true,
+    },
+  });
+
+  if (!candidate) return null;
+
+  // Validate name match when provided (defensive; allows extra spaces/case differences)
+  if (fullName) {
+    const userName = `${candidate.user?.firstName || ''} ${candidate.user?.lastName || ''}`.trim();
+    let formName = '';
+    try {
+      const form = typeof candidate.formDataDiri === 'string' ? JSON.parse(candidate.formDataDiri) : candidate.formDataDiri;
+      formName = form?.fullName || '';
+    } catch (_) {
+      formName = '';
+    }
+
+    const incoming = normalizeName(fullName);
+    const userNorm = normalizeName(userName);
+    const formNorm = normalizeName(formName);
+    if (incoming && incoming !== userNorm && (!formNorm || incoming !== formNorm)) {
+      return { error: `Full Name mismatch for email ${normalizedEmail} (got "${fullName}", expected "${userName || formName || normalizedEmail}")` };
+    }
+  }
+
+  return candidate.id;
+}
+
+async function ensureCandidatePositionAppliedForTx(tx, candidateId, positionTitle) {
+  if (!candidateId || !positionTitle) return;
+  const candidate = await tx.candidate.findUnique({
+    where: { id: candidateId },
+    select: { id: true, languages: true },
+  });
+  if (!candidate) return;
+
+  let languages = {};
+  if (candidate.languages) {
+    if (typeof candidate.languages === 'string') {
+      try {
+        languages = JSON.parse(candidate.languages);
+      } catch (_) {
+        languages = {};
+      }
+    } else if (typeof candidate.languages === 'object') {
+      languages = { ...(candidate.languages || {}) };
+    }
+  }
+
+  const existing = Array.isArray(languages.positionAppliedFor)
+    ? languages.positionAppliedFor
+    : languages.positionAppliedFor
+      ? [String(languages.positionAppliedFor)]
+      : [];
+
+  const normalizedExisting = new Set(
+    existing
+      .map((v) => String(v || '').trim())
+      .filter(Boolean)
+      // Clean up legacy values that are actually statuses
+      .filter((v) => v.toLowerCase() !== 'applied' && v.toLowerCase() !== 'under review' && v.toLowerCase() !== 'shortlisted')
+  );
+  normalizedExisting.add(String(positionTitle).trim());
+
+  languages.positionAppliedFor = Array.from(normalizedExisting);
+
+  await tx.candidate.update({
+    where: { id: candidateId },
+    data: { languages },
+  });
 }
 
 async function syncFptkApplicationsTx(tx, fptkId, appliedCandidates, options = {}) {
@@ -142,6 +250,15 @@ async function syncFptkApplicationsTx(tx, fptkId, appliedCandidates, options = {
   });
 
   const normalized = normalizeAppliedCandidates(appliedCandidates);
+  if (normalized.length > 5) {
+    throw httpError(400, 'Applied candidates limit exceeded (max 5)');
+  }
+
+  const fptk = await tx.fPTK.findUnique({
+    where: { id: fptkId },
+    select: { positionTitle: true, position: true },
+  });
+  const positionTitle = (fptk?.positionTitle || fptk?.position || '').toString().trim();
 
   if (normalized.length === 0) {
     await tx.application.deleteMany({
@@ -168,8 +285,29 @@ async function syncFptkApplicationsTx(tx, fptkId, appliedCandidates, options = {
   }
 
   for (const item of normalized) {
-    const candidateId = item.candidateId;
-    if (!candidateId) continue;
+    let candidateId = item.candidateId;
+    if (!candidateId) {
+      const resolved = await resolveCandidateIdTx(tx, {
+        candidateId: item.candidateId,
+        email: item.email,
+        fullName: item.fullName,
+      });
+      if (resolved && typeof resolved === 'object' && resolved.error) {
+        throw httpError(400, resolved.error);
+      }
+      candidateId = resolved;
+    }
+
+    if (!candidateId) {
+      const emailRaw = item.email;
+      const emailLabel =
+        typeof emailRaw === 'string'
+          ? emailRaw
+          : emailRaw && typeof emailRaw === 'object'
+            ? JSON.stringify(emailRaw)
+            : String(emailRaw || '');
+      throw httpError(400, `Candidate not found for email ${emailLabel || '(missing email)'}`);
+    }
 
     const existing = existingByCandidate.get(candidateId);
     const status = mapUiStatusToApplicationStatus(item.status);
@@ -218,6 +356,11 @@ async function syncFptkApplicationsTx(tx, fptkId, appliedCandidates, options = {
         logger.warn(`Failed to create application for candidate ${candidateId} on FPTK ${fptkId}: ${error.message}`);
         continue; // Skip to next candidate if application creation failed
       }
+    }
+
+    // Ensure candidate "Position Applied For" is updated (languages.positionAppliedFor)
+    if (positionTitle) {
+      await ensureCandidatePositionAppliedForTx(tx, candidateId, positionTitle);
     }
 
     // Handle interview data if provided

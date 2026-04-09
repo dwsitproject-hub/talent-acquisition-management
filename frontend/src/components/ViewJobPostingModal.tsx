@@ -46,24 +46,24 @@ export default function ViewJobPostingModal({ isOpen, onClose, jobPosting, onSta
     const lookup: Record<string, string> = {
       DRAFT: 'Applied',
       SUBMITTED: 'Applied',
-      SCREENING: 'Under Review',
+      SCREENING: 'Shortlisted',
       PSYCHOMETRIC_TEST: 'Under Review',
-      TECHNICAL_TEST: 'Technical Test',
+      TECHNICAL_TEST: 'Assessment',
       INTERVIEW_SCHEDULED: 'Interview Scheduled',
       INTERVIEW_COMPLETED: 'Interviewed',
       DOCUMENT_VERIFICATION: 'Document Verification',
-      OFFER_PROPOSED: 'Offer Extended',
+      OFFER_PROPOSED: 'Offer Proposed',
       OFFER_APPROVED: 'Offer Approved',
       OFFER_SENT: 'Offer Sent',
       OFFER_ACCEPTED: 'Offer Accepted',
-      OFFER_REJECTED: 'Offer Declined',
+      OFFER_REJECTED: 'Offer Rejected',
       MEDICAL_CHECKUP_SCHEDULED: 'Medical Checkup Scheduled',
-      MEDICAL_CHECKUP_COMPLETED: 'Medical Checkup Completed',
+      MEDICAL_CHECKUP_COMPLETED: 'MCU',
       CONTRACT_SENT: 'Contract Sent',
       CONTRACT_SIGNED: 'Contract Signed',
       ONBOARDING: 'On Boarding',
       HIRED: 'Hired',
-      REJECTED: 'Rejected',
+      REJECTED: 'Rejected (Failed Interview / Assessment)',
       WITHDRAWN: 'Withdrawn',
     }
     if (lookup[normalized]) return lookup[normalized]
@@ -410,7 +410,7 @@ export default function ViewJobPostingModal({ isOpen, onClose, jobPosting, onSta
                     color: '#3730a3',
                     margin: '4px 0 0 0'
                   }}>
-                    {(jobPosting as any).currentStatus || (jobPosting as any).status || 'Raise FPTK'}
+                    {(jobPosting as any).currentStatus || (jobPosting as any).status || 'Pending FKTK'}
                   </span>
                 </div>
                 {(jobPosting as any).typeGrade && (
@@ -571,18 +571,16 @@ export default function ViewJobPostingModal({ isOpen, onClose, jobPosting, onSta
               <div style={{ display: 'flex', alignItems: 'center', gap: '0', overflowX: 'auto', padding: '20px 0' }}>
                 {(() => {
                   const fixedMilestones = [
-                    'Raise FPTK',
-                    'CV Hunting (Sourcing Candidate)',
-                    'Psikotest & Technical Test',
-                    'Interview User',
-                    'Offering Process',
-                    'Medical Check Up (MCU)',
-                    'Signing',
-                    'On Boarding'
+                    'Pending FKTK',
+                    'Open',
+                    'Hold',
+                    'Re-Open',
+                    'Internal Movement',
+                    'Cancel'
                   ]
                   
                   const milestoneData = (jobPosting as any).milestones || []
-                  const currentStatus = (jobPosting as any).currentStatus || (jobPosting as any).status || 'Raise FPTK'
+                  const currentStatus = (jobPosting as any).currentStatus || (jobPosting as any).status || 'Pending FKTK'
                   const currentIndex = fixedMilestones.indexOf(currentStatus)
                   
                   return fixedMilestones.map((milestone, index) => {
@@ -642,7 +640,7 @@ export default function ViewJobPostingModal({ isOpen, onClose, jobPosting, onSta
                             color: isCompleted ? '#10b981' : isCurrent ? '#0ea5e9' : '#6b7280',
                             marginBottom: '2px'
                           }}>
-                            {index === fixedMilestones.length - 1 ? 'On Boarding' : milestone.split(' ')[0]}
+                            {milestone}
                           </div>
                           <div style={{
                             fontSize: '10px',
@@ -701,12 +699,12 @@ export default function ViewJobPostingModal({ isOpen, onClose, jobPosting, onSta
               {/* Milestone Details */}
               <div style={{ marginTop: '16px' }}>
                 <div style={{ fontSize: '14px', fontWeight: '500', color: '#374151', marginBottom: '8px' }}>
-                  Current Status: {(jobPosting as any).currentStatus || (jobPosting as any).status || 'Raise FPTK'}
+                  Current Status: {(jobPosting as any).currentStatus || (jobPosting as any).status || 'Pending FKTK'}
                 </div>
                 <div style={{ fontSize: '12px', color: '#6b7280' }}>
                   {(() => {
                     const milestoneData = (jobPosting as any).milestones || []
-                    const currentStatus = (jobPosting as any).currentStatus || (jobPosting as any).status || 'Raise FPTK'
+                    const currentStatus = (jobPosting as any).currentStatus || (jobPosting as any).status || 'Pending FKTK'
                     const currentMilestone = milestoneData.find((m: any) => m.status === currentStatus)
                     
                     if (currentMilestone) {
@@ -819,7 +817,7 @@ export default function ViewJobPostingModal({ isOpen, onClose, jobPosting, onSta
                           }}>
                             {statusLabel}
                           </span>
-                          {statusLabel === 'Rejected' && candidate.rejectedDate ? (
+                          {(statusLabel || '').toString().toLowerCase().startsWith('rejected') && candidate.rejectedDate ? (
                             <div style={{ marginTop: '6px', fontSize: '11px', color: '#b91c1c' }}>
                               Rejected Date: {formatDate(candidate.rejectedDate)}
                             </div>
@@ -853,7 +851,7 @@ export default function ViewJobPostingModal({ isOpen, onClose, jobPosting, onSta
                           }}>
                             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: isExpanded ? '8px' : '0' }}>
                               <div style={{ fontSize: '12px', fontWeight: '600', color: '#374151' }}>
-                                Interview Details {statusLabel === 'Interviewed' || ['Offer Extended', 'Offer Approved', 'Offer Sent', 'Offer Accepted', 'Offer Declined', 'Medical Checkup Scheduled', 'Medical Checkup Completed', 'Contract Sent', 'Contract Signed', 'On Boarding', 'Hired'].includes(statusLabel) ? '(Interview Results)' : ''}
+                                Interview Details {statusLabel === 'Interviewed' || ['Assessment', 'Offer Approved', 'Offer Sent', 'Offer Accepted', 'Offer Rejected', 'Medical Checkup Scheduled', 'MCU', 'Contract Sent', 'Contract Signed', 'On Boarding', 'Hired'].includes(statusLabel) ? '(Interview Results)' : ''}
                               </div>
                               <button
                                 type="button"

@@ -1,5 +1,7 @@
 const adminUserService = require('../services/adminUserService');
 const { asyncHandler } = require('../middleware/errorHandler');
+const { parseSpreadsheet, sendTemplate } = require('../utils/spreadsheet');
+const bulkImportService = require('../services/bulkImportService');
 
 exports.listUsers = asyncHandler(async (req, res) => {
   const search = (req.query.search || '').toString();
@@ -33,6 +35,45 @@ exports.resetPassword = asyncHandler(async (req, res) => {
   const { newPassword } = req.body;
   await adminUserService.resetPassword(id, newPassword);
   res.json({ success: true, message: 'Password reset' });
+});
+
+exports.bulkTemplate = asyncHandler(async (req, res) => {
+  const format = (req.query.format || 'xlsx').toString();
+  return sendTemplate(res, {
+    filenameBase: 'user-management-upload-template',
+    format,
+    headers: [
+      'First Name',
+      'Last Name',
+      'Email',
+      'Phone Number',
+      'Role',
+      'Division',
+      'Section Name',
+      'PT',
+      'Area',
+      'Area Detail',
+      'Password',
+    ],
+  });
+});
+
+exports.bulkUpload = asyncHandler(async (req, res) => {
+  if (!req.files || !req.files.file) {
+    return res.status(400).json({
+      success: false,
+      message: 'No file uploaded. Please attach a file field named "file".',
+    });
+  }
+
+  const { rows } = parseSpreadsheet(req.files.file.data);
+  const result = await bulkImportService.importAdminUsers(rows);
+
+  return res.status(200).json({
+    success: true,
+    message: 'User management bulk upload processed',
+    data: result,
+  });
 });
 
 

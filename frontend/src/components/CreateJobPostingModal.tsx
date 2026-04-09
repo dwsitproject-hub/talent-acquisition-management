@@ -35,7 +35,7 @@ export default function CreateJobPostingModal({ isOpen, onClose, onSave, editing
     requestDate: '',
     skills: [] as string[],
     yearsOfExperience: '',
-    status: 'Raise FPTK',
+    status: 'Pending FKTK',
     remark: ''
   })
 
@@ -479,7 +479,7 @@ export default function CreateJobPostingModal({ isOpen, onClose, onSave, editing
         requestDate: formatDateInput(editingJobPosting.requestDate),
         skills: editingJobPosting.skills || [],
         yearsOfExperience: editingJobPosting.yearsOfExperience || '',
-        status: editingJobPosting.currentStatus || editingJobPosting.status || 'Raise FPTK',
+        status: editingJobPosting.currentStatus || editingJobPosting.status || 'Pending FKTK',
         remark: editingJobPosting.remark || ''
       })
     } else if (isOpen) {
@@ -506,7 +506,7 @@ export default function CreateJobPostingModal({ isOpen, onClose, onSave, editing
         requestDate: '',
         skills: [],
         yearsOfExperience: '',
-        status: 'Raise FPTK',
+        status: 'Pending FKTK',
         remark: ''
       })
     }
@@ -684,7 +684,7 @@ export default function CreateJobPostingModal({ isOpen, onClose, onSave, editing
       requestDate: '',
       skills: [] as string[],
       yearsOfExperience: '',
-      status: 'Raise FPTK',
+      status: 'Pending FKTK',
       remark: ''
     })
     onClose()
@@ -1418,17 +1418,12 @@ export default function CreateJobPostingModal({ isOpen, onClose, onSave, editing
                   backgroundColor: 'white'
                 }}
               >
-                <option value="Raise FPTK">Raise FPTK</option>
-                <option value="CV Hunting (Sourcing Candidate)">CV Hunting (Sourcing Candidate)</option>
-                <option value="Psikotest & Technical Test">Psikotest & Technical Test</option>
-                <option value="Interview User">Interview User</option>
-                <option value="Offering Process">Offering Process</option>
-                <option value="Medical Check Up (MCU)">Medical Check Up (MCU)</option>
-                <option value="Signing">Signing</option>
-                <option value="On Boarding">On Boarding</option>
+                <option value="Open">Open</option>
+                <option value="Pending FKTK">Pending FKTK</option>
+                <option value="Re-Open">Re-Open</option>
                 <option value="Hold">Hold</option>
                 <option value="Cancel">Cancel</option>
-                <option value="Re-Open">Re-Open</option>
+                <option value="Internal Movement">Internal Movement</option>
               </select>
             </div>
           </div>

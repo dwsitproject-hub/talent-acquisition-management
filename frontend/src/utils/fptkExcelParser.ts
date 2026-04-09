@@ -36,6 +36,7 @@ export interface FPTKExcelRow {
   totalRequest?: string | number
   currentStatus?: string
   requestDate?: string
+  appliedCandidates?: Array<{ fullName: string; email: string; status: string }>
 }
 
 // Field mapping from Excel column names to our fields
@@ -77,9 +78,49 @@ const FIELD_MAPPING: Record<string, keyof FPTKExcelRow> = {
   'Request Date': 'requestDate',
 }
 
+const APPLIED_CANDIDATE_HEADER_MAP: Array<{
+  fullName: string
+  email: string
+  status: string
+}> = Array.from({ length: 5 }).map((_, idx) => {
+  const n = idx + 1
+  return {
+    fullName: `Applied Candidate ${n} Full Name`,
+    email: `Applied Candidate ${n} Email`,
+    status: `Applied Candidate ${n} Status`,
+  }
+})
+
 const VALID_PRIORITIES = ['P0', 'P1', 'P2']
 const VALID_EMPLOYMENT_TYPES = ['Kontrak', 'Probation', 'Full-time', 'Fulltime', 'Part-time', 'Parttime', 'Contract']
 const VALID_ADDITIONAL_OR_REPLACEMENT = ['Additional', 'Replacement', 'Additional/Replacement']
+
+const excelCellToString = (value: any): string => {
+  if (value === undefined || value === null) return ''
+  if (typeof value === 'string') return value
+  if (typeof value === 'number' || typeof value === 'boolean') return String(value)
+  if (value instanceof Date) return value.toISOString()
+
+  // ExcelJS rich text: { richText: [{ text: "..." }, ...] }
+  if (typeof value === 'object') {
+    if (typeof (value as any).text === 'string') return (value as any).text
+    if (Array.isArray((value as any).richText)) {
+      return (value as any).richText.map((p: any) => p?.text || '').join('')
+    }
+    if (typeof (value as any).result === 'string') return (value as any).result
+    if (typeof (value as any).hyperlink === 'string') {
+      // Prefer display text if present, otherwise hyperlink.
+      const display = typeof (value as any).text === 'string' ? (value as any).text : ''
+      return display || (value as any).hyperlink
+    }
+  }
+
+  try {
+    return String(value)
+  } catch {
+    return ''
+  }
+}
 
 function validateAndConvertFPTK(row: FPTKExcelRow, rowNumber: number): { valid: boolean; errors: string[]; fptk?: FPTK } {
   const errors: string[] = []
@@ -148,7 +189,7 @@ function validateAndConvertFPTK(row: FPTKExcelRow, rowNumber: number): { valid: 
   // Validate Current Status - use the value from Column U "Current Status" directly
   let status: FPTKStatus = 'draft'
   // Use currentStatus from Excel directly, don't override with statusFktk
-  let currentStatus = row.currentStatus?.toString().trim() || 'Raise FPTK'
+  let currentStatus = row.currentStatus?.toString().trim() || 'Pending FKTK'
   
   // Only map status enum if currentStatus is provided
   if (row.currentStatus) {
@@ -159,24 +200,18 @@ function validateAndConvertFPTK(row: FPTKExcelRow, rowNumber: number): { valid: 
     } else {
       // Map common status strings to enum values for status field
       const statusMap: Record<string, FPTKStatus> = {
-        'raise fptk': 'draft',
-        'raise': 'draft',
         'open': 'open',
-        'active': 'open',
-        'closed': 'filled',
-        'canceled': 'cancelled',
+        're-open': 'open',
+        'pending fktk': 'draft',
+        'hold': 'draft',
+        'cancel': 'cancelled',
         'cancelled': 'cancelled',
-        'signing': 'approved',
-        'on boarding': 'approved',
-        'cv hunting (sourcing candidate)': 'open',
-        'cv hunting': 'open',
-        'sourcing candidate': 'open',
+        'internal movement': 'draft',
       }
       status = statusMap[statusStr] || 'draft'
     }
   } else {
-    // If no currentStatus provided, default to 'Raise FPTK'
-    currentStatus = 'Raise FPTK'
+    currentStatus = 'Pending FKTK'
   }
 
   if (errors.length > 0) {
@@ -234,6 +269,7 @@ function validateAndConvertFPTK(row: FPTKExcelRow, rowNumber: number): { valid: 
     resignReason: row.resignReason?.toString().trim() || '',
     totalRequest: row.totalRequest?.toString().trim() || '',
     requestDate: row.requestDate?.toString().trim() || '',
+    appliedCandidates: row.appliedCandidates || [],
   }
 
   return { valid: true, errors: [], fptk: fptkWithExtra as any }
@@ -358,6 +394,33 @@ export function parseFPTKExcelFile(file: File): Promise<FPTKUploadResult> {
           }
         })
 
+        // Parse up to 5 applied candidates per row (optional)
+        const appliedCandidates: Array<{ fullName: string; email: string; status: string }> = []
+        APPLIED_CANDIDATE_HEADER_MAP.forEach((def) => {
+          const fullNameIdx = headers.findIndex((h) => h.toLowerCase().trim() === def.fullName.toLowerCase())
+          const emailIdx = headers.findIndex((h) => h.toLowerCase().trim() === def.email.toLowerCase())
+          const statusIdx = headers.findIndex((h) => h.toLowerCase().trim() === def.status.toLowerCase())
+          const fullNameVal = fullNameIdx >= 0 ? rowValues[fullNameIdx] : ''
+          const emailVal = emailIdx >= 0 ? rowValues[emailIdx] : ''
+          const statusVal = statusIdx >= 0 ? rowValues[statusIdx] : ''
+
+          const fullName = excelCellToString(fullNameVal).trim()
+          const email = excelCellToString(emailVal).trim()
+          const status = excelCellToString(statusVal).trim()
+
+          if (!fullName && !email && !status) return
+
+          appliedCandidates.push({
+            fullName,
+            email,
+            status: status || 'Applied',
+          })
+        })
+
+        if (appliedCandidates.length > 0) {
+          rowData.appliedCandidates = appliedCandidates
+        }
+
         // Validate and convert
         const validationResult = validateAndConvertFPTK(rowData, i)
         
@@ -413,7 +476,8 @@ export async function generateFPTKTemplate(): Promise<void> {
     'Resign Reason',
     'Total Request',
     'Current Status',
-    'Request Date'
+    'Request Date',
+    ...APPLIED_CANDIDATE_HEADER_MAP.flatMap((h) => [h.fullName, h.email, h.status]),
   ]
 
   const exampleRow = [
@@ -437,8 +501,9 @@ export async function generateFPTKTemplate(): Promise<void> {
     '',
     '',
     '1',
-    'draft',
+    'Pending FKTK',
     '2024-01-15'
+    // Applied candidates columns intentionally left blank in example
   ]
 
   const workbook = new ExcelJS.Workbook()
