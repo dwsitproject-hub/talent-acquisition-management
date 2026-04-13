@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useAuth } from '@/contexts/AuthContext'
 import { useRouter } from 'next/navigation'
 import Layout from '@/components/Layout/Layout'
@@ -21,7 +21,16 @@ import { PlusIcon, MagnifyingGlassIcon, BriefcaseIcon, EyeIcon, PencilIcon, Arro
 import { parseFPTKExcelFile, generateFPTKTemplate, FPTKUploadResult } from '@/utils/fptkExcelParser'
 import { FPTKAPI, MenuAccessAPI } from '@/lib/api'
 
-const DEFAULT_CURRENT_STATUS = 'Raise FPTK'
+const DEFAULT_CURRENT_STATUS = 'Pending FKTK'
+
+const CURRENT_STATUS_OPTIONS = [
+  'Open',
+  'Pending FKTK',
+  'Re-Open',
+  'Hold',
+  'Cancel',
+  'Internal Movement',
+] as const
 
 const mapUiStatusToDbStatus = (value?: string, fallback?: string) => {
   if (!value) {
@@ -41,14 +50,11 @@ const mapUiStatusToDbStatus = (value?: string, fallback?: string) => {
     expired: 'EXPIRED',
     'partially filled': 'PARTIALLY_FILLED',
     'partially_filled': 'PARTIALLY_FILLED',
-    'raise fptk': 'DRAFT',
-    'cv hunting (sourcing candidate)': 'OPEN',
-    'piskotest & technical test': 'OPEN',
-    'interview user': 'OPEN',
-    'offering process': 'OPEN',
-    'medical check up (mcu)': 'OPEN',
-    signing: 'APPROVED',
-    'on boarding': 'APPROVED',
+    're-open': 'OPEN',
+    'pending fktk': 'DRAFT',
+    hold: 'DRAFT',
+    cancel: 'CANCELLED',
+    'internal movement': 'DRAFT',
   }
 
   return lookup[normalized] || fallback || 'DRAFT'
@@ -77,24 +83,24 @@ const mapDbStatusToUiStatus = (value?: string): FPTKStatus => {
 const APPLICATION_STATUS_UI_LABELS: Record<string, string> = {
   DRAFT: 'Applied',
   SUBMITTED: 'Applied',
-  SCREENING: 'Under Review',
+  SCREENING: 'Shortlisted',
   PSYCHOMETRIC_TEST: 'Under Review',
-  TECHNICAL_TEST: 'Technical Test',
+  TECHNICAL_TEST: 'Assessment',
   INTERVIEW_SCHEDULED: 'Interview Scheduled',
   INTERVIEW_COMPLETED: 'Interviewed',
   DOCUMENT_VERIFICATION: 'Document Verification',
-  OFFER_PROPOSED: 'Offer Extended',
+  OFFER_PROPOSED: 'Offer Proposed',
   OFFER_APPROVED: 'Offer Approved',
   OFFER_SENT: 'Offer Sent',
   OFFER_ACCEPTED: 'Offer Accepted',
-  OFFER_REJECTED: 'Offer Declined',
+  OFFER_REJECTED: 'Offer Rejected',
   MEDICAL_CHECKUP_SCHEDULED: 'Medical Checkup Scheduled',
-  MEDICAL_CHECKUP_COMPLETED: 'Medical Checkup Completed',
+  MEDICAL_CHECKUP_COMPLETED: 'MCU',
   CONTRACT_SENT: 'Contract Sent',
   CONTRACT_SIGNED: 'Contract Signed',
   ONBOARDING: 'On Boarding',
   HIRED: 'Hired',
-  REJECTED: 'Rejected',
+  REJECTED: 'Rejected (Failed Interview / Assessment)',
   WITHDRAWN: 'Withdrawn',
 }
 
@@ -294,10 +300,11 @@ const mapAppliedCandidatesForPayload = (candidates?: any[]) => {
   return candidates
     .map((candidate: any) => {
       if (!candidate) return null
-      const candidateId = candidate.candidateId || candidate.id
-      if (!candidateId) return null
       return {
-        id: candidateId,
+        id: candidate.candidateId || candidate.id,
+        candidateId: candidate.candidateId || candidate.id,
+        fullName: candidate.fullName || candidate.name,
+        email: candidate.email,
         status: candidate.status || candidate.backendStatus || 'Applied',
         appliedDate: candidate.appliedDate || candidate.appliedAt || new Date().toISOString(),
         source: candidate.source,
@@ -334,6 +341,7 @@ export default function FPTKPage() {
   const [isUploadModalOpen, setIsUploadModalOpen] = useState(false)
   const [isUploading, setIsUploading] = useState(false)
   const [uploadResult, setUploadResult] = useState<FPTKUploadResult | null>(null)
+  const autoEditHandledRef = useRef(false)
 
   useEffect(() => {
     if (!isLoading && !isAuthenticated) {
@@ -364,6 +372,19 @@ export default function FPTKPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isAuthenticated, isLoading])
 
+  // Deep-link: /fptk?edit=<id> opens Edit modal directly
+  useEffect(() => {
+    if (!isAuthenticated || isLoading) return
+    if (autoEditHandledRef.current) return
+    if (typeof window === 'undefined') return
+    const editId = new URLSearchParams(window.location.search).get('edit')
+    if (!editId) return
+    const found = fptks.find((f) => f.id === editId)
+    if (!found) return
+    autoEditHandledRef.current = true
+    handleEditJobPosting(found)
+  }, [isAuthenticated, isLoading, fptks])
+
   // Reload FPTKs when search term changes (with debounce)
   useEffect(() => {
     if (!isAuthenticated || isLoading) return
@@ -376,7 +397,7 @@ export default function FPTKPage() {
 
   const handleCreateJobPosting = async (jobPostingData: any) => {
     try {
-      // Use currentStatus from form data, default to 'Raise FPTK'
+      // Use currentStatus from form data
       const currentStatus = jobPostingData.status || DEFAULT_CURRENT_STATUS
       const statusEnum = mapUiStatusToDbStatus(jobPostingData.status, 'DRAFT')
       const appliedCandidatesPayload = mapAppliedCandidatesForPayload(jobPostingData.appliedCandidates)
@@ -426,9 +447,19 @@ export default function FPTKPage() {
     }
   }
 
-  const handleViewJobPosting = (jobPosting: FPTK) => {
-    setSelectedJobPosting(jobPosting)
-    setIsViewModalOpen(true)
+  const handleViewJobPosting = async (jobPosting: FPTK) => {
+    try {
+      // Fetch full FPTK details including applications
+      const fullFptkData = await FPTKAPI.getById(jobPosting.id)
+      const mappedFptk = mapApiFptk(fullFptkData)
+      setSelectedJobPosting(mappedFptk)
+      setIsViewModalOpen(true)
+    } catch (error) {
+      console.error('Error loading FPTK details:', error)
+      // Fallback to using the jobPosting from list if fetch fails
+      setSelectedJobPosting(jobPosting)
+      setIsViewModalOpen(true)
+    }
   }
 
   const handleEditJobPosting = (jobPosting: FPTK) => {
@@ -463,7 +494,7 @@ export default function FPTKPage() {
         numberOfPositions: current.numberOfPositions ?? current.totalRequest ?? 1,
         totalRequest: current.totalRequest ?? current.numberOfPositions ?? 1,
         requestDate: current.requestDate,
-        currentStatus: 'Raise FPTK',
+        currentStatus: DEFAULT_CURRENT_STATUS,
         status: 'DRAFT',
         remark: current.remark || '',
         requiredSkills: current.skills || [],
@@ -548,7 +579,7 @@ export default function FPTKPage() {
 
   const handleStatusUpdate = async (jobPostingId: string, newStatus: string) => {
     try {
-      // newStatus is the Current Status value (e.g., "Raise FPTK", "CV Hunting", etc.)
+      // newStatus is the Current Status value (e.g., "Open", "Pending FKTK", etc.)
       // Map to backend status enum (keep existing logic for backward compatibility)
       const dbStatus = mapUiStatusToDbStatus(newStatus, 'DRAFT')
 
@@ -646,10 +677,13 @@ export default function FPTKPage() {
                 ? (fptkData as any).requestDate
                 : new Date().toISOString().split('T')[0], // Use today's date if empty
               // Use currentStatus from Excel Column U "Current Status"
-              currentStatus: (fptkData as any).currentStatus || 'Raise FPTK',
+              currentStatus: (fptkData as any).currentStatus || 'Pending FKTK',
               status: status,
               remark: (fptkData as any).remark || '',
               requiredSkills: (fptkData as any).skills || [],
+              appliedCandidates: Array.isArray((fptkData as any).appliedCandidates)
+                ? (fptkData as any).appliedCandidates
+                : [],
             }
 
             await FPTKAPI.create(payload)
@@ -770,8 +804,8 @@ export default function FPTKPage() {
     }
   }
 
-  const handleDownloadTemplate = () => {
-    generateFPTKTemplate()
+  const handleDownloadTemplate = async () => {
+    await generateFPTKTemplate()
   }
 
   if (isLoading) {
@@ -899,11 +933,7 @@ export default function FPTKPage() {
     })
   
   // Get unique statuses for filter dropdown
-  const uniqueStatuses = Array.from(new Set([
-    ...fptks.map(fptk => (fptk as any).currentStatus || 'Raise FPTK').filter(Boolean),
-    'Hold',
-    'Cancel'
-  ])).sort()
+  const uniqueStatuses = CURRENT_STATUS_OPTIONS as unknown as string[]
 
   return (
     <Layout>
@@ -1053,7 +1083,7 @@ export default function FPTKPage() {
                             {fptk.title}
                           </p>
                           <span className="ml-2 inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
-                            {fptk.currentStatus || 'Raise FPTK'}
+                            {fptk.currentStatus || DEFAULT_CURRENT_STATUS}
                           </span>
                         </div>
                         <div className="mt-1 flex items-center text-sm text-gray-500">

@@ -19,8 +19,11 @@ const generalLimiter = rateLimit({
   standardHeaders: true,
   legacyHeaders: false,
   skip: (req) => {
-    // Skip rate limiting for health checks
-    return req.path === '/health' || req.path === '/api/health';
+    // When mounted on /api, req.path will look like "/auth/login", "/health", etc.
+    // Keep auth endpoints controlled by their own limiters (e.g., loginLimiter) instead of generalLimiter.
+    if (req.path === '/health') return true;
+    if (req.path.startsWith('/auth/')) return true;
+    return false;
   },
 });
 

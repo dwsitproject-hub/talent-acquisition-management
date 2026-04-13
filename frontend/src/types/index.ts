@@ -364,6 +364,8 @@ export interface DashboardStats {
   totalCandidates: number
   activeApplications: number
   openPositions: number
+  closedPositions: number
+  holdPositions: number
   interviewsThisWeek: number
   hiredThisMonth: number
   pendingOffers: number

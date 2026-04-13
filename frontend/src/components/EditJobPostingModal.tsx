@@ -67,6 +67,10 @@ export default function EditJobPostingModal({
   const [fptkFileError, setFptkFileError] = useState<string>('')
   const [fptkReceiveDate, setFptkReceiveDate] = useState<string>('')
   const [hiringManagerOptions, setHiringManagerOptions] = useState<Array<{firstName: string, lastName: string}>>([])
+  const [teamMembers, setTeamMembers] = useState<Array<{id: string, firstName: string, lastName: string, email: string}>>([])
+  const [interviewerSuggestions, setInterviewerSuggestions] = useState<Array<{id: string, name: string, email: string}>>([])
+  const [showInterviewerSuggestions, setShowInterviewerSuggestions] = useState<Record<string, boolean>>({})
+  const interviewerInputRefs = useRef<Record<string, HTMLInputElement | null>>({})
   const fptkFileInputRef = useRef<HTMLInputElement>(null)
 
   const mapAppliedStatusLabel = (status?: string) => {
@@ -75,24 +79,24 @@ export default function EditJobPostingModal({
     const lookup: Record<string, string> = {
       DRAFT: 'Applied',
       SUBMITTED: 'Applied',
-      SCREENING: 'Under Review',
+      SCREENING: 'Shortlisted',
       PSYCHOMETRIC_TEST: 'Under Review',
-      TECHNICAL_TEST: 'Technical Test',
+      TECHNICAL_TEST: 'Assessment',
       INTERVIEW_SCHEDULED: 'Interview Scheduled',
       INTERVIEW_COMPLETED: 'Interviewed',
       DOCUMENT_VERIFICATION: 'Document Verification',
-      OFFER_PROPOSED: 'Offer Extended',
+      OFFER_PROPOSED: 'Offer Proposed',
       OFFER_APPROVED: 'Offer Approved',
       OFFER_SENT: 'Offer Sent',
       OFFER_ACCEPTED: 'Offer Accepted',
-      OFFER_REJECTED: 'Offer Declined',
+      OFFER_REJECTED: 'Offer Rejected',
       MEDICAL_CHECKUP_SCHEDULED: 'Medical Checkup Scheduled',
-      MEDICAL_CHECKUP_COMPLETED: 'Medical Checkup Completed',
+      MEDICAL_CHECKUP_COMPLETED: 'MCU',
       CONTRACT_SENT: 'Contract Sent',
       CONTRACT_SIGNED: 'Contract Signed',
       ONBOARDING: 'On Boarding',
       HIRED: 'Hired',
-      REJECTED: 'Rejected',
+      REJECTED: 'Rejected (Failed Interview / Assessment)',
       WITHDRAWN: 'Withdrawn',
     }
     if (lookup[normalized]) return lookup[normalized]
@@ -245,8 +249,26 @@ export default function EditJobPostingModal({
       }
     }
 
+    const loadTeamMembers = async () => {
+      try {
+        const users = await AdminUsersAPI.list('', '') // Load all users
+        if (isMounted) {
+          setTeamMembers(users.map((u: any) => ({
+            id: u.id,
+            firstName: u.firstName || '',
+            lastName: u.lastName || '',
+            email: u.email || ''
+          })))
+        }
+      } catch (error) {
+        console.error('Error loading team members:', error)
+        setTeamMembers([])
+      }
+    }
+
     loadDivisions()
     loadHiringManagers()
+    loadTeamMembers()
 
     return () => {
       isMounted = false
@@ -372,7 +394,7 @@ export default function EditJobPostingModal({
         replacementName: (jobPosting as any).replacementName || '',
         resignReason: (jobPosting as any).resignReason || '',
         requestDate: formatDateInput((jobPosting as any).requestDate),
-        status: (jobPosting as any).currentStatus || (jobPosting as any).status || 'Raise FPTK',
+        status: (jobPosting as any).currentStatus || (jobPosting as any).status || 'Pending FKTK',
         skills: (jobPosting as any).skills || [],
         yearsOfExperience: (jobPosting as any).yearsOfExperience || '',
         remark: (jobPosting as any).remark || ''
@@ -423,7 +445,7 @@ export default function EditJobPostingModal({
         replacementName: (jobPosting as any).replacementName || '',
         resignReason: (jobPosting as any).resignReason || '',
         requestDate: formatDateInput((jobPosting as any).requestDate),
-        status: (jobPosting as any).currentStatus || (jobPosting as any).status || 'Raise FPTK',
+        status: (jobPosting as any).currentStatus || (jobPosting as any).status || 'Pending FKTK',
         skills: (jobPosting as any).skills || [],
         yearsOfExperience: (jobPosting as any).yearsOfExperience || '',
         remark: (jobPosting as any).remark || ''
@@ -442,12 +464,35 @@ export default function EditJobPostingModal({
         setAppliedCandidates([])
       }
 
-      // Load candidates from API
+      // Load candidates from API with pagination (same logic as ViewJobPostingModal)
       const loadCandidates = async () => {
         try {
-          const response = await CandidatesAPI.getAll({}, { page: 1, limit: 100 })
-          const rawCandidates = response.data || []
-          const mappedCandidates = rawCandidates.map(mapApiCandidate).filter((c: any) => c !== null)
+          // Load candidates with pagination (API max limit is 100)
+          let allCandidates: any[] = []
+          let page = 1
+          const limit = 100
+          let hasMore = true
+          
+          while (hasMore) {
+            const response = await CandidatesAPI.getAll({}, { page, limit })
+            const candidatesData = response.data || []
+            allCandidates = [...allCandidates, ...candidatesData]
+            
+            // Check if there are more pages
+            const totalPages = response.pagination?.totalPages || 1
+            hasMore = page < totalPages
+            page++
+            
+            // Safety limit to prevent infinite loops
+            if (page > 50) {
+              console.warn('⚠️ Reached maximum page limit (50). Some candidates may not be loaded.')
+              break
+            }
+          }
+          
+          console.log('📋 Total candidates loaded in EditJobPostingModal:', allCandidates.length)
+          
+          const mappedCandidates = allCandidates.map(mapApiCandidate).filter((c: any) => c !== null)
           setAllCandidates(mappedCandidates)
           return mappedCandidates
         } catch (error) {
@@ -470,42 +515,96 @@ export default function EditJobPostingModal({
         const appliedIds = new Set(enrichedFromJob.map((candidate: any) => candidate.id))
 
         // Load real applied candidates for this specific open position (fallback for legacy data)
+        // Use the same comprehensive matching logic as ViewJobPostingModal
         const legacyApplied = candidates
           .filter((candidate: any) => {
-            const appliedField = (candidate as any).positionAppliedFor
-            const hasAppliedToThis = Array.isArray(appliedField)
-              ? appliedField.includes(jobPosting.title)
-              : appliedField === jobPosting.title
+            // Parse positionAppliedFor from different possible locations (same as ViewJobPostingModal)
+            let positionAppliedFor: string[] = []
+            
+            // Check direct field
+            if (candidate.positionAppliedFor !== undefined && candidate.positionAppliedFor !== null) {
+              positionAppliedFor = Array.isArray(candidate.positionAppliedFor) 
+                ? candidate.positionAppliedFor 
+                : [String(candidate.positionAppliedFor)]
+            }
+            
+            // Check languages field (where it's actually stored in backend)
+            if (positionAppliedFor.length === 0 && candidate.languages) {
+              const languagesData = typeof candidate.languages === 'string'
+                ? JSON.parse(candidate.languages || '{}')
+                : (candidate.languages || {})
+              
+              if (languagesData.positionAppliedFor) {
+                positionAppliedFor = Array.isArray(languagesData.positionAppliedFor)
+                  ? languagesData.positionAppliedFor
+                  : [String(languagesData.positionAppliedFor)]
+              }
+            }
+            
+            // Normalize position title for comparison
+            const positionTitle = (jobPosting.title || '').trim().toLowerCase()
+            const hasAppliedToThis = positionAppliedFor.some((pos: string) => {
+              const normalizedPos = (pos || '').trim().toLowerCase()
+              return normalizedPos === positionTitle
+            })
+            
+            // Also check currentPosition as fallback
             const currentPositionMatch =
-              candidate.professionalInfo && candidate.professionalInfo.currentPosition === jobPosting.title
+              candidate.professionalInfo && 
+              (candidate.professionalInfo.currentPosition || '').trim().toLowerCase() === positionTitle
+            
             return hasAppliedToThis || currentPositionMatch
           })
           .filter((candidate: any) => !appliedIds.has(candidate.id))
-          .map((candidate: any) =>
-            mergeAppliedCandidateData(
+          .map((candidate: any) => {
+            // Use the same mapping logic as ViewJobPostingModal for consistency
+            const user = candidate.user || {}
+            const formDataDiri = typeof candidate.formDataDiri === 'string' 
+              ? JSON.parse(candidate.formDataDiri || '{}') 
+              : (candidate.formDataDiri || {})
+            const languagesData = typeof candidate.languages === 'string'
+              ? JSON.parse(candidate.languages || '{}')
+              : (candidate.languages || {})
+
+            const fullName = [user.firstName, user.lastName].filter(Boolean).join(' ') ||
+              formDataDiri?.fullName || candidate.fullName || candidate.name ||
+              `Candidate ${candidate.id?.slice(0, 6) || ''}`
+
+            const email = user.email || candidate.email || formDataDiri?.email || ''
+            const skills = Array.isArray(candidate.skills)
+              ? candidate.skills
+              : Array.isArray(languagesData?.skills)
+                ? languagesData.skills
+                : candidate.professionalInfo?.skills || []
+
+            return mergeAppliedCandidateData(
               {
                 id: candidate.id,
                 candidateId: candidate.id,
-                fullName: candidate.fullName,
-                name:
-                  candidate.fullName ||
-                  `${candidate.personalInfo.firstName} ${candidate.personalInfo.lastName}`.trim(),
-                email: candidate.email || candidate.contactInfo.email,
-                status: candidate.status || 'Applied',
-                appliedDate: candidate.createdAt,
-                skills: candidate.skills || candidate.professionalInfo?.skills || [],
-                experience: parseInt(
-                  candidate.yearsOfExperience || candidate.professionalInfo?.experience || 0
-                ),
+                fullName,
+                name: fullName,
+                email,
+                phone: user.phoneNumber || '',
+                status: 'Applied',
+                backendStatus: 'SUBMITTED',
+                appliedDate: candidate.createdAt || new Date().toISOString(),
+                rejectedDate: null,
+                withdrawDate: null,
+                source: 'Manual',
+                skills,
+                experience: languagesData?.yearsOfExperience || candidate.yearsOfExperience || candidate.professionalInfo?.experience || 0,
+                yearsOfExperience: languagesData?.yearsOfExperience || candidate.yearsOfExperience || candidate.professionalInfo?.experience || 0,
+                division: user.division || candidate.division || null,
                 jobPostingId: jobPosting.id,
                 interviews: candidate.interviews || [],
               },
               candidate
             )
-          )
+          })
 
         legacyApplied.forEach((candidate: any) => appliedIds.add(candidate.id))
 
+        console.log('📊 Applied candidates found in EditJobPostingModal:', enrichedFromJob.length, 'from jobPosting,', legacyApplied.length, 'from positionAppliedFor')
         setAppliedCandidates([...enrichedFromJob, ...legacyApplied])
 
         // Generate suggested candidates based on division and skills
@@ -938,17 +1037,7 @@ export default function EditJobPostingModal({
 
   const handleStatusChange = (newStatus: string) => {
     // Validation: Check if moving to certain statuses is allowed
-    const statusesRequiringFptk = ['Offering Process', 'Medical Check Up (MCU)', 'Signing', 'On Boarding']
-    if (statusesRequiringFptk.includes(newStatus) && !isSuperAdmin) {
-      // Check if FPTK has been uploaded (statusFktk = "Received" and noFktk is not blank)
-      const hasFptkUploaded = formData.statusFktk?.trim().toLowerCase() === 'received' && 
-                              formData.noFktk?.trim() !== ''
-      
-      if (!hasFptkUploaded) {
-        alert(`Cannot move to ${newStatus}: FPTK must be uploaded (Status FKTK = "Received" and No FKTK must not be blank)`)
-        return
-      }
-    }
+    // Legacy rule removed: simplified Current Status values.
 
     setFormData(prev => {
       const oldStatus = prev.status
@@ -979,12 +1068,12 @@ export default function EditJobPostingModal({
       const target = prev.find(c => c.id === candidateId)
       const oldStatus = target ? target.status : undefined
       
-      // Capture dates for Rejected and Withdrawn statuses
       const updateData: any = { status: newStatus }
-      if (newStatus === 'Rejected') {
+      const normalized = (newStatus || '').toString().trim().toLowerCase()
+      if (normalized.startsWith('rejected')) {
         updateData.rejectedDate = new Date().toISOString()
         updateData.withdrawDate = null
-      } else if (newStatus === 'Withdrawn') {
+      } else if (normalized === 'withdrawn') {
         updateData.withdrawDate = new Date().toISOString()
         updateData.rejectedDate = null
       } else {
@@ -1008,8 +1097,8 @@ export default function EditJobPostingModal({
             candidateName: target?.name,
             oldStatus,
             newStatus,
-            ...(newStatus === 'Rejected' && { rejectedDate: updateData.rejectedDate }),
-            ...(newStatus === 'Withdrawn' && { withdrawDate: updateData.withdrawDate }),
+            ...(normalized.startsWith('rejected') && { rejectedDate: updateData.rejectedDate }),
+            ...(normalized === 'withdrawn' && { withdrawDate: updateData.withdrawDate }),
           },
         })
       }
@@ -1240,12 +1329,8 @@ export default function EditJobPostingModal({
 
   if (!isOpen || !jobPosting) return null
 
-  // Check if editing is disabled (when status is "On Boarding" in the saved data)
-  // Allow editing if user is changing status to "On Boarding" but hasn't saved yet
-  // Disable editing only if the jobPosting already has status "On Boarding" (already saved)
-  const savedStatus = (jobPosting as any).currentStatus || (jobPosting as any).status || ''
-  const isOnBoardingSaved = savedStatus?.trim() === 'On Boarding'
-  const isEditingDisabled = isOnBoardingSaved
+  // Editing lock removed: "Current Status" values were simplified.
+  const isEditingDisabled = false
 
   // Helper function to get disabled state and style for form elements
   const getFormElementProps = () => ({
@@ -1923,17 +2008,12 @@ export default function EditJobPostingModal({
                     opacity: isEditingDisabled ? 0.6 : 1
                   }}
                 >
-                  <option value="Raise FPTK">Raise FPTK</option>
-                  <option value="CV Hunting (Sourcing Candidate)">CV Hunting (Sourcing Candidate)</option>
-                  <option value="Piskotest & Technical Test">Piskotest & Technical Test</option>
-                  <option value="Interview User">Interview User</option>
-                  <option value="Offering Process">Offering Process</option>
-                  <option value="Medical Check Up (MCU)">Medical Check Up (MCU)</option>
-                  <option value="Signing">Signing</option>
-                  <option value="On Boarding">On Boarding</option>
+                  <option value="Open">Open</option>
+                  <option value="Pending FKTK">Pending FKTK</option>
+                  <option value="Re-Open">Re-Open</option>
                   <option value="Hold">Hold</option>
                   <option value="Cancel">Cancel</option>
-                  <option value="Re-Open">Re-Open</option>
+                  <option value="Internal Movement">Internal Movement</option>
                 </select>
                 {isEditingDisabled && (
                   <p style={{ fontSize: '12px', color: '#ef4444', marginTop: '4px' }}>
@@ -2141,12 +2221,15 @@ export default function EditJobPostingModal({
                             <option value="Shortlisted">Shortlisted</option>
                             <option value="Interview Scheduled">Interview Scheduled</option>
                             <option value="Interviewed">Interviewed</option>
-                            <option value="Offer Extended">Offer Extended</option>
                             <option value="Offer Accepted">Offer Accepted</option>
-                            <option value="Rejected">Rejected</option>
+                            <option value="Assessment">Assessment</option>
+                            <option value="MCU">MCU</option>
+                            <option value="On Boarding">On Boarding</option>
+                            <option value="Offer Rejected">Offer Rejected</option>
+                            <option value="Rejected (Failed Interview / Assessment)">Rejected (Failed Interview / Assessment)</option>
                             <option value="Withdrawn">Withdrawn</option>
                           </select>
-                          {candidate.status === 'Rejected' && candidate.rejectedDate ? (
+                          {(candidate.status || '').toString().toLowerCase().startsWith('rejected') && candidate.rejectedDate ? (
                             <div style={{ marginTop: '6px', fontSize: '11px', color: '#b91c1c' }}>
                               Rejected Date: {formatDate(candidate.rejectedDate)}
                             </div>
@@ -2172,11 +2255,12 @@ export default function EditJobPostingModal({
                         // Statuses that come after "Interviewed" - if interviews are filled, show them
                         const postInterviewStatuses = [
                           'Document Verification',
-                          'Offer Extended',
+                          'Assessment',
                           'Offer Approved',
                           'Offer Sent',
                           'Offer Accepted',
-                          'Offer Declined',
+                          'Offer Rejected',
+                          'MCU',
                           'Medical Checkup Scheduled',
                           'Medical Checkup Completed',
                           'Contract Sent',
@@ -2275,34 +2359,190 @@ export default function EditJobPostingModal({
                                 </button>
                               </div>
                               
-                              {/* Interviewer */}
-                              <div style={{ marginBottom: '8px' }}>
+                              {/* Interviewer with Autocomplete */}
+                              <div style={{ marginBottom: '8px', position: 'relative' }}>
                                 <label style={{ fontSize: '11px', fontWeight: '500', color: '#374151', marginBottom: '4px', display: 'block' }}>
                                   Interviewer
                                 </label>
-                                <input
-                                  type="text"
-                                  value={interview.interviewer || ''}
-                                  onChange={(e) => {
-                                    setAppliedCandidates(prev => prev.map(c => {
-                                      const matches = (c.id === candidate.id) || (c.candidateId === candidate.id) || (c.id === candidate.candidateId) || (c.candidateId === candidate.candidateId)
-                                      if (!matches) return c
-                                      const currentInterviews = [...(c.interviews || [])]
-                                      if (!currentInterviews[interviewIndex]) {
-                                        currentInterviews[interviewIndex] = { interviewer: '', date: '', time: '', results: '' }
-                                      }
-                                      currentInterviews[interviewIndex] = { ...currentInterviews[interviewIndex], interviewer: e.target.value }
-                                      return { ...c, interviews: currentInterviews }
-                                    }))
-                                  }}
-                                  style={{
-                                    width: '100%',
-                                    padding: '4px 6px',
-                                    border: '1px solid #d1d5db',
-                                    borderRadius: '4px',
-                                    fontSize: '11px'
-                                  }}
-                                />
+                                {(() => {
+                                  const candidateKey = `${candidate.id || candidate.candidateId}_${interviewIndex}`
+                                  const currentValue = interview.interviewer || ''
+                                  const showSuggestions = showInterviewerSuggestions[candidateKey] && currentValue.length > 0
+                                  
+                                  // Filter team members based on input
+                                  const filteredSuggestions = currentValue.length > 0
+                                    ? teamMembers
+                                        .filter((member) => {
+                                          const fullName = `${member.firstName} ${member.lastName}`.trim().toLowerCase()
+                                          const firstName = (member.firstName || '').toLowerCase()
+                                          const lastName = (member.lastName || '').toLowerCase()
+                                          const email = (member.email || '').toLowerCase()
+                                          const searchTerm = currentValue.toLowerCase()
+                                          
+                                          return fullName.includes(searchTerm) ||
+                                                 firstName.includes(searchTerm) ||
+                                                 lastName.includes(searchTerm) ||
+                                                 email.includes(searchTerm)
+                                        })
+                                        .slice(0, 5) // Limit to 5 suggestions
+                                        .map((member) => ({
+                                          id: member.id,
+                                          name: `${member.firstName} ${member.lastName}`.trim() || member.email,
+                                          email: member.email
+                                        }))
+                                    : []
+                                  
+                                  return (
+                                    <div style={{ position: 'relative' }}>
+                                      <input
+                                        ref={(el) => {
+                                          interviewerInputRefs.current[candidateKey] = el
+                                        }}
+                                        type="text"
+                                        value={currentValue}
+                                        onChange={(e) => {
+                                          const value = e.target.value
+                                          setAppliedCandidates(prev => prev.map(c => {
+                                            const matches = (c.id === candidate.id) || (c.candidateId === candidate.id) || (c.id === candidate.candidateId) || (c.candidateId === candidate.candidateId)
+                                            if (!matches) return c
+                                            const currentInterviews = [...(c.interviews || [])]
+                                            if (!currentInterviews[interviewIndex]) {
+                                              currentInterviews[interviewIndex] = { interviewer: '', date: '', time: '', results: '' }
+                                            }
+                                            currentInterviews[interviewIndex] = { ...currentInterviews[interviewIndex], interviewer: value }
+                                            return { ...c, interviews: currentInterviews }
+                                          }))
+                                          
+                                          // Filter team members based on new input value
+                                          if (value.length > 0) {
+                                            const newFilteredSuggestions = teamMembers
+                                              .filter((member) => {
+                                                const fullName = `${member.firstName} ${member.lastName}`.trim().toLowerCase()
+                                                const firstName = (member.firstName || '').toLowerCase()
+                                                const lastName = (member.lastName || '').toLowerCase()
+                                                const email = (member.email || '').toLowerCase()
+                                                const searchTerm = value.toLowerCase()
+                                                
+                                                return fullName.includes(searchTerm) ||
+                                                       firstName.includes(searchTerm) ||
+                                                       lastName.includes(searchTerm) ||
+                                                       email.includes(searchTerm)
+                                              })
+                                              .slice(0, 5)
+                                            
+                                            // Show suggestions if there are matches
+                                            if (newFilteredSuggestions.length > 0) {
+                                              setShowInterviewerSuggestions(prev => ({ ...prev, [candidateKey]: true }))
+                                            } else {
+                                              setShowInterviewerSuggestions(prev => ({ ...prev, [candidateKey]: false }))
+                                            }
+                                          } else {
+                                            setShowInterviewerSuggestions(prev => ({ ...prev, [candidateKey]: false }))
+                                          }
+                                        }}
+                                        onFocus={() => {
+                                          if (currentValue.length > 0) {
+                                            const newFilteredSuggestions = teamMembers
+                                              .filter((member) => {
+                                                const fullName = `${member.firstName} ${member.lastName}`.trim().toLowerCase()
+                                                const firstName = (member.firstName || '').toLowerCase()
+                                                const lastName = (member.lastName || '').toLowerCase()
+                                                const email = (member.email || '').toLowerCase()
+                                                const searchTerm = currentValue.toLowerCase()
+                                                
+                                                return fullName.includes(searchTerm) ||
+                                                       firstName.includes(searchTerm) ||
+                                                       lastName.includes(searchTerm) ||
+                                                       email.includes(searchTerm)
+                                              })
+                                              .slice(0, 5)
+                                            
+                                            if (newFilteredSuggestions.length > 0) {
+                                              setShowInterviewerSuggestions(prev => ({ ...prev, [candidateKey]: true }))
+                                            }
+                                          }
+                                        }}
+                                        onBlur={(e) => {
+                                          // Delay hiding suggestions to allow click on suggestion
+                                          setTimeout(() => {
+                                            setShowInterviewerSuggestions(prev => ({ ...prev, [candidateKey]: false }))
+                                          }, 200)
+                                        }}
+                                        placeholder="Type interviewer name or email..."
+                                        style={{
+                                          width: '100%',
+                                          padding: '4px 6px',
+                                          border: '1px solid #d1d5db',
+                                          borderRadius: '4px',
+                                          fontSize: '11px'
+                                        }}
+                                      />
+                                      {showSuggestions && filteredSuggestions.length > 0 && (
+                                        <div style={{
+                                          position: 'absolute',
+                                          top: '100%',
+                                          left: 0,
+                                          right: 0,
+                                          zIndex: 1000,
+                                          backgroundColor: 'white',
+                                          border: '1px solid #d1d5db',
+                                          borderRadius: '4px',
+                                          marginTop: '2px',
+                                          boxShadow: '0 4px 6px rgba(0, 0, 0, 0.1)',
+                                          maxHeight: '150px',
+                                          overflowY: 'auto'
+                                        }}>
+                                          {filteredSuggestions.map((suggestion, idx) => (
+                                            <div
+                                              key={suggestion.id || idx}
+                                              onClick={() => {
+                                                const selectedName = suggestion.name
+                                                setAppliedCandidates(prev => prev.map(c => {
+                                                  const matches = (c.id === candidate.id) || (c.candidateId === candidate.id) || (c.id === candidate.candidateId) || (c.candidateId === candidate.candidateId)
+                                                  if (!matches) return c
+                                                  const currentInterviews = [...(c.interviews || [])]
+                                                  if (!currentInterviews[interviewIndex]) {
+                                                    currentInterviews[interviewIndex] = { interviewer: '', date: '', time: '', results: '' }
+                                                  }
+                                                  currentInterviews[interviewIndex] = { ...currentInterviews[interviewIndex], interviewer: selectedName }
+                                                  return { ...c, interviews: currentInterviews }
+                                                }))
+                                                setShowInterviewerSuggestions(prev => ({ ...prev, [candidateKey]: false }))
+                                              }}
+                                              onMouseDown={(e) => {
+                                                // Prevent blur event from firing before click
+                                                e.preventDefault()
+                                              }}
+                                              style={{
+                                                padding: '6px 8px',
+                                                cursor: 'pointer',
+                                                fontSize: '11px',
+                                                borderBottom: idx < filteredSuggestions.length - 1 ? '1px solid #e5e7eb' : 'none',
+                                                backgroundColor: '#ffffff',
+                                                transition: 'background-color 0.15s'
+                                              }}
+                                              onMouseEnter={(e) => {
+                                                e.currentTarget.style.backgroundColor = '#f3f4f6'
+                                              }}
+                                              onMouseLeave={(e) => {
+                                                e.currentTarget.style.backgroundColor = '#ffffff'
+                                              }}
+                                            >
+                                              <div style={{ fontWeight: '500', color: '#111827' }}>
+                                                {suggestion.name}
+                                              </div>
+                                              {suggestion.email && (
+                                                <div style={{ fontSize: '10px', color: '#6b7280', marginTop: '2px' }}>
+                                                  {suggestion.email}
+                                                </div>
+                                              )}
+                                            </div>
+                                          ))}
+                                        </div>
+                                      )}
+                                    </div>
+                                  )
+                                })()}
                               </div>
                               
                               {/* Date and Time */}

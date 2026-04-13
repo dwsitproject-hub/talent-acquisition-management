@@ -2,6 +2,8 @@ const logger = require('../utils/logger');
 const candidateService = require('./candidateService');
 const masterDivisionService = require('./masterDivisionService');
 const masterOfficeLocationService = require('./masterOfficeLocationService');
+const bcrypt = require('bcryptjs');
+const prisma = require('../config/database');
 
 function splitName(fullName) {
   const name = String(fullName || '').trim();
@@ -128,10 +130,179 @@ async function importMasterOfficeLocations(rows) {
   return result;
 }
 
+function mapRoleToEnum(role) {
+  if (!role) return role;
+  const roleMap = {
+    SUPER_ADMIN: 'SUPER_ADMIN',
+    Management: 'CHRO',
+    CHRO: 'CHRO',
+    'Head of Division': 'DEPARTMENT_HEAD',
+    DEPARTMENT_HEAD: 'DEPARTMENT_HEAD',
+    HRBP: 'HRBP',
+    TA_TEAM: 'TA_TEAM',
+    HIRING_MANAGER: 'HIRING_MANAGER',
+    INTERVIEWER: 'INTERVIEWER',
+    CANDIDATE: 'CANDIDATE',
+  };
+  return roleMap[role] || role;
+}
+
+function normalizeEmail(v) {
+  return String(v ?? '').trim().toLowerCase();
+}
+
+async function validateOfficeLocation({ pt, area, areaDetail }) {
+  const ptStr = toStringValue(pt);
+  const areaStr = toStringValue(area);
+  const detailStr = toStringValue(areaDetail);
+
+  if (!ptStr && !areaStr && !detailStr) {
+    return { ok: true };
+  }
+
+  if (ptStr && areaStr && detailStr) {
+    const exists = await prisma.masterOfficeLocation.findUnique({
+      where: {
+        pt_area_areaDetail: {
+          pt: ptStr,
+          area: areaStr,
+          areaDetail: detailStr,
+        },
+      },
+      select: { id: true },
+    });
+    return exists ? { ok: true } : { ok: false, message: 'PT/Area/Area Detail combination not found in Master Office Location' };
+  }
+
+  if (ptStr && !areaStr && !detailStr) {
+    const exists = await prisma.masterOfficeLocation.findFirst({
+      where: { pt: ptStr },
+      select: { id: true },
+    });
+    return exists ? { ok: true } : { ok: false, message: `PT "${ptStr}" not found in Master Office Location` };
+  }
+
+  if (ptStr && areaStr && !detailStr) {
+    const exists = await prisma.masterOfficeLocation.findFirst({
+      where: { pt: ptStr, area: areaStr },
+      select: { id: true },
+    });
+    return exists ? { ok: true } : { ok: false, message: `Area "${areaStr}" not found for PT "${ptStr}" in Master Office Location` };
+  }
+
+  return { ok: false, message: 'Provide PT only, PT+Area, or PT+Area+Area Detail' };
+}
+
+async function importAdminUsers(rows) {
+  const result = { total: rows.length, created: 0, failed: 0, errors: [] };
+  const defaultPassword = process.env.BULK_DEFAULT_PASSWORD || 'DefaultPassword123!';
+
+  for (let i = 0; i < rows.length; i += 1) {
+    const rowNum = i + 2;
+    const row = rows[i] || {};
+
+    const firstName = toStringValue(row['first name']);
+    const lastName = toStringValue(row['last name']);
+    const email = normalizeEmail(row['email']);
+    const phoneNumber = toStringValue(row['phone number']);
+    const roleRaw = toStringValue(row['role']);
+    const division = toStringValue(row['division']);
+    const sectionName = toStringValue(row['section name']);
+    const pt = toStringValue(row['pt']);
+    const area = toStringValue(row['area']);
+    const areaDetail = toStringValue(row['area detail']);
+    const password = toStringValue(row['password']);
+
+    if (!email) {
+      result.failed += 1;
+      result.errors.push({ row: rowNum, message: 'Missing Email' });
+      continue;
+    }
+    if (!firstName) {
+      result.failed += 1;
+      result.errors.push({ row: rowNum, email, message: 'Missing First Name' });
+      continue;
+    }
+    if (!lastName) {
+      result.failed += 1;
+      result.errors.push({ row: rowNum, email, message: 'Missing Last Name' });
+      continue;
+    }
+    if (!roleRaw) {
+      result.failed += 1;
+      result.errors.push({ row: rowNum, email, message: 'Missing Role' });
+      continue;
+    }
+
+    const mappedRole = mapRoleToEnum(roleRaw);
+    const allowedRoles = ['SUPER_ADMIN', 'CHRO', 'DEPARTMENT_HEAD', 'HRBP', 'TA_TEAM', 'HIRING_MANAGER', 'INTERVIEWER'];
+    if (!allowedRoles.includes(mappedRole)) {
+      result.failed += 1;
+      const msg = mappedRole === 'CANDIDATE' ? 'Role CANDIDATE is not allowed for User Management upload' : `Invalid Role "${roleRaw}"`
+      result.errors.push({ row: rowNum, email, message: msg });
+      continue;
+    }
+
+    // For HRBP role, PT/Area/Area Detail are required and must exist.
+    if (mappedRole === 'HRBP') {
+      if (!pt || !area || !areaDetail) {
+        result.failed += 1;
+        result.errors.push({ row: rowNum, email, message: 'HRBP requires PT, Area, and Area Detail' });
+        continue;
+      }
+    }
+
+    try {
+      const officeValidation = await validateOfficeLocation({ pt, area, areaDetail });
+      if (!officeValidation.ok) {
+        result.failed += 1;
+        result.errors.push({ row: rowNum, email, message: officeValidation.message });
+        continue;
+      }
+
+      const existing = await prisma.user.findUnique({ where: { email }, select: { id: true } });
+      if (existing) {
+        result.failed += 1;
+        result.errors.push({ row: rowNum, email, message: 'Email already exists' });
+        continue;
+      }
+
+      const hashed = await bcrypt.hash(password || defaultPassword, 12);
+      await prisma.user.create({
+        data: {
+          email,
+          password: hashed,
+          firstName,
+          lastName,
+          phoneNumber: phoneNumber || null,
+          role: mappedRole,
+          division: division || null,
+          department: sectionName || null,
+          pt: pt || null,
+          area: area || null,
+          areaDetail: areaDetail || null,
+          isActive: true,
+          isEmailVerified: true,
+          emailVerifiedAt: new Date(),
+        },
+      });
+
+      result.created += 1;
+    } catch (e) {
+      result.failed += 1;
+      result.errors.push({ row: rowNum, email, message: e.message || 'Failed to create user' });
+      logger.warn(`Bulk import user failed row ${rowNum}: ${e.message}`);
+    }
+  }
+
+  return result;
+}
+
 module.exports = {
   importCandidates,
   importMasterDivisions,
   importMasterOfficeLocations,
+  importAdminUsers,
 };
 
 

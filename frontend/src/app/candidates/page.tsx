@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useAuth } from '@/contexts/AuthContext'
 import { useRouter } from 'next/navigation'
 import Layout from '@/components/Layout/Layout'
@@ -375,6 +375,7 @@ export const mapApiCandidate = (candidate: any): Candidate => {
 export default function CandidatesPage() {
   const { isAuthenticated, isLoading, user } = useAuth()
   const router = useRouter()
+  const autoViewHandledRef = useRef(false)
   const [searchTerm, setSearchTerm] = useState('')
   const [statusFilter, setStatusFilter] = useState<CandidateStatus | 'all'>('all')
   const [isAddModalOpen, setIsAddModalOpen] = useState(false)
@@ -431,6 +432,19 @@ export default function CandidatesPage() {
       loadCandidates()
     }
   }, [isAuthenticated, isLoading])
+
+  // Deep-link: /candidates?view=<id> opens View Candidate modal
+  useEffect(() => {
+    if (!isAuthenticated || isLoading) return
+    if (autoViewHandledRef.current) return
+    if (typeof window === 'undefined') return
+    const viewId = new URLSearchParams(window.location.search).get('view')
+    if (!viewId) return
+    const found = candidates.find((c) => c.id === viewId)
+    if (!found) return
+    autoViewHandledRef.current = true
+    handleViewCandidate(found)
+  }, [isAuthenticated, isLoading, candidates])
 
   // Reload candidates when search term changes (debounced)
   useEffect(() => {

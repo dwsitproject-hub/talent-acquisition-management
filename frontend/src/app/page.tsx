@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { useAuth } from '@/contexts/AuthContext'
 import { useRouter } from 'next/navigation'
 import Layout from '@/components/Layout/Layout'
@@ -15,14 +15,24 @@ import {
 import { DashboardStats, PositionStatusByLocation, OpenPositionProgress, SLALocation } from '@/types'
 import { DashboardAPI, CandidatesAPI, FPTKAPI, ApplicationsAPI } from '@/lib/api'
 import { mapApiFptk } from './fptk/page'
+import { businessDaysDiffIndonesia } from '@/utils/indoBusinessDays'
 
 const PRIORITY_FILTERS = ['ALL', 'P0', 'P1', 'P2'] as const
 const PENDING_OFFER_STATUSES = ['PENDING_HRBP_REVIEW', 'PENDING_HEAD_APPROVAL', 'SENT_TO_CANDIDATE']
 
 type DashboardListItem = {
+  id?: string
+  kind?: 'fptk' | 'candidate'
   title: string
   subtitle?: string
   meta?: string
+}
+
+const matchesQuery = (item: DashboardListItem, query: string) => {
+  const q = (query || '').trim().toLowerCase()
+  if (!q) return true
+  const hay = `${item.title || ''} ${item.subtitle || ''} ${item.meta || ''}`.toLowerCase()
+  return hay.includes(q)
 }
 
 const getPriorityValue = (position: any) => {
@@ -137,7 +147,7 @@ const computeSlaByLocation = (positions: any[]): SLALocation[] => {
       }
     }
 
-    const diffDays = Math.floor((now.getTime() - receivedDate.getTime()) / (1000 * 60 * 60 * 24))
+    const diffDays = businessDaysDiffIndonesia(receivedDate, now)
     if (diffDays <= 30) acc[location].buckets['0-30 Days'] += 1
     else if (diffDays <= 60) acc[location].buckets['31-60 Days'] += 1
     else if (diffDays <= 90) acc[location].buckets['61-90 Days'] += 1
@@ -165,6 +175,8 @@ const getInterviewsThisWeekItems = (positions: any[]): DashboardListItem[] => {
             subtitleParts.push(position.department)
           }
           items.push({
+            id: position?.id,
+            kind: position?.id ? ('fptk' as const) : undefined,
             title: candidate?.fullName || candidate?.name || 'Unknown Candidate',
             subtitle: subtitleParts.filter(Boolean).join(' • '),
             meta: `${date.toLocaleDateString()}${interview?.time ? ` at ${interview.time}` : ''}`,
@@ -189,6 +201,8 @@ const getHiredThisMonthItems = (positions: any[]): DashboardListItem[] => {
     .map((position) => {
       const date = parseDateValue(position?.updatedAt)
       return {
+        id: position?.id,
+        kind: position?.id ? ('fptk' as const) : undefined,
         title: position?.title || position?.position || 'Unknown Position',
         subtitle: position?.department ? `${position.department} • ${position.location || 'N/A'}` : position?.location,
         meta: date ? `Signed on ${date.toLocaleDateString()}` : undefined,
@@ -202,6 +216,8 @@ const getPendingOfferItems = (positions: any[]): DashboardListItem[] =>
       (position) => (position?.currentStatus || position?.status || '').toLowerCase() === 'offering process'
     )
     .map((position) => ({
+      id: position?.id,
+      kind: position?.id ? ('fptk' as const) : undefined,
       title: position?.title || position?.position || 'Unknown Position',
       subtitle: position?.department ? `${position.department} • ${position.location || 'N/A'}` : position?.location,
       meta: 'Awaiting offer confirmation',
@@ -247,6 +263,8 @@ const buildApplicationInsights = (
         ].filter(Boolean)
 
         interviewItems.push({
+          id: application?.fptkId,
+          kind: application?.fptkId ? ('fptk' as const) : undefined,
           title: candidateName,
           subtitle: `${positionTitle} • ${application?.fptk?.department || 'N/A'}`,
           meta: metaParts.join(' • '),
@@ -258,6 +276,8 @@ const buildApplicationInsights = (
       const hiredDate = application?.hiredAt ? new Date(application.hiredAt) : application?.updatedAt ? new Date(application.updatedAt) : null
       if (hiredDate && !isNaN(hiredDate.getTime()) && isWithinRange(hiredDate, monthRange.startOfMonth, monthRange.endOfMonth)) {
         hiredItems.push({
+          id: application?.fptkId,
+          kind: application?.fptkId ? ('fptk' as const) : undefined,
           title: candidateName,
           subtitle: `${positionTitle} • ${application?.fptk?.department || 'N/A'}`,
           meta: `Hired on ${hiredDate.toLocaleDateString()}`,
@@ -272,6 +292,8 @@ const buildApplicationInsights = (
     if (pendingOffer) {
       const offerStatus = pendingOffer.status
       pendingItems.push({
+        id: application?.fptkId,
+        kind: application?.fptkId ? ('fptk' as const) : undefined,
         title: candidateName,
         subtitle: `${positionTitle} • ${application?.fptk?.department || 'N/A'}`,
         meta: `Offer Status: ${offerStatus ? offerStatus.replace(/_/g, ' ') : 'Pending'}`,
@@ -289,6 +311,8 @@ export default function Dashboard() {
     totalCandidates: 0,
     activeApplications: 0,
     openPositions: 0,
+    closedPositions: 0,
+    holdPositions: 0,
     interviewsThisWeek: 0,
     hiredThisMonth: 0,
     pendingOffers: 0,
@@ -298,6 +322,7 @@ export default function Dashboard() {
     slaByLocation: []
   })
   const [detailModal, setDetailModal] = useState<{ title: string, items: any[] } | null>(null)
+  const [detailQuery, setDetailQuery] = useState('')
   const [baseStats, setBaseStats] = useState<Partial<DashboardStats> | null>(null)
   const [allPositions, setAllPositions] = useState<any[]>([])
   const [priorityFilter, setPriorityFilter] = useState<typeof PRIORITY_FILTERS[number]>('ALL')
@@ -306,18 +331,67 @@ export default function Dashboard() {
   const [pendingOfferDetailItems, setPendingOfferDetailItems] = useState<DashboardListItem[]>([])
   const [isLoadingApplicationInsights, setIsLoadingApplicationInsights] = useState(false)
   const [applicationInsightsLoaded, setApplicationInsightsLoaded] = useState(false)
+  const [openPositionsModalOpen, setOpenPositionsModalOpen] = useState(false)
+  const [openPositionsQuery, setOpenPositionsQuery] = useState('')
+  const [openPositionsLoading, setOpenPositionsLoading] = useState(false)
+  const [openPositionsError, setOpenPositionsError] = useState<string>('')
+  const [openPositionsList, setOpenPositionsList] = useState<any[]>([])
+  const openPositionsLoadedOnceRef = useRef(false)
 
 const filteredPositions = useMemo(
   () => filterPositionsByPriority(allPositions, priorityFilter),
   [allPositions, priorityFilter]
 )
-const openPositionItems = useMemo(() => {
+const openPositionItems = useMemo<DashboardListItem[]>(() => {
   return filteredPositions
     .filter((position) => {
-      const status = (position?.currentStatus || position?.status || '').toLowerCase()
-      return status !== 'on boarding' && status !== 'cancelled'
+      const status = (position?.currentStatus || position?.status || '').trim().toLowerCase()
+      return (
+        status !== 'cancel' &&
+        status !== 'hold' &&
+        status !== 'signing' &&
+        status !== 'on boarding' &&
+        status !== 'boarding'
+      )
     })
     .map((position) => ({
+      id: position?.id,
+      kind: 'fptk' as const,
+      title: position?.title || position?.position || 'Unknown Position',
+      subtitle: `${position?.department || 'N/A'} • ${position?.location || 'N/A'}`,
+      meta: position?.currentStatus || position?.status || 'N/A',
+    }))
+}, [filteredPositions])
+
+const closedPositionItems = useMemo<DashboardListItem[]>(() => {
+  return filteredPositions
+    .filter((position) => {
+      const status = (position?.currentStatus || position?.status || '').trim().toLowerCase()
+      return (
+        status === 'cancel' ||
+        status === 'signing' ||
+        status === 'on boarding' ||
+        status === 'boarding'
+      )
+    })
+    .map((position) => ({
+      id: position?.id,
+      kind: 'fptk' as const,
+      title: position?.title || position?.position || 'Unknown Position',
+      subtitle: `${position?.department || 'N/A'} • ${position?.location || 'N/A'}`,
+      meta: position?.currentStatus || position?.status || 'N/A',
+    }))
+}, [filteredPositions])
+
+const holdPositionItems = useMemo<DashboardListItem[]>(() => {
+  return filteredPositions
+    .filter((position) => {
+      const status = (position?.currentStatus || position?.status || '').trim().toLowerCase()
+      return status === 'hold'
+    })
+    .map((position) => ({
+      id: position?.id,
+      kind: 'fptk' as const,
       title: position?.title || position?.position || 'Unknown Position',
       subtitle: `${position?.department || 'N/A'} • ${position?.location || 'N/A'}`,
       meta: position?.currentStatus || position?.status || 'N/A',
@@ -336,6 +410,24 @@ const pendingOfferItems = useMemo(
   [filteredPositions]
 )
 
+const combinedLocations = useMemo(() => {
+  const locationsSet = new Set<string>()
+
+  dashboardStats.positionStatusByLocation.forEach((item) => {
+    if (item.location) locationsSet.add(item.location)
+  })
+
+  dashboardStats.openPositionProgress.forEach((item: any) => {
+    if (item.areaDetail) locationsSet.add(item.areaDetail)
+  })
+
+  dashboardStats.slaByLocation.forEach((item: any) => {
+    if (item.areaDetail) locationsSet.add(item.areaDetail)
+  })
+
+  return Array.from(locationsSet).sort()
+}, [dashboardStats.positionStatusByLocation, dashboardStats.openPositionProgress, dashboardStats.slaByLocation])
+
   const stats = [
     {
       name: 'Total Candidates',
@@ -349,6 +441,20 @@ const pendingOfferItems = useMemo(
       value: dashboardStats.openPositions.toString(),
       icon: BriefcaseIcon,
       change: '+3%',
+      changeType: 'positive',
+    },
+    {
+      name: 'Closed Positions',
+      value: dashboardStats.closedPositions.toString(),
+      icon: BriefcaseIcon,
+      change: '+0%',
+      changeType: 'positive',
+    },
+    {
+      name: 'Hold Positions',
+      value: dashboardStats.holdPositions.toString(),
+      icon: BriefcaseIcon,
+      change: '+0%',
       changeType: 'positive',
     },
     {
@@ -382,11 +488,7 @@ const pendingOfferItems = useMemo(
     }
   }, [isAuthenticated, isLoading, router])
 
-  useEffect(() => {
-    if (!isLoading && isAuthenticated && !applicationInsightsLoaded) {
-      loadApplicationInsights()
-    }
-  }, [isLoading, isAuthenticated, applicationInsightsLoaded])
+  // Load heavy application insights only on-demand (when user opens a detail view).
 
 useEffect(() => {
   if (!baseStats) return
@@ -398,19 +500,23 @@ useEffect(() => {
   setDashboardStats({
     totalCandidates: baseStats.totalCandidates ?? 0,
     activeApplications: baseStats.activeApplications ?? 0,
-    openPositions: openPositionItems.length,
+    openPositions: baseStats.openPositions ?? openPositionItems.length,
+    closedPositions: baseStats.closedPositions ?? closedPositionItems.length,
+    holdPositions: baseStats.holdPositions ?? holdPositionItems.length,
     interviewsThisWeek: interviewsCount,
     hiredThisMonth: hiredCount,
     pendingOffers: pendingCount,
     recentActivity: baseStats.recentActivity ?? [],
-    positionStatusByLocation: computePositionStatusByLocation(filteredPositions),
-    openPositionProgress: computeOpenPositionProgress(filteredPositions),
-    slaByLocation: computeSlaByLocation(filteredPositions),
+    positionStatusByLocation: (baseStats as any).positionStatusByLocation || computePositionStatusByLocation(filteredPositions),
+    openPositionProgress: (baseStats as any).openPositionProgress || computeOpenPositionProgress(filteredPositions),
+    slaByLocation: (baseStats as any).slaByLocation || computeSlaByLocation(filteredPositions),
   })
 }, [
   baseStats,
   filteredPositions,
   openPositionItems.length,
+  closedPositionItems.length,
+  holdPositionItems.length,
   interviewsThisWeekItems.length,
   hiredThisMonthItems.length,
   pendingOfferItems.length,
@@ -419,42 +525,47 @@ useEffect(() => {
   pendingOfferDetailItems.length,
 ])
 
-  const fetchAllPositions = async (): Promise<any[]> => {
-    if (!isAuthenticated) return []
-    const limit = 100
-    const maxPages = 50 // Safety limit: prevent infinite loops (max 5000 records)
-    let page = 1
-    let hasMore = true
-    let positions: any[] = []
+  const isOpenCurrentStatus = (value: any) => {
+    const status = (value || '').toString().trim().toLowerCase()
+    return status === 'open' || status === 'pending fktk' || status === 're-open' || status === 'internal movement'
+  }
 
-  while (hasMore && page <= maxPages) {
-    const response = await FPTKAPI.getAll({}, { page, limit })
-    const data = Array.isArray(response?.data) ? response.data : []
-    const mapped = data.map((fptk: any) => mapApiFptk(fptk))
-    positions = positions.concat(mapped)
+  const fetchOpenPositions = async (query: string) => {
+    if (!isAuthenticated) return
+    setOpenPositionsLoading(true)
+    setOpenPositionsError('')
+    try {
+      const limit = 100
+      const maxPages = 20
+      let page = 1
+      let hasMore = true
+      let positions: any[] = []
 
-      const totalPages = response?.pagination?.totalPages
-      if (totalPages) {
-        hasMore = page < totalPages
-      } else {
-        hasMore = data.length === limit
+      while (hasMore && page <= maxPages) {
+        const response = await FPTKAPI.getAll({ search: query || '' }, { page, limit })
+        const data = Array.isArray(response?.data) ? response.data : []
+        const mapped = data.map((fptk: any) => mapApiFptk(fptk))
+        positions = positions.concat(mapped)
+
+        const totalPages = response?.pagination?.totalPages
+        if (totalPages) {
+          hasMore = page < totalPages
+        } else {
+          hasMore = data.length === limit
+        }
+        page += 1
       }
-      page += 1
-    }
-    
-    if (page > maxPages) {
-      console.warn(`fetchAllPositions: Reached maximum page limit (${maxPages}). Some positions may not be loaded.`)
-    }
 
-    if (typeof window !== 'undefined') {
-      try {
-        localStorage.setItem('jobPostings', JSON.stringify(positions))
-      } catch (error) {
-        console.warn('Could not save positions to localStorage:', error)
-      }
+      const openOnly = positions.filter((p: any) => isOpenCurrentStatus(p?.currentStatus || p?.status))
+      setOpenPositionsList(openOnly.map((p: any) => ({ ...p, kind: 'fptk' as const })))
+      openPositionsLoadedOnceRef.current = true
+    } catch (e: any) {
+      console.error('fetchOpenPositions failed:', e)
+      setOpenPositionsError(e?.response?.data?.message || e?.message || 'Failed to load open positions')
+      setOpenPositionsList([])
+    } finally {
+      setOpenPositionsLoading(false)
     }
-
-    return positions
   }
 
   const loadApplicationInsights = async () => {
@@ -515,7 +626,6 @@ useEffect(() => {
     try {
       // Load dashboard stats from API
       const stats = await DashboardAPI.getStats()
-      const positions = await fetchAllPositions()
       console.log('Dashboard API Response:', stats)
       console.log('Position Status by Location:', stats.positionStatusByLocation)
       console.log('Open Position Progress:', stats.openPositionProgress)
@@ -539,13 +649,23 @@ useEffect(() => {
         totalCandidates: stats.totalCandidates || 0,
         activeApplications: stats.activeApplications || 0,
         recentActivity: stats.recentActivity || [],
+        openPositions: stats.openPositions || 0,
+        closedPositions: stats.closedPositions ?? 0,
+        holdPositions: stats.holdPositions ?? 0,
+        positionStatusByLocation: stats.positionStatusByLocation || [],
+        openPositionProgress: stats.openPositionProgress || [],
+        slaByLocation: stats.slaByLocation || [],
       }
+
+      console.log('Dashboard base stats:', base)
+      console.log('API closedPositions:', stats.closedPositions)
+      console.log('API holdPositions:', stats.holdPositions)
 
       setBaseStats({
         ...base,
-        openPositions: openPositionsComputed || stats.activeFPTKs || stats.totalFPTKs || 0,
+        openPositions: openPositionsComputed || stats.openPositions || stats.activeFPTKs || stats.totalFPTKs || 0,
       })
-      setAllPositions(positions)
+      setAllPositions([])
     } catch (error: any) {
       console.error('Error loading dashboard data:', error)
       console.error('Error details:', error.response?.data || error.message)
@@ -604,6 +724,19 @@ useEffect(() => {
       setBaseStats(fallbackBase)
       setAllPositions(jobPostings)
     }
+  }
+
+  const openFptkEdit = (id?: string) => {
+    if (!id) return
+    setDetailModal(null)
+    setOpenPositionsModalOpen(false)
+    router.push(`/fptk?edit=${encodeURIComponent(id)}`)
+  }
+
+  const openCandidateView = (id?: string) => {
+    if (!id) return
+    setDetailModal(null)
+    router.push(`/candidates?view=${encodeURIComponent(id)}`)
   }
 
   if (isLoading) {
@@ -668,6 +801,13 @@ useEffect(() => {
               key={item.name}
               className="text-left relative overflow-hidden rounded-lg bg-white px-4 py-5 shadow sm:px-6 sm:py-6 hover:ring-2 hover:ring-indigo-500 focus:outline-none"
               onClick={async () => {
+                if (item.name === 'Open Positions') {
+                  setOpenPositionsModalOpen(true)
+                  if (!openPositionsLoadedOnceRef.current) {
+                    await fetchOpenPositions('')
+                  }
+                  return
+                }
                 setDetailModal({ title: item.name, items: [] })
                 try {
                   let items: DashboardListItem[] = []
@@ -676,17 +816,32 @@ useEffect(() => {
                     const response = await CandidatesAPI.getAll({}, { page: 1, limit: 100 })
                     const candidates = response.data || []
                     items = candidates.map((c: any) => ({
+                      id: c.id,
+                      kind: 'candidate' as const,
                       title: `${c.user?.firstName || ''} ${c.user?.lastName || ''}`.trim() || 'Unknown',
                       subtitle: c.user?.email || 'No email',
                       meta: c._count?.applications ? `${c._count.applications} application(s)` : 'No applications',
                     }))
                   } else if (item.name === 'Open Positions') {
                     items = openPositionItems
+                  } else if (item.name === 'Closed Positions') {
+                    items = closedPositionItems
+                  } else if (item.name === 'Hold Positions') {
+                    items = holdPositionItems
                   } else if (item.name === 'Interviews This Week') {
+                    if (!applicationInsightsLoaded) {
+                      await loadApplicationInsights()
+                    }
                     items = interviewDetailItems.length ? interviewDetailItems : interviewsThisWeekItems
                   } else if (item.name === 'Hired This Month') {
+                    if (!applicationInsightsLoaded) {
+                      await loadApplicationInsights()
+                    }
                     items = hiredDetailItems.length ? hiredDetailItems : hiredThisMonthItems
                   } else if (item.name === 'Pending Offers') {
+                    if (!applicationInsightsLoaded) {
+                      await loadApplicationInsights()
+                    }
                     items = pendingOfferDetailItems.length ? pendingOfferDetailItems : pendingOfferItems
                   }
 
@@ -729,323 +884,500 @@ useEffect(() => {
           ))}
         </div>
 
-        {/* Charts Section */}
-        <div className="mt-8 grid grid-cols-1 lg:grid-cols-3 gap-8">
-          {/* Position Status by Location */}
-          <div className="bg-white shadow rounded-lg">
-            <div className="px-4 py-5 sm:p-6">
-              <h3 className="text-lg leading-6 font-medium text-gray-900">
-                Position Status by Location
-              </h3>
-              <div className="mt-5">
-                {dashboardStats.positionStatusByLocation.length > 0 ? (
-                  <div className="space-y-6">
-                    {dashboardStats.positionStatusByLocation.map((locationData: any, index: number) => (
-                      <div key={index} className="bg-gray-50 rounded-lg p-4">
-                        <div className="flex justify-between items-center mb-3">
-                          <h4 className="text-sm font-medium text-gray-900">{locationData.location}</h4>
-                          <div className="flex space-x-4 text-sm text-gray-600">
+        {openPositionsModalOpen && (
+          <div
+            className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center"
+            onClick={() => setOpenPositionsModalOpen(false)}
+          >
+            <div
+              className="bg-white rounded-lg shadow-xl max-w-3xl w-full mx-4"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="px-6 py-4 border-b flex items-center justify-between gap-3">
+                <div>
+                  <h2 className="text-lg font-semibold text-gray-900">Open Positions</h2>
+                  <div className="text-xs text-gray-500">Search by Position Name, then click to edit.</div>
+                </div>
+                <button className="text-gray-500 hover:text-gray-700" onClick={() => setOpenPositionsModalOpen(false)}>
+                  ✕
+                </button>
+              </div>
+
+              <div className="px-6 py-4">
+                <div className="flex gap-2">
+                  <input
+                    value={openPositionsQuery}
+                    onChange={(e) => setOpenPositionsQuery(e.target.value)}
+                    placeholder="Search position name..."
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                  />
+                  <button
+                    className="px-4 py-2 text-sm rounded-md bg-indigo-600 text-white hover:bg-indigo-700 disabled:opacity-50"
+                    disabled={openPositionsLoading}
+                    onClick={() => fetchOpenPositions(openPositionsQuery)}
+                  >
+                    Search
+                  </button>
+                </div>
+
+                {openPositionsError ? (
+                  <div className="mt-3 text-sm text-red-600">{openPositionsError}</div>
+                ) : null}
+
+                <div className="mt-4 max-h-[60vh] overflow-auto border rounded-md">
+                  {openPositionsLoading ? (
+                    <div className="p-4 text-sm text-gray-500">Loading…</div>
+                  ) : openPositionsList.length === 0 ? (
+                    <div className="p-4 text-sm text-gray-500">No open positions found.</div>
+                  ) : (
+                    <ul className="divide-y">
+                      {openPositionsList.map((p: any) => {
+                        const title = p?.title || p?.position || 'Unknown Position'
+                        const sub = `${p?.department || 'N/A'} • ${p?.location || 'N/A'}`
+                        const meta = p?.currentStatus || p?.status || 'N/A'
+                        return (
+                          <li key={p.id} className="px-4 py-3 hover:bg-gray-50">
                             <button
-                              className="hover:underline"
+                              className="w-full text-left"
                               onClick={() => {
-                                const items = filteredPositions
-                                  .filter(
-                                    (j: any) =>
-                                      (j.areaDetail || j.area || j.location || 'Unknown') === locationData.location
-                                  )
-                                  .map((j: any) => ({
-                                    title: j.title || j.position || 'Unknown Position',
-                                    subtitle: `${j.department || 'N/A'} • ${j.location || 'N/A'}`,
-                                    meta: j.currentStatus || j.status || 'N/A',
-                                  }))
-                                setDetailModal({ title: `Total Positions • ${locationData.location}`, items })
+                                openFptkEdit(p.id)
                               }}
                             >
-                              Total: <span className="font-semibold">{locationData.total}</span>
+                              <div className="text-sm font-medium text-indigo-700 hover:underline">{title}</div>
+                              <div className="text-sm text-gray-600">{sub}</div>
+                              <div className="text-xs text-gray-500 mt-1">{meta}</div>
                             </button>
-                            <button
-                              className="text-green-600 hover:underline"
-                              onClick={() => {
-                                const items = filteredPositions
-                                  .filter(
-                                    (j: any) =>
-                                      (j.areaDetail || j.area || j.location || 'Unknown') === locationData.location
-                                  )
-                                  .filter((j: any) => {
-                                    const status = (j.currentStatus || j.status || '').toLowerCase()
-                                    return status !== 'on boarding' && status !== 'cancelled'
-                                  })
-                                  .map((j: any) => ({
-                                    title: j.title || j.position || 'Unknown Position',
-                                    subtitle: `${j.department || 'N/A'} • ${j.location || 'N/A'}`,
-                                    meta: j.currentStatus || j.status || 'N/A',
-                                  }))
-                                setDetailModal({ title: `Open Positions • ${locationData.location}`, items })
-                              }}
-                            >
-                              Open: <span className="font-semibold">{locationData.open}</span>
-                            </button>
-                            <button
-                              className="text-red-600 hover:underline"
-                              onClick={() => {
-                                const items = filteredPositions
-                                  .filter(
-                                    (j: any) =>
-                                      (j.areaDetail || j.area || j.location || 'Unknown') === locationData.location
-                                  )
-                                  .filter((j: any) => {
-                                    const status = (j.currentStatus || j.status || '').toLowerCase()
-                                    return status === 'on boarding' || status === 'cancelled'
-                                  })
-                                  .map((j: any) => ({
-                                    title: j.title || j.position || 'Unknown Position',
-                                    subtitle: `${j.department || 'N/A'} • ${j.location || 'N/A'}`,
-                                    meta: j.currentStatus || j.status || 'N/A',
-                                  }))
-                                setDetailModal({ title: `Closed Positions • ${locationData.location}`, items })
-                              }}
-                            >
-                              Closed: <span className="font-semibold">{locationData.closed}</span>
-                            </button>
-                          </div>
-                        </div>
-                        
-                        {/* Bar Chart */}
-                        <div className="relative">
-                          <div className="flex items-end space-x-1 h-8">
-                            {/* Open Positions Bar */}
-                            <div className="flex-1 flex flex-col items-center">
-                              <div 
-                                className="bg-green-500 rounded-t w-full transition-all duration-300 hover:bg-green-600"
-                                style={{ 
-                                  height: `${Math.max((locationData.open / locationData.total) * 100, 5)}%`,
-                                  minHeight: locationData.open > 0 ? '8px' : '0px'
-                                }}
-                                title={`Open: ${locationData.open}`}
-                              ></div>
-                              <span className="text-xs text-gray-500 mt-1">Open</span>
-                            </div>
-                            
-                            {/* Closed Positions Bar */}
-                            <div className="flex-1 flex flex-col items-center">
-                              <div 
-                                className="bg-red-500 rounded-t w-full transition-all duration-300 hover:bg-red-600"
-                                style={{ 
-                                  height: `${Math.max((locationData.closed / locationData.total) * 100, 5)}%`,
-                                  minHeight: locationData.closed > 0 ? '8px' : '0px'
-                                }}
-                                title={`Closed: ${locationData.closed}`}
-                              ></div>
-                              <span className="text-xs text-gray-500 mt-1">Closed</span>
-                            </div>
-                          </div>
-                          
-                          {/* Percentage Labels */}
-                          <div className="flex justify-between mt-2 text-xs text-gray-500">
-                            <span>{Math.round((locationData.open / locationData.total) * 100)}% Open</span>
-                            <span>{Math.round((locationData.closed / locationData.total) * 100)}% Closed</span>
-                          </div>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                ) : (
-                  <div className="text-sm text-gray-500">
-                    No position data available. Create some positions to see the chart.
-                  </div>
-                )}
+                          </li>
+                        )
+                      })}
+                    </ul>
+                  )}
+                </div>
+              </div>
+
+              <div className="px-6 py-4 border-t flex justify-end">
+                <button
+                  className="px-4 py-2 text-sm rounded-md border text-gray-700 bg-white hover:bg-gray-50"
+                  onClick={() => setOpenPositionsModalOpen(false)}
+                >
+                  Close
+                </button>
               </div>
             </div>
           </div>
+        )}
 
-          {/* Open Position Current Progress */}
-          <div className="bg-white shadow rounded-lg">
-            <div className="px-4 py-5 sm:p-6">
-              <h3 className="text-lg leading-6 font-medium text-gray-900">
-                Open Position Progress by Area Detail
-              </h3>
-              <div className="mt-5">
-                {dashboardStats.openPositionProgress.length > 0 ? (
-                  <div className="space-y-6">
-                    {dashboardStats.openPositionProgress.map((areaData: any, index: number) => (
-                      <div key={index} className="bg-gray-50 rounded-lg p-4">
-                        <div className="flex justify-between items-center mb-3">
-                          <h4 className="text-sm font-medium text-gray-900">{areaData.areaDetail}</h4>
-                          <div className="text-sm text-gray-600">
-                            <span className="font-semibold">{areaData.total}</span> total positions ({areaData.percentage}%)
+        {/* Charts Section - Location aligned view */}
+        <div className="mt-8 bg-white shadow rounded-lg">
+          <div className="px-4 py-5 sm:p-6">
+            <h3 className="text-lg leading-6 font-medium text-gray-900 mb-4">
+              Location Overview
+            </h3>
+            <div className="hidden lg:grid grid-cols-4 gap-4 text-xs font-semibold text-gray-500 border-b pb-2 mb-4">
+              <span>Location</span>
+              <span>Position Status by Location</span>
+              <span>Open Position Progress by Area Detail</span>
+              <span>SLA by Location (from FPTK Receive Date)</span>
+            </div>
+
+            {combinedLocations.length === 0 ? (
+              <div className="text-sm text-gray-500">
+                No location data available. Create some positions to see the chart.
+              </div>
+            ) : (
+              <div className="space-y-4">
+                {combinedLocations.map((locationKey) => {
+                  const statusData = dashboardStats.positionStatusByLocation.find(
+                    (l: any) => l.location === locationKey
+                  )
+                  const progressData = dashboardStats.openPositionProgress.find(
+                    (l: any) => l.areaDetail === locationKey
+                  )
+                  const slaData = dashboardStats.slaByLocation.find(
+                    (l: any) => l.areaDetail === locationKey
+                  )
+
+                  return (
+                    <div
+                      key={locationKey}
+                      className="border rounded-lg p-4 hover:border-indigo-300 transition-colors"
+                    >
+                      <div className="grid grid-cols-1 lg:grid-cols-4 gap-4 items-start">
+                        {/* Location label */}
+                        <div>
+                          <div className="text-sm font-semibold text-gray-900 mb-1">
+                            {locationKey}
+                          </div>
+                          <div className="text-xs text-gray-500">
+                            {(statusData?.total || progressData?.total || slaData?.total || 0).toString()}{' '}
+                            total records
                           </div>
                         </div>
-                        
-                        {/* Grouped Status Bars */}
-                        <div className="space-y-2">
-                          {Object.entries(areaData.statusCounts).map(([status, count]: [string, any]) => (
-                            <div key={status} className="flex items-center">
-                              <div className="w-24 text-xs text-gray-600 truncate mr-2">
-                                {status}
+
+                        {/* Position Status by Location */}
+                        <div className="bg-gray-50 rounded-lg p-3">
+                          <div className="flex justify-between items-center mb-2">
+                            <div className="text-xs font-medium text-gray-700">
+                              Position Status
+                            </div>
+                            {statusData && (
+                              <div className="flex space-x-3 text-[11px] text-gray-600">
+                                <button
+                                  className="hover:underline"
+                                  onClick={() => {
+                                    const items = filteredPositions
+                                      .filter(
+                                        (j: any) =>
+                                          (j.areaDetail || j.area || j.location || 'Unknown') ===
+                                          statusData.location
+                                      )
+                                      .map((j: any) => ({
+                                        id: j.id,
+                                        kind: 'fptk',
+                                        title: j.title || j.position || 'Unknown Position',
+                                        subtitle: `${j.department || 'N/A'} • ${j.location || 'N/A'}`,
+                                        meta: j.currentStatus || j.status || 'N/A',
+                                      }))
+                                    setDetailModal({
+                                      title: `Total Positions • ${statusData.location}`,
+                                      items,
+                                    })
+                                  }}
+                                >
+                                  Total:{' '}
+                                  <span className="font-semibold">{statusData.total}</span>
+                                </button>
+                                <button
+                                  className="text-green-600 hover:underline"
+                                  onClick={() => {
+                                    const items = filteredPositions
+                                      .filter(
+                                        (j: any) =>
+                                          (j.areaDetail || j.area || j.location || 'Unknown') ===
+                                          statusData.location
+                                      )
+                                      .filter((j: any) => {
+                                        const status = (j.currentStatus || j.status || '').toLowerCase()
+                                        return status !== 'on boarding' && status !== 'cancelled'
+                                      })
+                                      .map((j: any) => ({
+                                        id: j.id,
+                                        kind: 'fptk',
+                                        title: j.title || j.position || 'Unknown Position',
+                                        subtitle: `${j.department || 'N/A'} • ${j.location || 'N/A'}`,
+                                        meta: j.currentStatus || j.status || 'N/A',
+                                      }))
+                                    setDetailModal({
+                                      title: `Open Positions • ${statusData.location}`,
+                                      items,
+                                    })
+                                  }}
+                                >
+                                  Open:{' '}
+                                  <span className="font-semibold">{statusData.open}</span>
+                                </button>
+                                <button
+                                  className="text-red-600 hover:underline"
+                                  onClick={() => {
+                                    const items = filteredPositions
+                                      .filter(
+                                        (j: any) =>
+                                          (j.areaDetail || j.area || j.location || 'Unknown') ===
+                                          statusData.location
+                                      )
+                                      .filter((j: any) => {
+                                        const status = (j.currentStatus || j.status || '').toLowerCase()
+                                        return status === 'on boarding' || status === 'cancelled'
+                                      })
+                                      .map((j: any) => ({
+                                        id: j.id,
+                                        kind: 'fptk',
+                                        title: j.title || j.position || 'Unknown Position',
+                                        subtitle: `${j.department || 'N/A'} • ${j.location || 'N/A'}`,
+                                        meta: j.currentStatus || j.status || 'N/A',
+                                      }))
+                                    setDetailModal({
+                                      title: `Closed Positions • ${statusData.location}`,
+                                      items,
+                                    })
+                                  }}
+                                >
+                                  Closed:{' '}
+                                  <span className="font-semibold">{statusData.closed}</span>
+                                </button>
                               </div>
-                              <button
-                                className="flex-1 bg-gray-200 rounded-full h-2 group"
-                                onClick={() => {
-                                  const items = filteredPositions
-                                    .filter(
-                                      (j: any) =>
-                                        (j.areaDetail || j.area || j.location || 'Unknown') === areaData.areaDetail
-                                    )
-                                    .filter((j: any) => (j.currentStatus || j.status || 'Raise FPTK') === status)
-                                    .map((j: any) => ({
-                                      title: j.title || j.position || 'Unknown Position',
-                                      subtitle: `${j.department || 'N/A'} • ${j.location || 'N/A'}`,
-                                      meta: j.currentStatus || j.status || 'N/A',
-                                    }))
-                                  setDetailModal({ title: `${status} • ${areaData.areaDetail}`, items })
-                                }}
-                                title={`${status}: ${count} positions`}
-                              >
-                                <div 
-                                  className="bg-blue-500 h-2 rounded-full transition-all duration-300 group-hover:bg-blue-600"
-                                  style={{ width: `${(count / areaData.total) * 100}%` }}
-                                ></div>
-                              </button>
-                              <button
-                                className="w-8 text-xs text-gray-600 text-right ml-2 hover:underline"
-                                onClick={() => {
-                                  const items = filteredPositions
-                                    .filter(
-                                      (j: any) =>
-                                        (j.areaDetail || j.area || j.location || 'Unknown') === areaData.areaDetail
-                                    )
-                                    .filter((j: any) => (j.currentStatus || j.status || 'Raise FPTK') === status)
-                                    .map((j: any) => ({
-                                      title: j.title || j.position || 'Unknown Position',
-                                      subtitle: `${j.department || 'N/A'} • ${j.location || 'N/A'}`,
-                                      meta: j.currentStatus || j.status || 'N/A',
-                                    }))
-                                  setDetailModal({ title: `${status} • ${areaData.areaDetail}`, items })
-                                }}
-                              >
-                                {count}
-                              </button>
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                ) : (
-                  <div className="text-sm text-gray-500">
-                    No position progress data available. Create some positions to see the chart.
-                  </div>
-                )}
-              </div>
-            </div>
-          </div>
-
-          {/* SLA by Location */}
-          <div className="bg-white shadow rounded-lg">
-            <div className="px-4 py-5 sm:p-6">
-              <h3 className="text-lg leading-6 font-medium text-gray-900">
-                SLA by Location (from FPTK Receive Date)
-              </h3>
-              <div className="mt-5">
-                {dashboardStats.slaByLocation.length > 0 ? (
-                  <div className="space-y-6">
-                    {dashboardStats.slaByLocation.map((areaData: any, index: number) => (
-                      <div key={index} className="bg-gray-50 rounded-lg p-4">
-                        <div className="flex justify-between items-center mb-3">
-                          <h4 className="text-sm font-medium text-gray-900">{areaData.areaDetail}</h4>
-                          <div className="text-sm text-gray-600">
-                            <span className="font-semibold">{areaData.total}</span> positions with SLA
+                            )}
                           </div>
-                        </div>
-                        <div className="space-y-2">
-                          {Object.entries(areaData.buckets).map(([bucket, count]: [string, any]) => (
-                            <div key={bucket} className="flex items-center">
-                              <div className="w-28 text-xs text-gray-600 truncate mr-2">{bucket}</div>
-                              <button
-                                className="flex-1 bg-gray-200 rounded-full h-2 group"
-                                onClick={() => {
-                                  const bucketMatch = (position: any) => {
-                                    const nowDate = new Date()
-                                    const dateValue = position?.fptkReceiveDate || position?.requestDate
-                                    if (!dateValue) return false
-                                    const d = new Date(dateValue)
-                                    if (isNaN(d.getTime())) return false
-                                    const diffDays = Math.floor((nowDate.getTime() - d.getTime()) / (1000 * 60 * 60 * 24))
-                                    if (bucket === '0-30 Days') return diffDays <= 30
-                                    if (bucket === '31-60 Days') return diffDays > 30 && diffDays <= 60
-                                    if (bucket === '61-90 Days') return diffDays > 60 && diffDays <= 90
-                                    return diffDays > 90
-                                  }
-                                  const items = filteredPositions
-                                    .filter(
-                                      (j: any) =>
-                                        (j.areaDetail || j.area || j.location || 'Unknown') === areaData.areaDetail
-                                    )
-                                    .filter((j: any) => bucketMatch(j))
-                                    .map((j: any) => ({
-                                      title: j.title || j.position || 'Unknown Position',
-                                      subtitle: `${j.department || 'N/A'} • ${j.location || 'N/A'}`,
-                                      meta: `FPTK Received: ${
-                                        j.fptkReceiveDate || j.requestDate
-                                          ? new Date(j.fptkReceiveDate || j.requestDate).toLocaleDateString()
-                                          : '-'
-                                      }`,
-                                    }))
-                                  setDetailModal({ title: `${bucket} • ${areaData.areaDetail}`, items })
-                                }}
-                                title={`${bucket}: ${count} positions`}
-                              >
-                                <div
-                                  className="bg-purple-500 h-2 rounded-full transition-all duration-300 group-hover:bg-purple-600"
-                                  style={{ width: `${areaData.total > 0 ? (count / areaData.total) * 100 : 0}%` }}
-                                ></div>
-                              </button>
-                              <button
-                                className="w-8 text-xs text-gray-600 text-right ml-2 hover:underline"
-                                onClick={() => {
-                                  const bucketMatch = (position: any) => {
-                                    const nowDate = new Date()
-                                    const dateValue = position?.fptkReceiveDate || position?.requestDate
-                                    if (!dateValue) return false
-                                    const d = new Date(dateValue)
-                                    if (isNaN(d.getTime())) return false
-                                    const diffDays = Math.floor((nowDate.getTime() - d.getTime()) / (1000 * 60 * 60 * 24))
-                                    if (bucket === '0-30 Days') return diffDays <= 30
-                                    if (bucket === '31-60 Days') return diffDays > 30 && diffDays <= 60
-                                    if (bucket === '61-90 Days') return diffDays > 60 && diffDays <= 90
-                                    return diffDays > 90
-                                  }
-                                  const items = filteredPositions
-                                    .filter(
-                                      (j: any) =>
-                                        (j.areaDetail || j.area || j.location || 'Unknown') === areaData.areaDetail
-                                    )
-                                    .filter((j: any) => bucketMatch(j))
-                                    .map((j: any) => ({
-                                      title: j.title || j.position || 'Unknown Position',
-                                      subtitle: `${j.department || 'N/A'} • ${j.location || 'N/A'}`,
-                                      meta: `FPTK Received: ${
-                                        j.fptkReceiveDate || j.requestDate
-                                          ? new Date(j.fptkReceiveDate || j.requestDate).toLocaleDateString()
-                                          : '-'
-                                      }`,
-                                    }))
-                                  setDetailModal({ title: `${bucket} • ${areaData.areaDetail}`, items })
-                                }}
-                              >
-                                {count}
-                              </button>
+                          {statusData ? (
+                            <div className="relative">
+                              <div className="flex items-end space-x-1 h-8">
+                                <div className="flex-1 flex flex-col items-center">
+                                  <div
+                                    className="bg-green-500 rounded-t w-full transition-all duration-300 hover:bg-green-600"
+                                    style={{
+                                      height: `${Math.max(
+                                        (statusData.open / statusData.total) * 100,
+                                        5
+                                      )}%`,
+                                      minHeight: statusData.open > 0 ? '8px' : '0px',
+                                    }}
+                                    title={`Open: ${statusData.open}`}
+                                  ></div>
+                                  <span className="text-[10px] text-gray-500 mt-1">Open</span>
+                                </div>
+                                <div className="flex-1 flex flex-col items-center">
+                                  <div
+                                    className="bg-red-500 rounded-t w-full transition-all duration-300 hover:bg-red-600"
+                                    style={{
+                                      height: `${Math.max(
+                                        (statusData.closed / statusData.total) * 100,
+                                        5
+                                      )}%`,
+                                      minHeight: statusData.closed > 0 ? '8px' : '0px',
+                                    }}
+                                    title={`Closed: ${statusData.closed}`}
+                                  ></div>
+                                  <span className="text-[10px] text-gray-500 mt-1">Closed</span>
+                                </div>
+                              </div>
+                              <div className="flex justify-between mt-2 text-[10px] text-gray-500">
+                                <span>
+                                  {Math.round((statusData.open / statusData.total) * 100)}% Open
+                                </span>
+                                <span>
+                                  {Math.round((statusData.closed / statusData.total) * 100)}% Closed
+                                </span>
+                              </div>
                             </div>
-                          ))}
+                          ) : (
+                            <div className="text-xs text-gray-400">No data.</div>
+                          )}
+                        </div>
+
+                        {/* Open Position Progress */}
+                        <div className="bg-gray-50 rounded-lg p-3">
+                          <div className="flex justify-between items-center mb-2">
+                            <div className="text-xs font-medium text-gray-700">Open Progress</div>
+                            {progressData && (
+                              <div className="text-[11px] text-gray-600">
+                                <span className="font-semibold">{progressData.total}</span> positions (
+                                {progressData.percentage}%)
+                              </div>
+                            )}
+                          </div>
+                          {progressData ? (
+                            <div className="space-y-1.5">
+                              {Object.entries(progressData.statusCounts).map(
+                                ([status, count]: [string, any]) => (
+                                  <div key={status} className="flex items-center">
+                                    <div className="w-24 text-[10px] text-gray-600 truncate mr-2">
+                                      {status}
+                                    </div>
+                                    <button
+                                      className="flex-1 bg-gray-200 rounded-full h-1.5 group"
+                                      onClick={() => {
+                                        const items = filteredPositions
+                                          .filter(
+                                            (j: any) =>
+                                              (j.areaDetail || j.area || j.location || 'Unknown') ===
+                                              progressData.areaDetail
+                                          )
+                                          .filter(
+                                            (j: any) =>
+                                              (j.currentStatus || j.status || 'Raise FPTK') === status
+                                          )
+                                          .map((j: any) => ({
+                                            id: j.id,
+                                            kind: 'fptk',
+                                            title: j.title || j.position || 'Unknown Position',
+                                            subtitle: `${j.department || 'N/A'} • ${j.location || 'N/A'}`,
+                                            meta: j.currentStatus || j.status || 'N/A',
+                                          }))
+                                        setDetailModal({
+                                          title: `${status} • ${progressData.areaDetail}`,
+                                          items,
+                                        })
+                                      }}
+                                      title={`${status}: ${count} positions`}
+                                    >
+                                      <div
+                                        className="bg-blue-500 h-1.5 rounded-full transition-all duration-300 group-hover:bg-blue-600"
+                                        style={{
+                                          width: `${(count / progressData.total) * 100}%`,
+                                        }}
+                                      ></div>
+                                    </button>
+                                    <button
+                                      className="w-6 text-[10px] text-gray-600 text-right ml-2 hover:underline"
+                                      onClick={() => {
+                                        const items = filteredPositions
+                                          .filter(
+                                            (j: any) =>
+                                              (j.areaDetail || j.area || j.location || 'Unknown') ===
+                                              progressData.areaDetail
+                                          )
+                                          .filter(
+                                            (j: any) =>
+                                              (j.currentStatus || j.status || 'Raise FPTK') === status
+                                          )
+                                          .map((j: any) => ({
+                                            id: j.id,
+                                            kind: 'fptk',
+                                            title: j.title || j.position || 'Unknown Position',
+                                            subtitle: `${j.department || 'N/A'} • ${j.location || 'N/A'}`,
+                                            meta: j.currentStatus || j.status || 'N/A',
+                                          }))
+                                        setDetailModal({
+                                          title: `${status} • ${progressData.areaDetail}`,
+                                          items,
+                                        })
+                                      }}
+                                    >
+                                      {count}
+                                    </button>
+                                  </div>
+                                )
+                              )}
+                            </div>
+                          ) : (
+                            <div className="text-xs text-gray-400">No progress data.</div>
+                          )}
+                        </div>
+
+                        {/* SLA by Location */}
+                        <div className="bg-gray-50 rounded-lg p-3">
+                          <div className="flex justify-between items-center mb-2">
+                            <div className="text-xs font-medium text-gray-700">SLA</div>
+                            {slaData && (
+                              <div className="text-[11px] text-gray-600">
+                                <span className="font-semibold">{slaData.total}</span> positions
+                              </div>
+                            )}
+                          </div>
+                          {slaData ? (
+                            <div className="space-y-1.5">
+                              {Object.entries(slaData.buckets).map(
+                                ([bucket, count]: [string, any]) => (
+                                  <div key={bucket} className="flex items-center">
+                                    <div className="w-28 text-[10px] text-gray-600 truncate mr-2">
+                                      {bucket}
+                                    </div>
+                                    <button
+                                      className="flex-1 bg-gray-200 rounded-full h-1.5 group"
+                                      onClick={() => {
+                                        const bucketMatch = (position: any) => {
+                                          const nowDate = new Date()
+                                          const dateValue =
+                                            position?.fptkReceiveDate || position?.requestDate
+                                          if (!dateValue) return false
+                                          const d = new Date(dateValue)
+                                          if (isNaN(d.getTime())) return false
+                                          const diffDays = businessDaysDiffIndonesia(d, nowDate)
+                                          if (bucket === '0-30 Days') return diffDays <= 30
+                                          if (bucket === '31-60 Days')
+                                            return diffDays > 30 && diffDays <= 60
+                                          if (bucket === '61-90 Days')
+                                            return diffDays > 60 && diffDays <= 90
+                                          return diffDays > 90
+                                        }
+                                        const items = filteredPositions
+                                          .filter(
+                                            (j: any) =>
+                                              (j.areaDetail || j.area || j.location || 'Unknown') ===
+                                              slaData.areaDetail
+                                          )
+                                          .filter((j: any) => bucketMatch(j))
+                                          .map((j: any) => ({
+                                            id: j.id,
+                                            kind: 'fptk',
+                                            title: j.title || j.position || 'Unknown Position',
+                                            subtitle: `${j.department || 'N/A'} • ${j.location || 'N/A'}`,
+                                            meta: `FPTK Received: ${
+                                              j.fptkReceiveDate || j.requestDate
+                                                ? new Date(
+                                                    j.fptkReceiveDate || j.requestDate
+                                                  ).toLocaleDateString()
+                                                : '-'
+                                            }`,
+                                          }))
+                                        setDetailModal({
+                                          title: `${bucket} • ${slaData.areaDetail}`,
+                                          items,
+                                        })
+                                      }}
+                                      title={`${bucket}: ${count} positions`}
+                                    >
+                                      <div
+                                        className="bg-purple-500 h-1.5 rounded-full transition-all duration-300 group-hover:bg-purple-600"
+                                        style={{
+                                          width: `${
+                                            slaData.total > 0
+                                              ? (count / slaData.total) * 100
+                                              : 0
+                                          }%`,
+                                        }}
+                                      ></div>
+                                    </button>
+                                    <button
+                                      className="w-6 text-[10px] text-gray-600 text-right ml-2 hover:underline"
+                                      onClick={() => {
+                                        const bucketMatch = (position: any) => {
+                                          const nowDate = new Date()
+                                          const dateValue =
+                                            position?.fptkReceiveDate || position?.requestDate
+                                          if (!dateValue) return false
+                                          const d = new Date(dateValue)
+                                          if (isNaN(d.getTime())) return false
+                                          const diffDays = businessDaysDiffIndonesia(d, nowDate)
+                                          if (bucket === '0-30 Days') return diffDays <= 30
+                                          if (bucket === '31-60 Days')
+                                            return diffDays > 30 && diffDays <= 60
+                                          if (bucket === '61-90 Days')
+                                            return diffDays > 60 && diffDays <= 90
+                                          return diffDays > 90
+                                        }
+                                        const items = filteredPositions
+                                          .filter(
+                                            (j: any) =>
+                                              (j.areaDetail || j.area || j.location || 'Unknown') ===
+                                              slaData.areaDetail
+                                          )
+                                          .filter((j: any) => bucketMatch(j))
+                                          .map((j: any) => ({
+                                            id: j.id,
+                                            kind: 'fptk',
+                                            title: j.title || j.position || 'Unknown Position',
+                                            subtitle: `${j.department || 'N/A'} • ${j.location || 'N/A'}`,
+                                            meta: `FPTK Received: ${
+                                              j.fptkReceiveDate || j.requestDate
+                                                ? new Date(
+                                                    j.fptkReceiveDate || j.requestDate
+                                                  ).toLocaleDateString()
+                                                : '-'
+                                            }`,
+                                          }))
+                                        setDetailModal({
+                                          title: `${bucket} • ${slaData.areaDetail}`,
+                                          items,
+                                        })
+                                      }}
+                                    >
+                                      {count}
+                                    </button>
+                                  </div>
+                                )
+                              )}
+                            </div>
+                          ) : (
+                            <div className="text-xs text-gray-400">No SLA data.</div>
+                          )}
                         </div>
                       </div>
-                    ))}
-                  </div>
-                ) : (
-                  <div className="text-sm text-gray-500">No SLA data available.</div>
-                )}
+                    </div>
+                  )
+                })}
               </div>
-            </div>
+            )}
           </div>
         </div>
 
@@ -1135,29 +1467,79 @@ useEffect(() => {
       </div>
       {/* Details Modal */}
       {detailModal && (
-        <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center" onClick={() => setDetailModal(null)}>
+        <div
+          className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center"
+          onClick={() => {
+            setDetailModal(null)
+            setDetailQuery('')
+          }}
+        >
           <div className="bg-white rounded-lg shadow-xl max-w-2xl w-full mx-4" onClick={(e) => e.stopPropagation()}>
             <div className="px-6 py-4 border-b flex items-center justify-between">
               <h2 className="text-lg font-semibold text-gray-900">{detailModal.title}</h2>
-              <button className="text-gray-500 hover:text-gray-700" onClick={() => setDetailModal(null)}>✕</button>
+              <button
+                className="text-gray-500 hover:text-gray-700"
+                onClick={() => {
+                  setDetailModal(null)
+                  setDetailQuery('')
+                }}
+              >
+                ✕
+              </button>
             </div>
             <div className="max-h-[60vh] overflow-auto px-6 py-4">
+              <div className="mb-3">
+                <input
+                  value={detailQuery}
+                  onChange={(e) => setDetailQuery(e.target.value)}
+                  placeholder="Search..."
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                />
+              </div>
+
               {detailModal.items.length > 0 ? (
                 <ul className="divide-y">
-                  {detailModal.items.map((it, idx) => (
-                    <li key={idx} className="py-3">
-                      <div className="text-sm font-medium text-gray-900">{it.title}</div>
-                      {it.subtitle && <div className="text-sm text-gray-600">{it.subtitle}</div>}
-                      {it.meta && <div className="text-xs text-gray-500 mt-1">{it.meta}</div>}
-                    </li>
-                  ))}
+                  {detailModal.items
+                    .filter((it: DashboardListItem) => matchesQuery(it, detailQuery))
+                    .map((it: DashboardListItem, idx: number) => {
+                      const clickable = !!it.id && (it.kind === 'fptk' || it.kind === 'candidate')
+                      const onClick = () => {
+                        if (it.kind === 'fptk') return openFptkEdit(it.id)
+                        if (it.kind === 'candidate') return openCandidateView(it.id)
+                      }
+                      return (
+                        <li key={it.id || idx} className="py-3">
+                          {clickable ? (
+                            <button className="w-full text-left" onClick={onClick}>
+                              <div className="text-sm font-medium text-indigo-700 hover:underline">{it.title}</div>
+                              {it.subtitle && <div className="text-sm text-gray-600">{it.subtitle}</div>}
+                              {it.meta && <div className="text-xs text-gray-500 mt-1">{it.meta}</div>}
+                            </button>
+                          ) : (
+                            <>
+                              <div className="text-sm font-medium text-gray-900">{it.title}</div>
+                              {it.subtitle && <div className="text-sm text-gray-600">{it.subtitle}</div>}
+                              {it.meta && <div className="text-xs text-gray-500 mt-1">{it.meta}</div>}
+                            </>
+                          )}
+                        </li>
+                      )
+                    })}
                 </ul>
               ) : (
                 <div className="text-sm text-gray-500">No data available.</div>
               )}
             </div>
             <div className="px-6 py-4 border-t flex justify-end">
-              <button className="px-4 py-2 text-sm rounded-md border text-gray-700 bg-white hover:bg-gray-50" onClick={() => setDetailModal(null)}>Close</button>
+              <button
+                className="px-4 py-2 text-sm rounded-md border text-gray-700 bg-white hover:bg-gray-50"
+                onClick={() => {
+                  setDetailModal(null)
+                  setDetailQuery('')
+                }}
+              >
+                Close
+              </button>
             </div>
           </div>
         </div>

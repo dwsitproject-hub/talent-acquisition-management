@@ -118,6 +118,62 @@ async function getDashboardStats(user = null) {
       }),
     ]);
 
+    // Calculate position counts based on currentStatus
+    // Open Position: NOT in ["Cancel", "Hold", "Signing", "On Boarding"]
+    // Closed Position: in ["Cancel", "Signing", "On Boarding"]
+    // Hold Position: "Hold"
+    const allFPTKsForCounts = await prisma.fPTK.findMany({
+      where: fptkWhere,
+      select: {
+        currentStatus: true,
+      },
+    });
+
+    // Debug: Log status distribution
+    const statusCounts = {};
+    allFPTKsForCounts.forEach((fptk) => {
+      const status = (fptk.currentStatus || '').trim();
+      statusCounts[status] = (statusCounts[status] || 0) + 1;
+    });
+    logger.info('Dashboard: FPTK status distribution:', JSON.stringify(statusCounts));
+
+    const openPositionsCount = allFPTKsForCounts.filter((fptk) => {
+      const status = (fptk.currentStatus || '').trim();
+      if (!status) return true; // Count null/empty as open
+      const statusLower = status.toLowerCase();
+      return (
+        statusLower !== 'cancel' &&
+        statusLower !== 'cancelled' &&
+        statusLower !== 'hold' &&
+        statusLower !== 'signing' &&
+        statusLower !== 'on boarding' &&
+        statusLower !== 'boarding'
+      );
+    }).length;
+
+    const closedPositionsCount = allFPTKsForCounts.filter((fptk) => {
+      const status = (fptk.currentStatus || '').trim();
+      if (!status) return false; // Don't count null/empty as closed
+      const statusLower = status.toLowerCase();
+      return (
+        statusLower === 'cancel' ||
+        statusLower === 'cancelled' ||
+        statusLower === 'signing' ||
+        statusLower === 'on boarding' ||
+        statusLower === 'boarding'
+      );
+    }).length;
+
+    const holdPositionsCount = allFPTKsForCounts.filter((fptk) => {
+      const status = (fptk.currentStatus || '').trim();
+      if (!status) return false; // Don't count null/empty as hold
+      const statusLower = status.toLowerCase();
+      return statusLower === 'hold';
+    }).length;
+
+    logger.info(`Dashboard: Position counts - Open: ${openPositionsCount}, Closed: ${closedPositionsCount}, Hold: ${holdPositionsCount}`);
+    logger.info(`Dashboard: allFPTKsForCounts.length: ${allFPTKsForCounts.length}, fptkWhere keys: ${Object.keys(fptkWhere).join(', ')}`);
+
     // Calculate interviews this week
     const now = new Date();
     const dayOfWeek = now.getDay();
@@ -337,7 +393,9 @@ async function getDashboardStats(user = null) {
       totalCandidates,
       totalFPTKs,
       activeFPTKs,
-      openPositions: publishedFPTKs,
+      openPositions: openPositionsCount,
+      closedPositions: closedPositionsCount,
+      holdPositions: holdPositionsCount,
       totalApplications,
       activeApplications,
       pendingInterviews,
@@ -349,6 +407,9 @@ async function getDashboardStats(user = null) {
       slaByLocation,
       recentActivity,
     };
+
+    logger.info(`Dashboard: Result object keys: ${Object.keys(result).join(', ')}`);
+    logger.info(`Dashboard: Result closedPositions: ${result.closedPositions}, holdPositions: ${result.holdPositions}`);
 
     // Log sample data for debugging
     if (positionStatusByLocation.length > 0) {

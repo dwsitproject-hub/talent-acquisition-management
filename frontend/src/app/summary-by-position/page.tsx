@@ -1,8 +1,10 @@
 "use client"
 
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import Layout from '@/components/Layout/Layout'
 import { FPTKAPI, ApplicationsAPI } from '@/lib/api'
+import MultiSelectDropdown from '@/components/MultiSelectDropdown'
+import { getSlaBucketIndonesiaWorkingDays } from '@/utils/indoBusinessDays'
 
 interface StatusCounts {
   [status: string]: number
@@ -11,6 +13,7 @@ interface StatusCounts {
 interface SummaryRow {
   priority: string
   division: string
+  location: string
   section: string
   position: string
   statusFktk: string
@@ -25,20 +28,26 @@ const DEFAULT_STATUSES: string[] = [
   'Shortlisted',
   'Interview Scheduled',
   'Interviewed',
-  'Offer Extended',
+  'Assessment',
   'Offer Accepted',
-  'Rejected',
+  'MCU',
+  'On Boarding',
+  'Offer Rejected',
+  'Offer Accepted',
+  'Rejected (Failed Interview / Assessment)',
   'Withdrawn'
 ]
 
 export default function SummaryByPositionPage() {
   const [rows, setRows] = useState<SummaryRow[]>([])
   const [allStatuses, setAllStatuses] = useState<string[]>([])
-  const [priorityFilter, setPriorityFilter] = useState<string>('All')
-  const [divisionFilter, setDivisionFilter] = useState<string>('All')
+  const [priorityFilter, setPriorityFilter] = useState<string[]>([])
+  const [divisionFilter, setDivisionFilter] = useState<string[]>([])
+  const [locationFilter, setLocationFilter] = useState<string[]>([])
   const [sortKey, setSortKey] = useState<keyof SummaryRow>('position')
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('asc')
   const [divisions, setDivisions] = useState<string[]>([])
+  const [locations, setLocations] = useState<string[]>([])
 
   useEffect(() => {
     loadSummaryData()
@@ -48,24 +57,24 @@ export default function SummaryByPositionPage() {
   const mapApplicationStatusToUi = (status: string): string => {
     const statusMap: Record<string, string> = {
       'SUBMITTED': 'Applied',
-      'SCREENING': 'Under Review',
+      'SCREENING': 'Shortlisted',
       'PSYCHOMETRIC_TEST': 'Under Review',
-      'TECHNICAL_TEST': 'Under Review',
+      'TECHNICAL_TEST': 'Assessment',
       'INTERVIEW_SCHEDULED': 'Interview Scheduled',
       'INTERVIEW_COMPLETED': 'Interviewed',
       'DOCUMENT_VERIFICATION': 'Under Review',
-      'OFFER_PROPOSED': 'Offer Extended',
-      'OFFER_APPROVED': 'Offer Extended',
-      'OFFER_SENT': 'Offer Extended',
+      'OFFER_PROPOSED': 'Under Review',
+      'OFFER_APPROVED': 'Under Review',
+      'OFFER_SENT': 'Under Review',
       'OFFER_ACCEPTED': 'Offer Accepted',
-      'OFFER_REJECTED': 'Rejected',
+      'OFFER_REJECTED': 'Offer Rejected',
       'MEDICAL_CHECKUP_SCHEDULED': 'Under Review',
-      'MEDICAL_CHECKUP_COMPLETED': 'Under Review',
+      'MEDICAL_CHECKUP_COMPLETED': 'MCU',
       'CONTRACT_SENT': 'Offer Accepted',
       'CONTRACT_SIGNED': 'Offer Accepted',
-      'ONBOARDING': 'Offer Accepted',
+      'ONBOARDING': 'On Boarding',
       'HIRED': 'Offer Accepted',
-      'REJECTED': 'Rejected',
+      'REJECTED': 'Rejected (Failed Interview / Assessment)',
       'WITHDRAWN': 'Withdrawn',
     }
     return statusMap[status] || 'Applied'
@@ -125,20 +134,21 @@ export default function SummaryByPositionPage() {
           }
         })
 
-        // SLA bucket based on FPTK Receive Date
-        const receiveDate = job.fptkReceiveDate ? new Date(job.fptkReceiveDate) : null
+        // SLA bucket based on FPTK Receive Date (fallback to requestDate if receiveDate not available)
+        // Use same logic as dashboard: fptkReceiveDate || requestDate
+        const referenceDate = job.fptkReceiveDate || job.requestDate || job.createdAt
         let slaBucket = '-'
-        if (receiveDate && !isNaN(receiveDate.getTime())) {
-          const diffDays = Math.floor((new Date().getTime() - receiveDate.getTime()) / (1000 * 60 * 60 * 24))
-          if (diffDays <= 30) slaBucket = '0-30 Days'
-          else if (diffDays <= 60) slaBucket = '31-60 Days'
-          else if (diffDays <= 90) slaBucket = '61-90 Days'
-          else slaBucket = 'Above 91 Days'
+        if (referenceDate) {
+          const dateObj = new Date(referenceDate)
+          if (!isNaN(dateObj.getTime())) {
+            slaBucket = getSlaBucketIndonesiaWorkingDays(dateObj, new Date())
+          }
         }
 
         return {
           priority: job.priority || job.urgentNormal || '—',
           division: job.department || job.division || '-',
+          location: job.areaDetail || job.area || job.location || '-',
           section: job.section || '-',
           position: job.positionTitle || job.position || job.title || '-',
           statusFktk: job.statusFktk || '-',
@@ -150,22 +160,56 @@ export default function SummaryByPositionPage() {
 
       setAllStatuses([...DEFAULT_STATUSES])
       setRows(result)
-      setDivisions(['All', ...Array.from(new Set(result.map(r => r.division))).filter(Boolean)])
+      setDivisions(Array.from(new Set(result.map((r) => r.division))).filter(Boolean).sort())
+      setLocations(Array.from(new Set(result.map((r) => r.location))).filter(Boolean).sort())
     } catch (error: any) {
       console.error('Error loading summary data:', error)
       alert('Failed to load summary data. Please try again.')
       setRows([])
       setAllStatuses([...DEFAULT_STATUSES])
-      setDivisions(['All'])
+      setDivisions([])
+      setLocations([])
     }
   }
 
-  const priorities = ['All', 'P0', 'P1', 'P2']
+  const priorities = ['P0', 'P1', 'P2']
 
-  const filteredRows = rows.filter(r => (
-    (priorityFilter === 'All' || r.priority === priorityFilter) &&
-    (divisionFilter === 'All' || r.division === divisionFilter)
-  ))
+  const filteredRows = rows.filter((r) => {
+    const priorityOk = priorityFilter.length === 0 || priorityFilter.includes(r.priority)
+    const divisionOk = divisionFilter.length === 0 || divisionFilter.includes(r.division)
+    const locationOk = locationFilter.length === 0 || locationFilter.includes(r.location)
+    return priorityOk && divisionOk && locationOk
+  })
+
+  const isClosedPosition = (statusFktk: string) => {
+    const s = (statusFktk || '').toString().trim().toLowerCase()
+    return (
+      s.includes('cancel') ||
+      s.includes('on boarding') ||
+      s.includes('onboarding') ||
+      s.includes('boarding') ||
+      s.includes('signing')
+    )
+  }
+
+  const openPositionCount = filteredRows.filter((r) => !isClosedPosition(r.statusFktk)).length
+  const closedPositionCount = filteredRows.filter((r) => isClosedPosition(r.statusFktk)).length
+
+  const slaCounts = useMemo(() => {
+    const counts = {
+      '0-30 Days': 0,
+      '31-60 Days': 0,
+      '61-90 Days': 0,
+      'Above 91 Days': 0,
+    }
+    filteredRows.forEach((r) => {
+      if (r.sla in counts) {
+        // @ts-expect-error index
+        counts[r.sla] += 1
+      }
+    })
+    return counts
+  }, [filteredRows])
 
   const sortedRows = [...filteredRows].sort((a, b) => {
     const dir = sortDir === 'asc' ? 1 : -1
@@ -201,29 +245,58 @@ export default function SummaryByPositionPage() {
 
         {/* Filters */}
         <div className="bg-white shadow rounded-lg p-4 grid grid-cols-1 sm:grid-cols-3 gap-4">
-          <div>
-            <label className="block text-xs font-medium text-gray-500 mb-1">Priority</label>
-            <select
-              className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm"
-              value={priorityFilter}
-              onChange={(e) => setPriorityFilter(e.target.value)}
-            >
-              {priorities.map(p => (
-                <option key={p} value={p}>{p}</option>
-              ))}
-            </select>
+          <MultiSelectDropdown
+            label="Priority"
+            options={priorities}
+            value={priorityFilter}
+            onChange={setPriorityFilter}
+            placeholder="All priorities"
+            searchPlaceholder="Search priority..."
+          />
+          <MultiSelectDropdown
+            label="Division"
+            options={divisions}
+            value={divisionFilter}
+            onChange={setDivisionFilter}
+            placeholder="All divisions"
+            searchPlaceholder="Type division..."
+          />
+          <MultiSelectDropdown
+            label="Location"
+            options={locations}
+            value={locationFilter}
+            onChange={setLocationFilter}
+            placeholder="All locations"
+            searchPlaceholder="Type location..."
+          />
+        </div>
+
+        {/* Open / Closed cards */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
+          <div className="bg-white shadow rounded-lg px-4 py-5 sm:px-6">
+            <div className="text-sm font-medium text-gray-500">Open Position</div>
+            <div className="mt-2 text-3xl font-semibold text-gray-900">{openPositionCount}</div>
+            <div className="mt-1 text-xs text-gray-400">Follows active filters</div>
           </div>
-          <div>
-            <label className="block text-xs font-medium text-gray-500 mb-1">Division</label>
-            <select
-              className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm"
-              value={divisionFilter}
-              onChange={(e) => setDivisionFilter(e.target.value)}
-            >
-              {divisions.map(d => (
-                <option key={d} value={d}>{d}</option>
-              ))}
-            </select>
+          <div className="bg-white shadow rounded-lg px-4 py-5 sm:px-6">
+            <div className="text-sm font-medium text-gray-500">Closed Position</div>
+            <div className="mt-2 text-3xl font-semibold text-gray-900">{closedPositionCount}</div>
+            <div className="mt-1 text-xs text-gray-400">Follows active filters</div>
+          </div>
+          <div className="bg-white shadow rounded-lg px-4 py-5 sm:px-6">
+            <div className="text-sm font-medium text-gray-500">SLA 0-30 Days</div>
+            <div className="mt-2 text-3xl font-semibold text-gray-900">{slaCounts['0-30 Days']}</div>
+            <div className="mt-1 text-xs text-gray-400">Working days (ID) • filtered</div>
+          </div>
+          <div className="bg-white shadow rounded-lg px-4 py-5 sm:px-6">
+            <div className="text-sm font-medium text-gray-500">SLA 31-60 Days</div>
+            <div className="mt-2 text-3xl font-semibold text-gray-900">{slaCounts['31-60 Days']}</div>
+            <div className="mt-1 text-xs text-gray-400">Working days (ID) • filtered</div>
+          </div>
+          <div className="bg-white shadow rounded-lg px-4 py-5 sm:px-6">
+            <div className="text-sm font-medium text-gray-500">SLA Above 91 Days</div>
+            <div className="mt-2 text-3xl font-semibold text-gray-900">{slaCounts['Above 91 Days']}</div>
+            <div className="mt-1 text-xs text-gray-400">Working days (ID) • filtered</div>
           </div>
         </div>
 
@@ -234,6 +307,7 @@ export default function SummaryByPositionPage() {
                 <tr>
                   <th onClick={() => handleSort('priority')} className="cursor-pointer px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Priority {sortIndicator('priority')}</th>
                   <th onClick={() => handleSort('division')} className="cursor-pointer px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Division {sortIndicator('division')}</th>
+                  <th onClick={() => handleSort('location')} className="cursor-pointer px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Location {sortIndicator('location')}</th>
                   <th onClick={() => handleSort('section')} className="cursor-pointer px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Section {sortIndicator('section')}</th>
                   <th onClick={() => handleSort('position')} className="cursor-pointer px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Position {sortIndicator('position')}</th>
                   <th onClick={() => handleSort('statusFktk')} className="cursor-pointer px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status FKTK {sortIndicator('statusFktk')}</th>
@@ -249,6 +323,7 @@ export default function SummaryByPositionPage() {
                   <tr key={idx}>
                     <td className="px-4 py-2 whitespace-nowrap text-sm text-gray-900">{row.priority}</td>
                     <td className="px-4 py-2 whitespace-nowrap text-sm text-gray-900">{row.division}</td>
+                    <td className="px-4 py-2 whitespace-nowrap text-sm text-gray-900">{row.location}</td>
                     <td className="px-4 py-2 whitespace-nowrap text-sm text-gray-900">{row.section}</td>
                     <td className="px-4 py-2 whitespace-nowrap text-sm text-gray-900">{row.position}</td>
                     <td className="px-4 py-2 whitespace-nowrap text-sm text-gray-900">{row.statusFktk}</td>
@@ -265,7 +340,7 @@ export default function SummaryByPositionPage() {
                 ))}
                 {rows.length === 0 && (
                   <tr>
-                    <td colSpan={7 + allStatuses.length} className="px-4 py-6 text-center text-sm text-gray-500">
+                    <td colSpan={8 + allStatuses.length} className="px-4 py-6 text-center text-sm text-gray-500">
                       No data available. Create some positions and applied candidates to see the summary.
                     </td>
                   </tr>

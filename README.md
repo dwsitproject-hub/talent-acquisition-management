@@ -67,6 +67,19 @@ The KPN Talent Acquisition System is an enterprise-grade, production-ready recru
   - Shows Remark field from the Open Position
   - Shows SLA bucket per position based on Request Date: 0-30, 31-60, 61-90, Above 91 days
 - ✅ Remark field added to Open Position (Create, Edit, View) with 2048 char limit and persistence
+- ✅ Applied candidate visibility aligned between **View** and **Edit Position**:
+  - Edit dialog now loads applied candidates using the same matching logic as the View dialog
+  - Supports legacy `positionAppliedFor` data stored both directly and inside `languages.positionAppliedFor`
+  - Uses paginated candidate loading (up to API limit) so all relevant candidates are included
+- ✅ Interview scheduling UX improvements in **Edit Position**:
+  - `Interviewer` field now has autocomplete suggestions powered by the **Team** directory
+  - Suggestions match first name, last name, full name, or email
+  - If no match is found, users can still enter and save free‑text interviewer names
+- ✅ Production database backup automation:
+  - Daily automated backups at **7:00 PM GMT+7 (WIB) / 12:00 UTC**
+  - Centralized backup directory: `/opt/backups/tas-production`
+  - Retention policy: backups older than **14 days** are automatically deleted
+  - Cross‑platform restore flow documented for Linux servers and Windows laptops (PowerShell + WSL)
 
 ### User Roles
 1. **Hiring Manager** - FPTK upload, requisition monitoring

@@ -13,6 +13,9 @@ git pull origin main
 docker compose -f docker-compose.network.yml -f /tmp/docker-compose.override.yml -p tas-production --env-file .env.production up -d --build backend
 
 Frontend
+
+
+
 cd /opt/tas-production
 git pull origin main
 

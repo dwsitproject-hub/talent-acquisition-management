@@ -24,6 +24,7 @@ function getApiBaseUrl(): string {
 // We'll set the baseURL dynamically on each request to ensure it's always current
 export const api = axios.create({
   timeout: 10000,
+  withCredentials: true,
   headers: {
     'Content-Type': 'application/json',
   },
@@ -74,28 +75,48 @@ api.interceptors.request.use(
 // Response interceptor to handle errors
 api.interceptors.response.use(
   (response) => response,
-  (error) => {
-    if (error.response?.status === 401) {
-      // Handle unauthorized access - only redirect if not already on login page
+  async (error) => {
+    const status = error.response?.status
+    const originalRequest = error.config
+
+    // Avoid infinite loops
+    if (!originalRequest || originalRequest.__isRetryRequest) {
+      return Promise.reject(error)
+    }
+
+    // If access token expired, try refresh once then retry original request
+    if (status === 401 && typeof window !== 'undefined') {
       try {
-        // Only access localStorage if in browser environment
-        if (typeof window !== 'undefined') {
+        ;(originalRequest as any).__isRetryRequest = true
+
+        const refreshRes = await api.post('/auth/refresh', {})
+        const newAccessToken = refreshRes?.data?.data?.accessToken
+        if (newAccessToken) {
           try {
-            localStorage.removeItem('authToken')
-            localStorage.removeItem('refreshToken')
+            localStorage.setItem('authToken', newAccessToken)
           } catch (e) {
-            // Ignore localStorage errors
-            console.warn('Could not clear auth tokens during 401:', e)
+            console.warn('Could not persist refreshed access token:', e)
           }
-          if (window.location.pathname !== '/login') {
-            window.location.href = '/login'
-          }
+          originalRequest.headers = originalRequest.headers || {}
+          originalRequest.headers.Authorization = `Bearer ${newAccessToken}`
+          return api.request(originalRequest)
         }
+      } catch (refreshErr) {
+        // fallthrough to logout
+      }
+
+      // Refresh failed => logout
+      try {
+        localStorage.removeItem('authToken')
+        localStorage.removeItem('refreshToken')
       } catch (e) {
-        // Ignore errors during cleanup
-        console.warn('Error during 401 cleanup:', e)
+        console.warn('Could not clear auth tokens during 401:', e)
+      }
+      if (window.location.pathname !== '/login') {
+        window.location.href = '/login'
       }
     }
+
     return Promise.reject(error)
   }
 )
@@ -122,6 +143,21 @@ export const AdminUsersAPI = {
   },
   async resetPassword(id: string, newPassword: string) {
     const res = await api.post(`/admin/users/${id}/reset-password`, { newPassword })
+    return res.data
+  },
+  async downloadTemplate(format: 'csv' | 'xlsx' = 'xlsx') {
+    const res = await api.get('/admin/users/bulk-template', {
+      params: { format },
+      responseType: 'blob',
+    })
+    return res.data as Blob
+  },
+  async bulkUpload(file: File) {
+    const formData = new FormData()
+    formData.append('file', file)
+    const res = await api.post('/admin/users/bulk-upload', formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    })
     return res.data
   },
 }

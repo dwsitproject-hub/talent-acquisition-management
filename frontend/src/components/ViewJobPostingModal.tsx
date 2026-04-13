@@ -46,24 +46,24 @@ export default function ViewJobPostingModal({ isOpen, onClose, jobPosting, onSta
     const lookup: Record<string, string> = {
       DRAFT: 'Applied',
       SUBMITTED: 'Applied',
-      SCREENING: 'Under Review',
+      SCREENING: 'Shortlisted',
       PSYCHOMETRIC_TEST: 'Under Review',
-      TECHNICAL_TEST: 'Technical Test',
+      TECHNICAL_TEST: 'Assessment',
       INTERVIEW_SCHEDULED: 'Interview Scheduled',
       INTERVIEW_COMPLETED: 'Interviewed',
       DOCUMENT_VERIFICATION: 'Document Verification',
-      OFFER_PROPOSED: 'Offer Extended',
+      OFFER_PROPOSED: 'Offer Proposed',
       OFFER_APPROVED: 'Offer Approved',
       OFFER_SENT: 'Offer Sent',
       OFFER_ACCEPTED: 'Offer Accepted',
-      OFFER_REJECTED: 'Offer Declined',
+      OFFER_REJECTED: 'Offer Rejected',
       MEDICAL_CHECKUP_SCHEDULED: 'Medical Checkup Scheduled',
-      MEDICAL_CHECKUP_COMPLETED: 'Medical Checkup Completed',
+      MEDICAL_CHECKUP_COMPLETED: 'MCU',
       CONTRACT_SENT: 'Contract Sent',
       CONTRACT_SIGNED: 'Contract Signed',
       ONBOARDING: 'On Boarding',
       HIRED: 'Hired',
-      REJECTED: 'Rejected',
+      REJECTED: 'Rejected (Failed Interview / Assessment)',
       WITHDRAWN: 'Withdrawn',
     }
     if (lookup[normalized]) return lookup[normalized]
@@ -76,20 +76,152 @@ export default function ViewJobPostingModal({ isOpen, onClose, jobPosting, onSta
 
   // Load applied candidates when job posting changes
   useEffect(() => {
-    if (jobPosting && Array.isArray((jobPosting as any).appliedCandidates)) {
-      const normalized = (jobPosting as any).appliedCandidates.map((candidate: any) => ({
-        ...candidate,
-        status: candidate.status || mapAppliedStatusLabel(candidate.backendStatus),
-        backendStatus: candidate.backendStatus || candidate.status,
-        skills: candidate.skills || [],
-        interviews: candidate.interviews || [], // Preserve interview data
-        rejectedDate: candidate.rejectedDate || candidate.rejectedAt || null,
-        withdrawDate: candidate.withdrawDate || candidate.withdrawnAt || null,
-      }))
-      setAppliedCandidates(normalized)
-    } else {
-      setAppliedCandidates([])
+    const loadAppliedCandidates = async () => {
+      if (!jobPosting) {
+        setAppliedCandidates([])
+        return
+      }
+
+      // First, use applications from the FPTK (proper Application records)
+      let candidates: any[] = []
+      
+      if (Array.isArray((jobPosting as any).appliedCandidates)) {
+        candidates = (jobPosting as any).appliedCandidates.map((candidate: any) => ({
+          ...candidate,
+          status: candidate.status || mapAppliedStatusLabel(candidate.backendStatus),
+          backendStatus: candidate.backendStatus || candidate.status,
+          skills: candidate.skills || [],
+          interviews: candidate.interviews || [],
+          rejectedDate: candidate.rejectedDate || candidate.rejectedAt || null,
+          withdrawDate: candidate.withdrawDate || candidate.withdrawnAt || null,
+        }))
+      }
+
+      // If no applications found, try to find candidates by positionAppliedFor (legacy fallback)
+      if (candidates.length === 0 && jobPosting.title) {
+        try {
+          console.log('🔍 No applications found, searching candidates by positionAppliedFor for:', jobPosting.title)
+          
+          // Load candidates with pagination (API max limit is 100)
+          let allCandidates: any[] = []
+          let page = 1
+          const limit = 100
+          let hasMore = true
+          
+          while (hasMore) {
+            const response = await CandidatesAPI.getAll({}, { page, limit })
+            const candidatesData = response.data || []
+            allCandidates = [...allCandidates, ...candidatesData]
+            
+            // Check if there are more pages
+            const totalPages = response.pagination?.totalPages || 1
+            hasMore = page < totalPages
+            page++
+            
+            // Safety limit to prevent infinite loops
+            if (page > 50) {
+              console.warn('⚠️ Reached maximum page limit (50). Some candidates may not be loaded.')
+              break
+            }
+          }
+          
+          console.log('📋 Total candidates loaded:', allCandidates.length)
+          
+          // Find candidates who have this position in their positionAppliedFor
+          const matchingCandidates = allCandidates.filter((candidate: any) => {
+            // Parse positionAppliedFor from different possible locations
+            let positionAppliedFor: string[] = []
+            
+            // Check direct field
+            if (candidate.positionAppliedFor !== undefined && candidate.positionAppliedFor !== null) {
+              positionAppliedFor = Array.isArray(candidate.positionAppliedFor) 
+                ? candidate.positionAppliedFor 
+                : [String(candidate.positionAppliedFor)]
+            }
+            
+            // Check languages field (where it's actually stored in backend)
+            if (positionAppliedFor.length === 0 && candidate.languages) {
+              const languagesData = typeof candidate.languages === 'string'
+                ? JSON.parse(candidate.languages || '{}')
+                : (candidate.languages || {})
+              
+              if (languagesData.positionAppliedFor) {
+                positionAppliedFor = Array.isArray(languagesData.positionAppliedFor)
+                  ? languagesData.positionAppliedFor
+                  : [String(languagesData.positionAppliedFor)]
+              }
+            }
+            
+            // Normalize position title for comparison
+            const positionTitle = (jobPosting.title || '').trim().toLowerCase()
+            const matches = positionAppliedFor.some((pos: string) => {
+              const normalizedPos = (pos || '').trim().toLowerCase()
+              const isMatch = normalizedPos === positionTitle
+              if (isMatch) {
+                console.log('✅ Match found:', pos, '===', jobPosting.title)
+              }
+              return isMatch
+            })
+            
+            if (matches) {
+              console.log('🎯 Candidate matched:', candidate.id, candidate.user?.firstName, candidate.user?.lastName, 'Positions:', positionAppliedFor)
+            }
+            
+            return matches
+          })
+          
+          console.log('📊 Matching candidates found:', matchingCandidates.length)
+
+          // Map to applied candidates format
+          candidates = matchingCandidates.map((candidate: any) => {
+            const user = candidate.user || {}
+            const formDataDiri = typeof candidate.formDataDiri === 'string' 
+              ? JSON.parse(candidate.formDataDiri || '{}') 
+              : (candidate.formDataDiri || {})
+            const languagesData = typeof candidate.languages === 'string'
+              ? JSON.parse(candidate.languages || '{}')
+              : (candidate.languages || {})
+
+            const fullName = [user.firstName, user.lastName].filter(Boolean).join(' ') ||
+              formDataDiri?.fullName || candidate.fullName || candidate.name ||
+              `Candidate ${candidate.id?.slice(0, 6) || ''}`
+
+            const email = user.email || candidate.email || formDataDiri?.email || ''
+            const skills = Array.isArray(candidate.skills)
+              ? candidate.skills
+              : Array.isArray(languagesData?.skills)
+                ? languagesData.skills
+                : []
+
+            return {
+              id: candidate.id,
+              candidateId: candidate.id,
+              fullName,
+              name: fullName,
+              email,
+              phone: user.phoneNumber || '',
+              status: 'Applied',
+              backendStatus: 'SUBMITTED',
+              appliedDate: candidate.createdAt || new Date().toISOString(),
+              rejectedDate: null,
+              withdrawDate: null,
+              source: 'Manual',
+              skills,
+              experience: languagesData?.yearsOfExperience || 0,
+              yearsOfExperience: languagesData?.yearsOfExperience || 0,
+              division: user.division || candidate.division || null,
+              interviews: [],
+            }
+          })
+        } catch (error) {
+          console.error('Error loading candidates by positionAppliedFor:', error)
+        }
+      }
+
+      setAppliedCandidates(candidates)
     }
+
+    loadAppliedCandidates()
   }, [jobPosting])
 
   if (!isOpen || !jobPosting) return null
@@ -278,7 +410,7 @@ export default function ViewJobPostingModal({ isOpen, onClose, jobPosting, onSta
                     color: '#3730a3',
                     margin: '4px 0 0 0'
                   }}>
-                    {(jobPosting as any).currentStatus || (jobPosting as any).status || 'Raise FPTK'}
+                    {(jobPosting as any).currentStatus || (jobPosting as any).status || 'Pending FKTK'}
                   </span>
                 </div>
                 {(jobPosting as any).typeGrade && (
@@ -439,18 +571,16 @@ export default function ViewJobPostingModal({ isOpen, onClose, jobPosting, onSta
               <div style={{ display: 'flex', alignItems: 'center', gap: '0', overflowX: 'auto', padding: '20px 0' }}>
                 {(() => {
                   const fixedMilestones = [
-                    'Raise FPTK',
-                    'CV Hunting (Sourcing Candidate)',
-                    'Piskotest & Technical Test',
-                    'Interview User',
-                    'Offering Process',
-                    'Medical Check Up (MCU)',
-                    'Signing',
-                    'On Boarding'
+                    'Pending FKTK',
+                    'Open',
+                    'Hold',
+                    'Re-Open',
+                    'Internal Movement',
+                    'Cancel'
                   ]
                   
                   const milestoneData = (jobPosting as any).milestones || []
-                  const currentStatus = (jobPosting as any).currentStatus || (jobPosting as any).status || 'Raise FPTK'
+                  const currentStatus = (jobPosting as any).currentStatus || (jobPosting as any).status || 'Pending FKTK'
                   const currentIndex = fixedMilestones.indexOf(currentStatus)
                   
                   return fixedMilestones.map((milestone, index) => {
@@ -510,7 +640,7 @@ export default function ViewJobPostingModal({ isOpen, onClose, jobPosting, onSta
                             color: isCompleted ? '#10b981' : isCurrent ? '#0ea5e9' : '#6b7280',
                             marginBottom: '2px'
                           }}>
-                            {index === fixedMilestones.length - 1 ? 'On Boarding' : milestone.split(' ')[0]}
+                            {milestone}
                           </div>
                           <div style={{
                             fontSize: '10px',
@@ -569,12 +699,12 @@ export default function ViewJobPostingModal({ isOpen, onClose, jobPosting, onSta
               {/* Milestone Details */}
               <div style={{ marginTop: '16px' }}>
                 <div style={{ fontSize: '14px', fontWeight: '500', color: '#374151', marginBottom: '8px' }}>
-                  Current Status: {(jobPosting as any).currentStatus || (jobPosting as any).status || 'Raise FPTK'}
+                  Current Status: {(jobPosting as any).currentStatus || (jobPosting as any).status || 'Pending FKTK'}
                 </div>
                 <div style={{ fontSize: '12px', color: '#6b7280' }}>
                   {(() => {
                     const milestoneData = (jobPosting as any).milestones || []
-                    const currentStatus = (jobPosting as any).currentStatus || (jobPosting as any).status || 'Raise FPTK'
+                    const currentStatus = (jobPosting as any).currentStatus || (jobPosting as any).status || 'Pending FKTK'
                     const currentMilestone = milestoneData.find((m: any) => m.status === currentStatus)
                     
                     if (currentMilestone) {
@@ -687,7 +817,7 @@ export default function ViewJobPostingModal({ isOpen, onClose, jobPosting, onSta
                           }}>
                             {statusLabel}
                           </span>
-                          {statusLabel === 'Rejected' && candidate.rejectedDate ? (
+                          {(statusLabel || '').toString().toLowerCase().startsWith('rejected') && candidate.rejectedDate ? (
                             <div style={{ marginTop: '6px', fontSize: '11px', color: '#b91c1c' }}>
                               Rejected Date: {formatDate(candidate.rejectedDate)}
                             </div>
@@ -721,7 +851,7 @@ export default function ViewJobPostingModal({ isOpen, onClose, jobPosting, onSta
                           }}>
                             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: isExpanded ? '8px' : '0' }}>
                               <div style={{ fontSize: '12px', fontWeight: '600', color: '#374151' }}>
-                                Interview Details {statusLabel === 'Interviewed' || ['Offer Extended', 'Offer Approved', 'Offer Sent', 'Offer Accepted', 'Offer Declined', 'Medical Checkup Scheduled', 'Medical Checkup Completed', 'Contract Sent', 'Contract Signed', 'On Boarding', 'Hired'].includes(statusLabel) ? '(Interview Results)' : ''}
+                                Interview Details {statusLabel === 'Interviewed' || ['Assessment', 'Offer Approved', 'Offer Sent', 'Offer Accepted', 'Offer Rejected', 'Medical Checkup Scheduled', 'MCU', 'Contract Sent', 'Contract Signed', 'On Boarding', 'Hired'].includes(statusLabel) ? '(Interview Results)' : ''}
                               </div>
                               <button
                                 type="button"

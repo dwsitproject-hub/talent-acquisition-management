@@ -8,16 +8,7 @@ import { DocumentArrowDownIcon } from '@heroicons/react/24/outline'
 import { FPTKAPI } from '@/lib/api'
 
 const PRIORITY_OPTIONS = ['P0', 'P1', 'P2', 'Normal']
-const STATUS_OPTIONS = [
-  'Raise FPTK',
-  'CV Hunting (Sourcing Candidate)',
-  'Piskotest & Technical Test',
-  'Interview User',
-  'Offering Process',
-  'Medical Check Up (MCU)',
-  'Signing',
-  'On Boarding'
-]
+const STATUS_OPTIONS = ['Open', 'Pending FKTK', 'Re-Open', 'Hold', 'Cancel', 'Internal Movement']
 
 export default function ReportsPage() {
   const { isAuthenticated, isLoading } = useAuth()
@@ -91,7 +82,7 @@ export default function ReportsPage() {
     if (selectedPriorities.length > 0 && !selectedPriorities.includes(priorityLabel)) return false
 
     if (selectedStatuses.length > 0) {
-      const currentStatus = position.currentStatus || position.status || 'Raise FPTK'
+      const currentStatus = position.currentStatus || position.status || 'Pending FKTK'
       if (!selectedStatuses.includes(currentStatus)) return false
     }
 

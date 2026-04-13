@@ -10,6 +10,12 @@ router.use(authenticate);
 // List users
 router.get('/users', authorize('SUPER_ADMIN', 'HRBP', 'TA_TEAM'), adminUserController.listUsers);
 
+// Download bulk upload template
+router.get('/users/bulk-template', authorize('SUPER_ADMIN', 'TA_TEAM'), adminUserController.bulkTemplate);
+
+// Bulk upload users (CSV/XLSX)
+router.post('/users/bulk-upload', authorize('SUPER_ADMIN', 'TA_TEAM'), adminUserController.bulkUpload);
+
 // Create user
 router.post('/users', authorize('SUPER_ADMIN', 'TA_TEAM'), adminUserController.createUser);
 
