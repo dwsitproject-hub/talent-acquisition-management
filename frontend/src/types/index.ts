@@ -368,7 +368,6 @@ export interface DashboardStats {
   holdPositions: number
   interviewsThisWeek: number
   hiredThisMonth: number
-  pendingOffers: number
   recentActivity: any[]
   positionStatusByLocation: PositionStatusByLocation[]
   openPositionProgress: OpenPositionProgress[]

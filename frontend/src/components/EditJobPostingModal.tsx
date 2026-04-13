@@ -2014,6 +2014,7 @@ export default function EditJobPostingModal({
                   <option value="Hold">Hold</option>
                   <option value="Cancel">Cancel</option>
                   <option value="Internal Movement">Internal Movement</option>
+                  <option value="Close">Close</option>
                 </select>
                 {isEditingDisabled && (
                   <p style={{ fontSize: '12px', color: '#ef4444', marginTop: '4px' }}>

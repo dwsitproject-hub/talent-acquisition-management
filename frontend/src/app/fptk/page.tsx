@@ -20,8 +20,24 @@ const mapEmploymentType = (value?: string): JobType => {
 import { PlusIcon, MagnifyingGlassIcon, BriefcaseIcon, EyeIcon, PencilIcon, ArrowUpTrayIcon, DocumentArrowDownIcon, XMarkIcon, DocumentDuplicateIcon } from '@heroicons/react/24/outline'
 import { parseFPTKExcelFile, generateFPTKTemplate, FPTKUploadResult } from '@/utils/fptkExcelParser'
 import { FPTKAPI, MenuAccessAPI } from '@/lib/api'
+import MultiSelectDropdown from '@/components/MultiSelectDropdown'
 
 const DEFAULT_CURRENT_STATUS = 'Pending FKTK'
+
+const mapEnumToRole = (role: string): string => {
+  if (!role) return role
+  const roleMap: Record<string, string> = {
+    SUPER_ADMIN: 'SUPER_ADMIN',
+    CHRO: 'Management',
+    DEPARTMENT_HEAD: 'Head of Division',
+    HRBP: 'HRBP',
+    TA_TEAM: 'TA_TEAM',
+    HIRING_MANAGER: 'HIRING_MANAGER',
+    INTERVIEWER: 'INTERVIEWER',
+    CANDIDATE: 'CANDIDATE',
+  }
+  return roleMap[role] || role
+}
 
 const CURRENT_STATUS_OPTIONS = [
   'Open',
@@ -30,6 +46,7 @@ const CURRENT_STATUS_OPTIONS = [
   'Hold',
   'Cancel',
   'Internal Movement',
+  'Close',
 ] as const
 
 const mapUiStatusToDbStatus = (value?: string, fallback?: string) => {
@@ -55,6 +72,7 @@ const mapUiStatusToDbStatus = (value?: string, fallback?: string) => {
     hold: 'DRAFT',
     cancel: 'CANCELLED',
     'internal movement': 'DRAFT',
+    close: 'FILLED',
   }
 
   return lookup[normalized] || fallback || 'DRAFT'
@@ -328,10 +346,12 @@ const mapAppliedCandidatesForPayload = (candidates?: any[]) => {
 export default function FPTKPage() {
   const { isAuthenticated, isLoading, user } = useAuth()
   const router = useRouter()
+  const backendRole = (user as any)?.role?.name || (user as any)?.role || 'TA_TEAM'
+  const roleName = mapEnumToRole(backendRole)
   const [fptks, setFptks] = useState<FPTK[]>([])
   const [loading, setLoading] = useState(true)
   const [searchTerm, setSearchTerm] = useState('')
-  const [statusFilter, setStatusFilter] = useState<string>('')
+  const [statusFilters, setStatusFilters] = useState<string[]>([])
   const [sortBy, setSortBy] = useState<'location' | 'areaDetail' | ''>('')
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc')
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false)
@@ -342,6 +362,8 @@ export default function FPTKPage() {
   const [isUploading, setIsUploading] = useState(false)
   const [uploadResult, setUploadResult] = useState<FPTKUploadResult | null>(null)
   const autoEditHandledRef = useRef(false)
+  const [menuAccess, setMenuAccess] = useState<Record<string, any>>({})
+  const [menuAccessLoading, setMenuAccessLoading] = useState(true)
 
   useEffect(() => {
     if (!isLoading && !isAuthenticated) {
@@ -394,6 +416,39 @@ export default function FPTKPage() {
     return () => clearTimeout(timer)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [searchTerm])
+
+  useEffect(() => {
+    let isMounted = true
+    const loadMenuAccess = async () => {
+      if (!isAuthenticated || isLoading || !isMounted) return
+      try {
+        const access = await MenuAccessAPI.get()
+        if (isMounted) {
+          setMenuAccess(access || {})
+        }
+      } catch (error) {
+        console.error('Error loading menu access:', error)
+        if (isMounted) {
+          setMenuAccess({})
+        }
+      } finally {
+        if (isMounted) {
+          setMenuAccessLoading(false)
+        }
+      }
+    }
+
+    if (isAuthenticated && !isLoading) {
+      loadMenuAccess()
+    } else {
+      setMenuAccess({})
+      setMenuAccessLoading(false)
+    }
+
+    return () => {
+      isMounted = false
+    }
+  }, [isAuthenticated, isLoading])
 
   const handleCreateJobPosting = async (jobPostingData: any) => {
     try {
@@ -820,61 +875,6 @@ export default function FPTKPage() {
     return null
   }
 
-  // Menu access enforcement
-  // Map backend enum values to frontend role names
-  const mapEnumToRole = (role: string): string => {
-    if (!role) return role
-    const roleMap: Record<string, string> = {
-      'SUPER_ADMIN': 'SUPER_ADMIN',
-      'CHRO': 'Management',
-      'DEPARTMENT_HEAD': 'Head of Division',
-      'HRBP': 'HRBP',
-      'TA_TEAM': 'TA_TEAM',
-      'HIRING_MANAGER': 'HIRING_MANAGER',
-      'INTERVIEWER': 'INTERVIEWER',
-      'CANDIDATE': 'CANDIDATE',
-    }
-    return roleMap[role] || role
-  }
-
-  const backendRole = (user as any)?.role?.name || (user as any)?.role || 'TA_TEAM'
-  const roleName = mapEnumToRole(backendRole)
-  const [menuAccess, setMenuAccess] = useState<Record<string, any>>({})
-  const [menuAccessLoading, setMenuAccessLoading] = useState(true)
-
-  useEffect(() => {
-    let isMounted = true
-    const loadMenuAccess = async () => {
-      if (!isAuthenticated || isLoading || !isMounted) return
-      try {
-        const access = await MenuAccessAPI.get()
-        if (isMounted) {
-          setMenuAccess(access || {})
-        }
-      } catch (error) {
-        console.error('Error loading menu access:', error)
-        if (isMounted) {
-          setMenuAccess({})
-        }
-      } finally {
-        if (isMounted) {
-          setMenuAccessLoading(false)
-        }
-      }
-    }
-
-    if (isAuthenticated && !isLoading) {
-      loadMenuAccess()
-    } else {
-      setMenuAccess({})
-      setMenuAccessLoading(false)
-    }
-
-    return () => {
-      isMounted = false
-    }
-  }, [isAuthenticated, isLoading])
-
   const cfg = menuAccess['/fptk'] || {}
   const visibleRoles: string[] = cfg.visibleRoles && cfg.visibleRoles.length ? cfg.visibleRoles : ['SUPER_ADMIN','Management','Head of Division','HRBP','TA_TEAM','HIRING_MANAGER']
   
@@ -904,10 +904,10 @@ export default function FPTKPage() {
   // Filter and sort FPTKs
   const filteredFptks = fptks
     .filter(fptk => {
-      // Filter by status
-      if (statusFilter) {
-        const currentStatus = (fptk as any).currentStatus || ''
-        if (currentStatus.trim() !== statusFilter) {
+      // Filter by status (OR)
+      if (statusFilters.length > 0) {
+        const currentStatus = ((fptk as any).currentStatus || DEFAULT_CURRENT_STATUS).trim()
+        if (!statusFilters.includes(currentStatus)) {
           return false
         }
       }
@@ -997,18 +997,15 @@ export default function FPTKPage() {
           </div>
           <div className="flex gap-4 items-center">
             {/* Status Filter */}
-            <div className="flex items-center gap-2">
-              <label className="text-sm font-medium text-gray-700">Filter by Status:</label>
-              <select
-                value={statusFilter}
-                onChange={(e) => setStatusFilter(e.target.value)}
-                className="block pl-3 pr-10 py-2 border border-gray-300 rounded-md leading-5 bg-white focus:outline-none focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
-              >
-                <option value="">All Statuses</option>
-                {uniqueStatuses.map(status => (
-                  <option key={status} value={status}>{status}</option>
-                ))}
-              </select>
+            <div className="min-w-[220px] flex-1 max-w-md">
+              <MultiSelectDropdown
+                label="Filter by Current Status"
+                options={[...uniqueStatuses]}
+                value={statusFilters}
+                onChange={setStatusFilters}
+                placeholder="All statuses"
+                searchPlaceholder="Search status..."
+              />
             </div>
             {/* Sort by Location */}
             <div className="flex items-center gap-2">
@@ -1042,8 +1039,48 @@ export default function FPTKPage() {
           </div>
         </div>
 
+        {/* Milestones: count per Current Status (search results) */}
+        <div className="mb-6">
+          <h3 className="text-sm font-medium text-gray-900 mb-2">By Current Status</h3>
+          <p className="text-xs text-gray-500 mb-3">
+            Counts reflect the current search. Click a status to filter the list below; click again to clear that filter.
+          </p>
+          <div className="flex flex-wrap gap-2">
+            {CURRENT_STATUS_OPTIONS.map((st) => {
+              const count = fptks.filter(
+                (f) => ((f as any).currentStatus || DEFAULT_CURRENT_STATUS).trim() === st
+              ).length
+              const active = statusFilters.includes(st)
+              return (
+                <button
+                  key={st}
+                  type="button"
+                  onClick={() => {
+                    const onlyThis = statusFilters.length === 1 && statusFilters[0] === st
+                    setStatusFilters(onlyThis ? [] : [st])
+                    requestAnimationFrame(() => {
+                      document.getElementById('fptk-position-list')?.scrollIntoView({
+                        behavior: 'smooth',
+                        block: 'start',
+                      })
+                    })
+                  }}
+                  className={`inline-flex items-center gap-2 rounded-lg border px-3 py-2 text-sm shadow-sm text-left transition ${
+                    active
+                      ? 'border-indigo-500 ring-2 ring-indigo-200 bg-indigo-50'
+                      : 'border-gray-200 bg-white hover:border-indigo-300 hover:ring-1 hover:ring-indigo-200'
+                  }`}
+                >
+                  <span className="text-gray-700">{st}</span>
+                  <span className="font-semibold text-gray-900 tabular-nums">{count}</span>
+                </button>
+              )
+            })}
+          </div>
+        </div>
+
         {/* FPTK List */}
-        <div className="bg-white shadow overflow-hidden sm:rounded-md">
+        <div id="fptk-position-list" className="bg-white shadow overflow-hidden sm:rounded-md">
           {loading ? (
             <div className="p-6 text-center">
               <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600 mx-auto"></div>

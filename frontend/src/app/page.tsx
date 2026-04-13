@@ -9,7 +9,6 @@ import {
   BriefcaseIcon,
   CalendarDaysIcon,
   DocumentTextIcon,
-  ChartBarIcon,
   ArrowPathIcon,
 } from '@heroicons/react/24/outline'
 import { DashboardStats, PositionStatusByLocation, OpenPositionProgress, SLALocation } from '@/types'
@@ -18,7 +17,23 @@ import { mapApiFptk } from './fptk/page'
 import { businessDaysDiffIndonesia } from '@/utils/indoBusinessDays'
 
 const PRIORITY_FILTERS = ['ALL', 'P0', 'P1', 'P2'] as const
-const PENDING_OFFER_STATUSES = ['PENDING_HRBP_REVIEW', 'PENDING_HEAD_APPROVAL', 'SENT_TO_CANDIDATE']
+
+const normalizeUiCurrentStatus = (value?: string) => (value || '').trim().toLowerCase()
+
+/** Open Positions card: Open | Pending FKTK | Re-Open */
+const isOpenCurrentStatusLabel = (value?: string) => {
+  const s = normalizeUiCurrentStatus(value)
+  if (!s) return true
+  return s === 'open' || s === 'pending fktk' || s === 're-open' || s === 'reopen'
+}
+
+/** Closed Positions card: Close | Internal Movement */
+const isClosedCurrentStatusLabel = (value?: string) => {
+  const s = normalizeUiCurrentStatus(value)
+  return s === 'close' || s === 'internal movement'
+}
+
+const isHoldCurrentStatusLabel = (value?: string) => normalizeUiCurrentStatus(value) === 'hold'
 
 type DashboardListItem = {
   id?: string
@@ -94,11 +109,11 @@ const computePositionStatusByLocation = (positions: any[]): PositionStatusByLoca
       acc[location] = { location, total: 0, open: 0, closed: 0 }
     }
     acc[location].total += 1
-    const status = (position?.currentStatus || position?.status || '').toLowerCase()
-    if (status === 'on boarding' || status === 'cancelled') {
-      acc[location].closed += 1
-    } else {
+    const cs = position?.currentStatus || position?.status || ''
+    if (isOpenCurrentStatusLabel(cs)) {
       acc[location].open += 1
+    } else {
+      acc[location].closed += 1
     }
     return acc
   }, {} as Record<string, PositionStatusByLocation>)
@@ -164,8 +179,14 @@ const getInterviewsThisWeekItems = (positions: any[]): DashboardListItem[] => {
   const { startOfWeek, endOfWeek } = getCurrentWeekRange()
   const items: DashboardListItem[] = []
 
+  const statusMatches = (raw: string) => {
+    const s = (raw || '').trim().toLowerCase()
+    return s === 'interview scheduled' || s === 'interviewed'
+  }
+
   positions.forEach((position) => {
     (position?.appliedCandidates || []).forEach((candidate: any) => {
+      if (!statusMatches(candidate?.status || '')) return
       ;(candidate?.interviews || []).forEach((interview: any) => {
         const date = parseDateValue(interview?.date || interview?.scheduledAt)
         if (!date) return
@@ -193,8 +214,8 @@ const getHiredThisMonthItems = (positions: any[]): DashboardListItem[] => {
   const { startOfMonth, endOfMonth } = getMonthRange()
   return positions
     .filter((position) => {
-      const status = (position?.currentStatus || position?.status || '').toLowerCase()
-      if (status !== 'signing') return false
+      const s = normalizeUiCurrentStatus(position?.currentStatus || position?.status)
+      if (s !== 'close') return false
       const date = parseDateValue(position?.updatedAt)
       return date ? isWithinRange(date, startOfMonth, endOfMonth) : false
     })
@@ -205,34 +226,23 @@ const getHiredThisMonthItems = (positions: any[]): DashboardListItem[] => {
         kind: position?.id ? ('fptk' as const) : undefined,
         title: position?.title || position?.position || 'Unknown Position',
         subtitle: position?.department ? `${position.department} • ${position.location || 'N/A'}` : position?.location,
-        meta: date ? `Signed on ${date.toLocaleDateString()}` : undefined,
+        meta: date ? `Updated ${date.toLocaleDateString()}` : undefined,
       }
     })
 }
 
-const getPendingOfferItems = (positions: any[]): DashboardListItem[] =>
-  positions
-    .filter(
-      (position) => (position?.currentStatus || position?.status || '').toLowerCase() === 'offering process'
-    )
-    .map((position) => ({
-      id: position?.id,
-      kind: position?.id ? ('fptk' as const) : undefined,
-      title: position?.title || position?.position || 'Unknown Position',
-      subtitle: position?.department ? `${position.department} • ${position.location || 'N/A'}` : position?.location,
-      meta: 'Awaiting offer confirmation',
-    }))
-
 const buildApplicationInsights = (
   applications: any[],
-  weekRange: { startOfWeek: Date; endOfWeek: Date },
-  monthRange: { startOfMonth: Date; endOfMonth: Date }
+  weekRange: { startOfWeek: Date; endOfWeek: Date }
 ) => {
   const interviewItems: DashboardListItem[] = []
-  const hiredItems: DashboardListItem[] = []
-  const pendingItems: DashboardListItem[] = []
 
   applications.forEach((application: any) => {
+    const appStatus = (application?.status || '').toString().toUpperCase()
+    if (appStatus !== 'INTERVIEW_SCHEDULED' && appStatus !== 'INTERVIEW_COMPLETED') {
+      return
+    }
+
     const candidateName =
       `${application?.candidate?.user?.firstName || ''} ${application?.candidate?.user?.lastName || ''}`.trim() ||
       application?.candidate?.fullName ||
@@ -271,37 +281,9 @@ const buildApplicationInsights = (
         })
       }
     })
-
-    if ((application?.status || '').toString().toUpperCase() === 'HIRED') {
-      const hiredDate = application?.hiredAt ? new Date(application.hiredAt) : application?.updatedAt ? new Date(application.updatedAt) : null
-      if (hiredDate && !isNaN(hiredDate.getTime()) && isWithinRange(hiredDate, monthRange.startOfMonth, monthRange.endOfMonth)) {
-        hiredItems.push({
-          id: application?.fptkId,
-          kind: application?.fptkId ? ('fptk' as const) : undefined,
-          title: candidateName,
-          subtitle: `${positionTitle} • ${application?.fptk?.department || 'N/A'}`,
-          meta: `Hired on ${hiredDate.toLocaleDateString()}`,
-        })
-      }
-    }
-
-    const pendingOffer = (application?.offers || []).find((offer: any) =>
-      PENDING_OFFER_STATUSES.includes((offer?.status || '').toString().toUpperCase())
-    )
-
-    if (pendingOffer) {
-      const offerStatus = pendingOffer.status
-      pendingItems.push({
-        id: application?.fptkId,
-        kind: application?.fptkId ? ('fptk' as const) : undefined,
-        title: candidateName,
-        subtitle: `${positionTitle} • ${application?.fptk?.department || 'N/A'}`,
-        meta: `Offer Status: ${offerStatus ? offerStatus.replace(/_/g, ' ') : 'Pending'}`,
-      })
-    }
   })
 
-  return { interviewItems, hiredItems, pendingItems }
+  return { interviewItems }
 }
 
 export default function Dashboard() {
@@ -315,7 +297,6 @@ export default function Dashboard() {
     holdPositions: 0,
     interviewsThisWeek: 0,
     hiredThisMonth: 0,
-    pendingOffers: 0,
     recentActivity: [] as any[],
     positionStatusByLocation: [],
     openPositionProgress: [],
@@ -327,8 +308,6 @@ export default function Dashboard() {
   const [allPositions, setAllPositions] = useState<any[]>([])
   const [priorityFilter, setPriorityFilter] = useState<typeof PRIORITY_FILTERS[number]>('ALL')
   const [interviewDetailItems, setInterviewDetailItems] = useState<DashboardListItem[]>([])
-  const [hiredDetailItems, setHiredDetailItems] = useState<DashboardListItem[]>([])
-  const [pendingOfferDetailItems, setPendingOfferDetailItems] = useState<DashboardListItem[]>([])
   const [isLoadingApplicationInsights, setIsLoadingApplicationInsights] = useState(false)
   const [applicationInsightsLoaded, setApplicationInsightsLoaded] = useState(false)
   const [openPositionsModalOpen, setOpenPositionsModalOpen] = useState(false)
@@ -344,16 +323,7 @@ const filteredPositions = useMemo(
 )
 const openPositionItems = useMemo<DashboardListItem[]>(() => {
   return filteredPositions
-    .filter((position) => {
-      const status = (position?.currentStatus || position?.status || '').trim().toLowerCase()
-      return (
-        status !== 'cancel' &&
-        status !== 'hold' &&
-        status !== 'signing' &&
-        status !== 'on boarding' &&
-        status !== 'boarding'
-      )
-    })
+    .filter((position) => isOpenCurrentStatusLabel(position?.currentStatus || position?.status))
     .map((position) => ({
       id: position?.id,
       kind: 'fptk' as const,
@@ -365,15 +335,7 @@ const openPositionItems = useMemo<DashboardListItem[]>(() => {
 
 const closedPositionItems = useMemo<DashboardListItem[]>(() => {
   return filteredPositions
-    .filter((position) => {
-      const status = (position?.currentStatus || position?.status || '').trim().toLowerCase()
-      return (
-        status === 'cancel' ||
-        status === 'signing' ||
-        status === 'on boarding' ||
-        status === 'boarding'
-      )
-    })
+    .filter((position) => isClosedCurrentStatusLabel(position?.currentStatus || position?.status))
     .map((position) => ({
       id: position?.id,
       kind: 'fptk' as const,
@@ -385,10 +347,7 @@ const closedPositionItems = useMemo<DashboardListItem[]>(() => {
 
 const holdPositionItems = useMemo<DashboardListItem[]>(() => {
   return filteredPositions
-    .filter((position) => {
-      const status = (position?.currentStatus || position?.status || '').trim().toLowerCase()
-      return status === 'hold'
-    })
+    .filter((position) => isHoldCurrentStatusLabel(position?.currentStatus || position?.status))
     .map((position) => ({
       id: position?.id,
       kind: 'fptk' as const,
@@ -405,11 +364,6 @@ const hiredThisMonthItems = useMemo(
   () => getHiredThisMonthItems(filteredPositions),
   [filteredPositions]
 )
-const pendingOfferItems = useMemo(
-  () => getPendingOfferItems(filteredPositions),
-  [filteredPositions]
-)
-
 const combinedLocations = useMemo(() => {
   const locationsSet = new Set<string>()
 
@@ -471,13 +425,6 @@ const combinedLocations = useMemo(() => {
       change: '+15%',
       changeType: 'positive',
     },
-    {
-      name: 'Pending Offers',
-      value: dashboardStats.pendingOffers.toString(),
-      icon: ChartBarIcon,
-      change: '+5%',
-      changeType: 'positive',
-    },
   ]
 
   useEffect(() => {
@@ -493,9 +440,12 @@ const combinedLocations = useMemo(() => {
 useEffect(() => {
   if (!baseStats) return
 
-  const interviewsCount = interviewDetailItems.length || interviewsThisWeekItems.length
-  const hiredCount = hiredDetailItems.length || hiredThisMonthItems.length
-  const pendingCount = pendingOfferDetailItems.length || pendingOfferItems.length
+  const interviewsCount =
+    interviewDetailItems.length ||
+    interviewsThisWeekItems.length ||
+    baseStats.interviewsThisWeek ||
+    0
+  const hiredCount = hiredThisMonthItems.length || baseStats.hiredThisMonth || 0
 
   setDashboardStats({
     totalCandidates: baseStats.totalCandidates ?? 0,
@@ -505,7 +455,6 @@ useEffect(() => {
     holdPositions: baseStats.holdPositions ?? holdPositionItems.length,
     interviewsThisWeek: interviewsCount,
     hiredThisMonth: hiredCount,
-    pendingOffers: pendingCount,
     recentActivity: baseStats.recentActivity ?? [],
     positionStatusByLocation: (baseStats as any).positionStatusByLocation || computePositionStatusByLocation(filteredPositions),
     openPositionProgress: (baseStats as any).openPositionProgress || computeOpenPositionProgress(filteredPositions),
@@ -519,16 +468,8 @@ useEffect(() => {
   holdPositionItems.length,
   interviewsThisWeekItems.length,
   hiredThisMonthItems.length,
-  pendingOfferItems.length,
   interviewDetailItems.length,
-  hiredDetailItems.length,
-  pendingOfferDetailItems.length,
 ])
-
-  const isOpenCurrentStatus = (value: any) => {
-    const status = (value || '').toString().trim().toLowerCase()
-    return status === 'open' || status === 'pending fktk' || status === 're-open' || status === 'internal movement'
-  }
 
   const fetchOpenPositions = async (query: string) => {
     if (!isAuthenticated) return
@@ -556,7 +497,7 @@ useEffect(() => {
         page += 1
       }
 
-      const openOnly = positions.filter((p: any) => isOpenCurrentStatus(p?.currentStatus || p?.status))
+      const openOnly = positions.filter((p: any) => isOpenCurrentStatusLabel(p?.currentStatus || p?.status))
       setOpenPositionsList(openOnly.map((p: any) => ({ ...p, kind: 'fptk' as const })))
       openPositionsLoadedOnceRef.current = true
     } catch (e: any) {
@@ -568,8 +509,8 @@ useEffect(() => {
     }
   }
 
-  const loadApplicationInsights = async () => {
-    if (isLoadingApplicationInsights || !isAuthenticated) return
+  const loadApplicationInsights = async (): Promise<DashboardListItem[]> => {
+    if (isLoadingApplicationInsights || !isAuthenticated) return []
 
     setIsLoadingApplicationInsights(true)
 
@@ -579,10 +520,7 @@ useEffect(() => {
       let page = 1
       let hasMore = true
       const weekRange = getCurrentWeekRange()
-      const monthRange = getMonthRange()
       const interviewItems: DashboardListItem[] = []
-      const hiredItems: DashboardListItem[] = []
-      const pendingItems: DashboardListItem[] = []
 
       while (hasMore && page <= maxPages) {
         const response = await ApplicationsAPI.getAll({}, { page, limit })
@@ -592,10 +530,8 @@ useEffect(() => {
           break
         }
 
-        const insights = buildApplicationInsights(data, weekRange, monthRange)
+        const insights = buildApplicationInsights(data, weekRange)
         interviewItems.push(...insights.interviewItems)
-        hiredItems.push(...insights.hiredItems)
-        pendingItems.push(...insights.pendingItems)
 
         const totalPages = response?.pagination?.totalPages
         if (totalPages) {
@@ -611,14 +547,39 @@ useEffect(() => {
       }
 
       setInterviewDetailItems(interviewItems)
-      setHiredDetailItems(hiredItems)
-      setPendingOfferDetailItems(pendingItems)
       setApplicationInsightsLoaded(true)
+      return interviewItems
     } catch (error) {
       console.error('Error loading application insights:', error)
+      return []
     } finally {
       setIsLoadingApplicationInsights(false)
     }
+  }
+
+  const fetchAllFptksForDashboard = async (): Promise<any[]> => {
+    if (!isAuthenticated) return []
+    const limit = 100
+    const maxPages = 30
+    let page = 1
+    let hasMore = true
+    let positions: any[] = []
+
+    while (hasMore && page <= maxPages) {
+      const response = await FPTKAPI.getAll({}, { page, limit })
+      const data = Array.isArray(response?.data) ? response.data : []
+      positions = positions.concat(data.map((fptk: any) => mapApiFptk(fptk)))
+
+      const totalPages = response?.pagination?.totalPages
+      if (totalPages) {
+        hasMore = page < totalPages
+      } else {
+        hasMore = data.length === limit
+      }
+      page += 1
+    }
+
+    return positions
   }
 
   const loadDashboardData = async () => {
@@ -652,6 +613,8 @@ useEffect(() => {
         openPositions: stats.openPositions || 0,
         closedPositions: stats.closedPositions ?? 0,
         holdPositions: stats.holdPositions ?? 0,
+        interviewsThisWeek: stats.interviewsThisWeek ?? 0,
+        hiredThisMonth: stats.hiredThisMonth ?? 0,
         positionStatusByLocation: stats.positionStatusByLocation || [],
         openPositionProgress: stats.openPositionProgress || [],
         slaByLocation: stats.slaByLocation || [],
@@ -812,6 +775,14 @@ useEffect(() => {
                 try {
                   let items: DashboardListItem[] = []
 
+                  const mapPositionRow = (position: any): DashboardListItem => ({
+                    id: position?.id,
+                    kind: 'fptk' as const,
+                    title: position?.title || position?.position || 'Unknown Position',
+                    subtitle: `${position?.department || 'N/A'} • ${position?.location || 'N/A'}`,
+                    meta: position?.currentStatus || position?.status || 'N/A',
+                  })
+
                   if (item.name === 'Total Candidates') {
                     const response = await CandidatesAPI.getAll({}, { page: 1, limit: 100 })
                     const candidates = response.data || []
@@ -825,24 +796,31 @@ useEffect(() => {
                   } else if (item.name === 'Open Positions') {
                     items = openPositionItems
                   } else if (item.name === 'Closed Positions') {
-                    items = closedPositionItems
+                    const pos = await fetchAllFptksForDashboard()
+                    setAllPositions(pos)
+                    items = filterPositionsByPriority(pos, priorityFilter)
+                      .filter((p: any) => isClosedCurrentStatusLabel(p?.currentStatus || p?.status))
+                      .map(mapPositionRow)
                   } else if (item.name === 'Hold Positions') {
-                    items = holdPositionItems
+                    const pos = await fetchAllFptksForDashboard()
+                    setAllPositions(pos)
+                    items = filterPositionsByPriority(pos, priorityFilter)
+                      .filter((p: any) => isHoldCurrentStatusLabel(p?.currentStatus || p?.status))
+                      .map(mapPositionRow)
                   } else if (item.name === 'Interviews This Week') {
-                    if (!applicationInsightsLoaded) {
-                      await loadApplicationInsights()
+                    const pos = await fetchAllFptksForDashboard()
+                    setAllPositions(pos)
+                    const local = getInterviewsThisWeekItems(filterPositionsByPriority(pos, priorityFilter))
+                    if (local.length > 0) {
+                      items = local
+                    } else {
+                      const fromApi = await loadApplicationInsights()
+                      items = fromApi.length ? fromApi : local
                     }
-                    items = interviewDetailItems.length ? interviewDetailItems : interviewsThisWeekItems
                   } else if (item.name === 'Hired This Month') {
-                    if (!applicationInsightsLoaded) {
-                      await loadApplicationInsights()
-                    }
-                    items = hiredDetailItems.length ? hiredDetailItems : hiredThisMonthItems
-                  } else if (item.name === 'Pending Offers') {
-                    if (!applicationInsightsLoaded) {
-                      await loadApplicationInsights()
-                    }
-                    items = pendingOfferDetailItems.length ? pendingOfferDetailItems : pendingOfferItems
+                    const pos = await fetchAllFptksForDashboard()
+                    setAllPositions(pos)
+                    items = getHiredThisMonthItems(filterPositionsByPriority(pos, priorityFilter))
                   }
 
                   if (!items.length) {
@@ -1056,10 +1034,9 @@ useEffect(() => {
                                           (j.areaDetail || j.area || j.location || 'Unknown') ===
                                           statusData.location
                                       )
-                                      .filter((j: any) => {
-                                        const status = (j.currentStatus || j.status || '').toLowerCase()
-                                        return status !== 'on boarding' && status !== 'cancelled'
-                                      })
+                                      .filter((j: any) =>
+                                        isOpenCurrentStatusLabel(j.currentStatus || j.status)
+                                      )
                                       .map((j: any) => ({
                                         id: j.id,
                                         kind: 'fptk',
@@ -1086,8 +1063,13 @@ useEffect(() => {
                                           statusData.location
                                       )
                                       .filter((j: any) => {
-                                        const status = (j.currentStatus || j.status || '').toLowerCase()
-                                        return status === 'on boarding' || status === 'cancelled'
+                                        const cs = j.currentStatus || j.status || ''
+                                        const n = normalizeUiCurrentStatus(cs)
+                                        return (
+                                          isClosedCurrentStatusLabel(cs) ||
+                                          n === 'cancel' ||
+                                          n === 'cancelled'
+                                        )
                                       })
                                       .map((j: any) => ({
                                         id: j.id,

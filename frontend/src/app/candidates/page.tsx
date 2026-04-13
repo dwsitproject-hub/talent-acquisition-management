@@ -21,6 +21,21 @@ import { saveCandidateLink } from '@/utils/candidateLink'
 import { CandidatesAPI, MenuAccessAPI } from '@/lib/api'
 import BulkUploadModal from '@/components/BulkUploadModal'
 
+const mapEnumToRole = (role: string): string => {
+  if (!role) return role
+  const roleMap: Record<string, string> = {
+    SUPER_ADMIN: 'SUPER_ADMIN',
+    CHRO: 'Management',
+    DEPARTMENT_HEAD: 'Head of Division',
+    HRBP: 'HRBP',
+    TA_TEAM: 'TA_TEAM',
+    HIRING_MANAGER: 'HIRING_MANAGER',
+    INTERVIEWER: 'INTERVIEWER',
+    CANDIDATE: 'CANDIDATE',
+  }
+  return roleMap[role] || role
+}
+
 const mockCandidates: Candidate[] = [
   {
     id: '1',
@@ -375,6 +390,8 @@ export const mapApiCandidate = (candidate: any): Candidate => {
 export default function CandidatesPage() {
   const { isAuthenticated, isLoading, user } = useAuth()
   const router = useRouter()
+  const backendRole = (user as any)?.role?.name || (user as any)?.role || 'TA_TEAM'
+  const roleName = mapEnumToRole(backendRole)
   const autoViewHandledRef = useRef(false)
   const [searchTerm, setSearchTerm] = useState('')
   const [statusFilter, setStatusFilter] = useState<CandidateStatus | 'all'>('all')
@@ -386,6 +403,8 @@ export default function CandidatesPage() {
   const [generatedLink, setGeneratedLink] = useState<string | null>(null)
   const [showLinkModal, setShowLinkModal] = useState(false)
   const [isBulkUploadOpen, setIsBulkUploadOpen] = useState(false)
+  const [menuAccess, setMenuAccess] = useState<Record<string, any>>({})
+  const [menuAccessLoading, setMenuAccessLoading] = useState(true)
 
   // Load candidates from API
   const loadCandidates = async () => {
@@ -461,40 +480,6 @@ export default function CandidatesPage() {
     }
   }, [isAuthenticated, isLoading, router])
 
-  if (isLoading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-indigo-600"></div>
-      </div>
-    )
-  }
-
-  if (!isAuthenticated) {
-    return null
-  }
-
-  // Map backend enum values to frontend role names
-  const mapEnumToRole = (role: string): string => {
-    if (!role) return role
-    const roleMap: Record<string, string> = {
-      'SUPER_ADMIN': 'SUPER_ADMIN',
-      'CHRO': 'Management',
-      'DEPARTMENT_HEAD': 'Head of Division',
-      'HRBP': 'HRBP',
-      'TA_TEAM': 'TA_TEAM',
-      'HIRING_MANAGER': 'HIRING_MANAGER',
-      'INTERVIEWER': 'INTERVIEWER',
-      'CANDIDATE': 'CANDIDATE',
-    }
-    return roleMap[role] || role
-  }
-
-  // Menu access enforcement - fetch from API
-  const backendRole = (user as any)?.role?.name || (user as any)?.role || 'TA_TEAM'
-  const roleName = mapEnumToRole(backendRole)
-  const [menuAccess, setMenuAccess] = useState<Record<string, any>>({})
-  const [menuAccessLoading, setMenuAccessLoading] = useState(true)
-
   useEffect(() => {
     let isMounted = true
     const loadMenuAccess = async () => {
@@ -527,6 +512,18 @@ export default function CandidatesPage() {
       isMounted = false
     }
   }, [isAuthenticated, isLoading])
+
+  if (isLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-indigo-600"></div>
+      </div>
+    )
+  }
+
+  if (!isAuthenticated) {
+    return null
+  }
 
   const cfg = menuAccess['/candidates'] || {}
   const visibleRoles: string[] = cfg.visibleRoles && cfg.visibleRoles.length ? cfg.visibleRoles : [

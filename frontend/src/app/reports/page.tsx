@@ -8,7 +8,7 @@ import { DocumentArrowDownIcon } from '@heroicons/react/24/outline'
 import { FPTKAPI } from '@/lib/api'
 
 const PRIORITY_OPTIONS = ['P0', 'P1', 'P2', 'Normal']
-const STATUS_OPTIONS = ['Open', 'Pending FKTK', 'Re-Open', 'Hold', 'Cancel', 'Internal Movement']
+const STATUS_OPTIONS = ['Open', 'Pending FKTK', 'Re-Open', 'Hold', 'Cancel', 'Internal Movement', 'Close']
 
 export default function ReportsPage() {
   const { isAuthenticated, isLoading } = useAuth()

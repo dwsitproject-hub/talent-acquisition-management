@@ -207,6 +207,7 @@ function validateAndConvertFPTK(row: FPTKExcelRow, rowNumber: number): { valid: 
         'cancel': 'cancelled',
         'cancelled': 'cancelled',
         'internal movement': 'draft',
+        'close': 'filled',
       }
       status = statusMap[statusStr] || 'draft'
     }

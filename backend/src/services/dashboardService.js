@@ -1,6 +1,42 @@
 const prisma = require('../config/database');
 const logger = require('../utils/logger');
 
+function startOfWeekMonday(date) {
+  const d = new Date(date);
+  const day = d.getDay();
+  const diffToMonday = (day + 6) % 7;
+  d.setDate(d.getDate() - diffToMonday);
+  d.setHours(0, 0, 0, 0);
+  return d;
+}
+
+function endOfWeekSunday(date) {
+  const start = startOfWeekMonday(date);
+  const end = new Date(start);
+  end.setDate(start.getDate() + 6);
+  end.setHours(23, 59, 59, 999);
+  return end;
+}
+
+function normalizeCurrentStatus(value) {
+  return (value || '').trim().toLowerCase();
+}
+
+function isOpenCurrentStatus(value) {
+  const s = normalizeCurrentStatus(value);
+  if (!s) return true;
+  return s === 'open' || s === 'pending fktk' || s === 're-open' || s === 'reopen';
+}
+
+function isClosedCurrentStatus(value) {
+  const s = normalizeCurrentStatus(value);
+  return s === 'close' || s === 'internal movement';
+}
+
+function isHoldCurrentStatus(value) {
+  return normalizeCurrentStatus(value) === 'hold';
+}
+
 /**
  * Get dashboard statistics
  */
@@ -69,8 +105,6 @@ async function getDashboardStats(user = null) {
       totalApplications,
       activeApplications,
       pendingInterviews,
-      pendingOffers,
-      hiredThisMonth,
     ] = await Promise.all([
       prisma.candidate.count({ where: candidateWhere }),
       prisma.fPTK.count({ where: fptkWhere }),
@@ -96,26 +130,6 @@ async function getDashboardStats(user = null) {
           ...(Object.keys(applicationWhere).length > 0 ? { application: applicationWhere } : {}),
         },
       }),
-      (async () => {
-        const offerWhere = {
-          status: {
-            in: ['PENDING_HRBP_REVIEW', 'PENDING_HEAD_APPROVAL', 'SENT_TO_CANDIDATE'],
-          },
-        };
-        if (Object.keys(applicationWhere).length > 0) {
-          offerWhere.application = applicationWhere;
-        }
-        return prisma.offer.count({ where: offerWhere });
-      })(),
-      prisma.application.count({
-        where: {
-          ...applicationWhere,
-          status: 'HIRED',
-          hiredAt: {
-            gte: new Date(new Date().getFullYear(), new Date().getMonth(), 1),
-          },
-        },
-      }),
     ]);
 
     // Calculate position counts based on currentStatus
@@ -137,61 +151,61 @@ async function getDashboardStats(user = null) {
     });
     logger.info('Dashboard: FPTK status distribution:', JSON.stringify(statusCounts));
 
-    const openPositionsCount = allFPTKsForCounts.filter((fptk) => {
-      const status = (fptk.currentStatus || '').trim();
-      if (!status) return true; // Count null/empty as open
-      const statusLower = status.toLowerCase();
-      return (
-        statusLower !== 'cancel' &&
-        statusLower !== 'cancelled' &&
-        statusLower !== 'hold' &&
-        statusLower !== 'signing' &&
-        statusLower !== 'on boarding' &&
-        statusLower !== 'boarding'
-      );
-    }).length;
+    const openPositionsCount = allFPTKsForCounts.filter((fptk) =>
+      isOpenCurrentStatus(fptk.currentStatus)
+    ).length;
 
-    const closedPositionsCount = allFPTKsForCounts.filter((fptk) => {
-      const status = (fptk.currentStatus || '').trim();
-      if (!status) return false; // Don't count null/empty as closed
-      const statusLower = status.toLowerCase();
-      return (
-        statusLower === 'cancel' ||
-        statusLower === 'cancelled' ||
-        statusLower === 'signing' ||
-        statusLower === 'on boarding' ||
-        statusLower === 'boarding'
-      );
-    }).length;
+    const closedPositionsCount = allFPTKsForCounts.filter((fptk) =>
+      isClosedCurrentStatus(fptk.currentStatus)
+    ).length;
 
-    const holdPositionsCount = allFPTKsForCounts.filter((fptk) => {
-      const status = (fptk.currentStatus || '').trim();
-      if (!status) return false; // Don't count null/empty as hold
-      const statusLower = status.toLowerCase();
-      return statusLower === 'hold';
-    }).length;
+    const holdPositionsCount = allFPTKsForCounts.filter((fptk) =>
+      isHoldCurrentStatus(fptk.currentStatus)
+    ).length;
 
     logger.info(`Dashboard: Position counts - Open: ${openPositionsCount}, Closed: ${closedPositionsCount}, Hold: ${holdPositionsCount}`);
     logger.info(`Dashboard: allFPTKsForCounts.length: ${allFPTKsForCounts.length}, fptkWhere keys: ${Object.keys(fptkWhere).join(', ')}`);
 
-    // Calculate interviews this week
+    // Interviews this week (Mon–Sun): applications in Interview Scheduled / Interviewed with interview in range
     const now = new Date();
-    const dayOfWeek = now.getDay();
-    const startOfWeek = new Date(now);
-    startOfWeek.setDate(now.getDate() - dayOfWeek);
-    startOfWeek.setHours(0, 0, 0, 0);
-    const endOfWeek = new Date(now);
-    endOfWeek.setDate(now.getDate() - dayOfWeek + 6);
-    endOfWeek.setHours(23, 59, 59, 999);
+    const weekStart = startOfWeekMonday(now);
+    const weekEnd = endOfWeekSunday(now);
 
-    const interviewsThisWeek = await prisma.interview.count({
+    const interviewStatusWhere = { status: { in: ['INTERVIEW_SCHEDULED', 'INTERVIEW_COMPLETED'] } };
+    const interviewsThisWeek =
+      Object.keys(applicationWhere).length > 0
+        ? await prisma.interview.count({
+            where: {
+              scheduledAt: {
+                gte: weekStart,
+                lte: weekEnd,
+              },
+              application: {
+                AND: [interviewStatusWhere, applicationWhere],
+              },
+            },
+          })
+        : await prisma.interview.count({
+            where: {
+              scheduledAt: {
+                gte: weekStart,
+                lte: weekEnd,
+              },
+              application: interviewStatusWhere,
+            },
+          });
+
+    const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+    monthStart.setHours(0, 0, 0, 0);
+    const monthEnd = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59, 999);
+
+    const hiredThisMonth = await prisma.fPTK.count({
       where: {
-        scheduledAt: {
-          gte: startOfWeek,
-          lte: endOfWeek,
-        },
-        status: {
-          in: ['SCHEDULED', 'CONFIRMED'],
+        ...fptkWhere,
+        OR: [{ currentStatus: 'Close' }, { currentStatus: 'close' }],
+        updatedAt: {
+          gte: monthStart,
+          lte: monthEnd,
         },
       },
     });
@@ -235,21 +249,8 @@ async function getDashboardStats(user = null) {
       return statusMap[fptk.status] || fptk.status || 'Raise FPTK';
     };
 
-    // Helper function to check if status is closed
-    const isClosed = (fptk) => {
-      const status = getStatus(fptk);
-      const dbStatus = fptk.status;
-      // Closed if status contains 'On Boarding', 'Cancelled', 'Filled', or database status is FILLED or CANCELLED
-      const statusLower = status.toLowerCase();
-      return (
-        statusLower.includes('on boarding') ||
-        statusLower.includes('boarding') ||
-        statusLower === 'cancelled' ||
-        statusLower === 'filled' ||
-        dbStatus === 'FILLED' ||
-        dbStatus === 'CANCELLED'
-      );
-    };
+    // Location chart: green = actively open recruiting; red = everything else (incl. Hold, Close, Cancel)
+    const isClosed = (fptk) => !isOpenCurrentStatus(fptk.currentStatus || getStatus(fptk));
 
     // Calculate Position Status by Location
     const positionStatusByLocationMap = {};
@@ -400,7 +401,6 @@ async function getDashboardStats(user = null) {
       activeApplications,
       pendingInterviews,
       interviewsThisWeek,
-      pendingOffers,
       hiredThisMonth,
       positionStatusByLocation,
       openPositionProgress,

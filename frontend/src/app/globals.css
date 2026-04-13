@@ -26,3 +26,17 @@ body {
   color: var(--foreground);
   font-family: var(--font-family-primary);
 }
+
+/* Native <select> / <option>: force readable text on light backgrounds (fixes low-contrast grey on some Windows/GPU setups, including dark OS theme). */
+select,
+select option {
+  color: #111827;
+  background-color: #ffffff;
+  -webkit-text-fill-color: #111827;
+}
+
+select:disabled,
+select:disabled option {
+  color: #374151;
+  -webkit-text-fill-color: #374151;
+}

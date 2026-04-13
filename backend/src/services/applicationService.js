@@ -372,6 +372,13 @@ async function updateApplicationStatus(applicationId, newStatus, userId, reason 
     data: updateData,
   });
 
+  if (newStatus === 'ONBOARDING' && application.fptkId) {
+    await prisma.fPTK.update({
+      where: { id: application.fptkId },
+      data: { currentStatus: 'Close' },
+    });
+  }
+
   // Create status history
   await prisma.applicationStatusHistory.create({
     data: {

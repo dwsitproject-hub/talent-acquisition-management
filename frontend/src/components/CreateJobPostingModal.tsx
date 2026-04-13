@@ -1424,6 +1424,7 @@ export default function CreateJobPostingModal({ isOpen, onClose, onSave, editing
                 <option value="Hold">Hold</option>
                 <option value="Cancel">Cancel</option>
                 <option value="Internal Movement">Internal Movement</option>
+                <option value="Close">Close</option>
               </select>
             </div>
           </div>

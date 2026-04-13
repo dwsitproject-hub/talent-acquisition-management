@@ -441,6 +441,20 @@ async function syncFptkApplicationsTx(tx, fptkId, appliedCandidates, options = {
       }
     }
   }
+
+  await ensureFptkCloseIfAnyOnBoardingTx(tx, fptkId);
+}
+
+async function ensureFptkCloseIfAnyOnBoardingTx(tx, fptkId) {
+  const onboardingCount = await tx.application.count({
+    where: { fptkId, status: 'ONBOARDING' },
+  });
+  if (onboardingCount > 0) {
+    await tx.fPTK.update({
+      where: { id: fptkId },
+      data: { currentStatus: 'Close' },
+    });
+  }
 }
 
 async function getFptkWithRelations(fptkId) {
