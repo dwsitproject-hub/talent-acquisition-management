@@ -1227,6 +1227,72 @@ async function getPublishedFPTKs(filters, pagination) {
 }
 
 /**
+ * Permanently delete an FPTK and its dependent applications (SUPER_ADMIN only at route layer).
+ * Applications must be removed first because Prisma has no onDelete cascade from FPTK -> Application.
+ */
+async function deleteFPTK(fptkId) {
+  const existing = await prisma.fPTK.findUnique({
+    where: { id: fptkId },
+    select: { id: true, position: true, positionTitle: true },
+  });
+
+  if (!existing) {
+    throw httpError(404, 'Position not found');
+  }
+
+  await prisma.$transaction(async (tx) => {
+    await tx.application.deleteMany({ where: { fptkId } });
+    await tx.fPTK.delete({ where: { id: fptkId } });
+  });
+
+  logger.info(`FPTK deleted: ${fptkId} (${existing.positionTitle || existing.position || 'untitled'})`);
+
+  return { id: fptkId };
+}
+
+const BULK_DELETE_MAX = 200;
+
+/**
+ * Delete multiple FPTKs in one transaction (applications first, then positions).
+ */
+async function deleteFPTKsBulk(rawIds) {
+  if (!Array.isArray(rawIds) || rawIds.length === 0) {
+    throw httpError(400, 'Provide a non-empty ids array');
+  }
+
+  const ids = [...new Set(rawIds.map((id) => String(id || '').trim()).filter(Boolean))];
+  if (ids.length === 0) {
+    throw httpError(400, 'No valid ids');
+  }
+  if (ids.length > BULK_DELETE_MAX) {
+    throw httpError(400, `You can delete at most ${BULK_DELETE_MAX} positions per request`);
+  }
+
+  const existing = await prisma.fPTK.findMany({
+    where: { id: { in: ids } },
+    select: { id: true },
+  });
+  const foundIds = existing.map((e) => e.id);
+  if (foundIds.length === 0) {
+    throw httpError(404, 'No matching positions found');
+  }
+
+  await prisma.$transaction(async (tx) => {
+    await tx.application.deleteMany({ where: { fptkId: { in: foundIds } } });
+    await tx.fPTK.deleteMany({ where: { id: { in: foundIds } } });
+  });
+
+  const notFoundIds = ids.filter((id) => !foundIds.includes(id));
+  logger.info(`FPTK bulk delete: ${foundIds.length} position(s) removed`);
+
+  return {
+    deletedIds: foundIds,
+    deletedCount: foundIds.length,
+    notFoundIds,
+  };
+}
+
+/**
  * Update FPTK filled positions count
  */
 async function updateFilledPositions(fptkId) {
@@ -1268,6 +1334,8 @@ module.exports = {
   getAllFPTKs,
   getSummaryByPosition,
   updateFPTK,
+  deleteFPTK,
+  deleteFPTKsBulk,
   publishFPTK,
   unpublishFPTK,
   getPublishedFPTKs,

@@ -143,6 +143,27 @@ router.get(
 );
 
 /**
+ * @route   POST /api/fptk/bulk-delete
+ * @desc    Permanently delete multiple FPTKs (and related applications)
+ * @access  Private (Super Admin only)
+ */
+router.post(
+  '/bulk-delete',
+  authenticate,
+  authorize('SUPER_ADMIN'),
+  asyncHandler(async (req, res) => {
+    const ids = Array.isArray(req.body?.ids) ? req.body.ids : [];
+    const result = await fptkService.deleteFPTKsBulk(ids);
+
+    res.json({
+      success: true,
+      message: `${result.deletedCount} position(s) deleted successfully`,
+      data: result,
+    });
+  })
+);
+
+/**
  * @route   GET /api/fptk/:id
  * @desc    Get FPTK by ID
  * @access  Private / Public (based on published status)
@@ -218,6 +239,28 @@ router.put(
       success: true,
       message: 'FPTK updated successfully',
       data: fptk,
+    });
+  })
+);
+
+/**
+ * @route   DELETE /api/fptk/:id
+ * @desc    Permanently delete FPTK (and related applications)
+ * @access  Private (Super Admin only)
+ */
+router.delete(
+  '/:id',
+  authenticate,
+  authorize('SUPER_ADMIN'),
+  validationRules.uuidParam('id'),
+  validate,
+  asyncHandler(async (req, res) => {
+    const result = await fptkService.deleteFPTK(req.params.id);
+
+    res.json({
+      success: true,
+      message: 'Position deleted successfully',
+      data: result,
     });
   })
 );

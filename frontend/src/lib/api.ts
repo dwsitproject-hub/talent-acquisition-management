@@ -334,6 +334,14 @@ export const FPTKAPI = {
     const res = await api.post(`/fptk/${id}/unpublish`)
     return res.data.data
   },
+  async delete(id: string) {
+    const res = await api.delete(`/fptk/${id}`)
+    return res.data.data
+  },
+  async deleteBulk(ids: string[]) {
+    const res = await api.post('/fptk/bulk-delete', { ids })
+    return res.data.data
+  },
 }
 
 // Candidates APIs

@@ -17,7 +17,7 @@ const mapEmploymentType = (value?: string): JobType => {
   return 'full-time'
 }
 
-import { PlusIcon, MagnifyingGlassIcon, BriefcaseIcon, EyeIcon, PencilIcon, ArrowUpTrayIcon, DocumentArrowDownIcon, XMarkIcon, DocumentDuplicateIcon } from '@heroicons/react/24/outline'
+import { PlusIcon, MagnifyingGlassIcon, BriefcaseIcon, EyeIcon, PencilIcon, ArrowUpTrayIcon, DocumentArrowDownIcon, XMarkIcon, DocumentDuplicateIcon, TrashIcon } from '@heroicons/react/24/outline'
 import { parseFPTKExcelFile, generateFPTKTemplate, FPTKUploadResult } from '@/utils/fptkExcelParser'
 import { FPTKAPI, MenuAccessAPI } from '@/lib/api'
 import MultiSelectDropdown from '@/components/MultiSelectDropdown'
@@ -364,6 +364,9 @@ export default function FPTKPage() {
   const autoEditHandledRef = useRef(false)
   const [menuAccess, setMenuAccess] = useState<Record<string, any>>({})
   const [menuAccessLoading, setMenuAccessLoading] = useState(true)
+  const [deletingId, setDeletingId] = useState<string | null>(null)
+  const [bulkDeleting, setBulkDeleting] = useState(false)
+  const [selectedIds, setSelectedIds] = useState<string[]>([])
 
   useEffect(() => {
     if (!isLoading && !isAuthenticated) {
@@ -416,6 +419,10 @@ export default function FPTKPage() {
     return () => clearTimeout(timer)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [searchTerm])
+
+  useEffect(() => {
+    setSelectedIds((prev) => prev.filter((id) => fptks.some((f) => f.id === id)))
+  }, [fptks])
 
   useEffect(() => {
     let isMounted = true
@@ -561,6 +568,31 @@ export default function FPTKPage() {
     } catch (error: any) {
       console.error('Error copying position:', error)
       alert(error.response?.data?.message || 'Failed to copy position. Please try again.')
+    }
+  }
+
+  const handleDeleteJobPosting = async (jobPosting: FPTK) => {
+    const label = jobPosting.title || jobPosting.position || 'this position'
+    const confirmed = window.confirm(
+      `Delete "${label}" permanently? This removes the position and all related applications. This cannot be undone.`
+    )
+    if (!confirmed) return
+    try {
+      setDeletingId(jobPosting.id)
+      await FPTKAPI.delete(jobPosting.id)
+      if (selectedJobPosting?.id === jobPosting.id) {
+        setIsViewModalOpen(false)
+        setIsEditModalOpen(false)
+        setSelectedJobPosting(null)
+      }
+      setFptks((prev) => prev.filter((f) => f.id !== jobPosting.id))
+      setSelectedIds((prev) => prev.filter((id) => id !== jobPosting.id))
+      alert('Position deleted.')
+    } catch (error: any) {
+      console.error('Error deleting position:', error)
+      alert(error.response?.data?.message || 'Failed to delete position. Please try again.')
+    } finally {
+      setDeletingId(null)
     }
   }
 
@@ -897,6 +929,7 @@ export default function FPTKPage() {
   const canEdit = (perms.edit || []).includes(roleName) || (perms.edit || []).includes('*')
   // Check if user can upload (SUPER_ADMIN, TA_TEAM, HRBP)
   const canUpload = ['SUPER_ADMIN', 'TA_TEAM', 'HRBP'].includes(roleName) || ['SUPER_ADMIN', 'TA_TEAM', 'HRBP'].includes(backendRole)
+  const canDelete = backendRole === 'SUPER_ADMIN'
   
   // Debug: Log role check
   console.log('FPTK Page - Role check:', { roleName, canUpload, visibleRoles })
@@ -934,6 +967,56 @@ export default function FPTKPage() {
   
   // Get unique statuses for filter dropdown
   const uniqueStatuses = CURRENT_STATUS_OPTIONS as unknown as string[]
+
+  const visibleRowIds = filteredFptks.map((f) => f.id)
+  const selectedVisibleCount = selectedIds.filter((id) => visibleRowIds.includes(id)).length
+  const allVisibleSelected = visibleRowIds.length > 0 && selectedVisibleCount === visibleRowIds.length
+  const someVisibleSelected = selectedVisibleCount > 0 && !allVisibleSelected
+
+  const togglePositionSelection = (id: string) => {
+    setSelectedIds((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]))
+  }
+
+  const handleToggleSelectAllVisible = () => {
+    if (visibleRowIds.length === 0) return
+    if (allVisibleSelected) {
+      setSelectedIds((prev) => prev.filter((id) => !visibleRowIds.includes(id)))
+    } else {
+      setSelectedIds((prev) => [...new Set([...prev, ...visibleRowIds])])
+    }
+  }
+
+  const handleDeleteSelected = async () => {
+    if (selectedIds.length === 0) return
+    const toDelete = selectedIds.filter((id) => fptks.some((f) => f.id === id))
+    if (toDelete.length === 0) {
+      setSelectedIds([])
+      return
+    }
+    const confirmed = window.confirm(
+      `Delete ${toDelete.length} position(s) permanently? This removes each position and its related applications. This cannot be undone.`
+    )
+    if (!confirmed) return
+    try {
+      setBulkDeleting(true)
+      await FPTKAPI.deleteBulk(toDelete)
+      setFptks((prev) => prev.filter((f) => !toDelete.includes(f.id)))
+      if (selectedJobPosting && toDelete.includes(selectedJobPosting.id)) {
+        setIsViewModalOpen(false)
+        setIsEditModalOpen(false)
+        setSelectedJobPosting(null)
+      }
+      setSelectedIds([])
+      alert(`${toDelete.length} position(s) deleted.`)
+    } catch (error: any) {
+      console.error('Error bulk deleting positions:', error)
+      alert(error.response?.data?.message || 'Failed to delete positions. Please try again.')
+    } finally {
+      setBulkDeleting(false)
+    }
+  }
+
+  const selectionBusy = bulkDeleting || deletingId !== null
 
   return (
     <Layout>
@@ -1081,6 +1164,41 @@ export default function FPTKPage() {
 
         {/* FPTK List */}
         <div id="fptk-position-list" className="bg-white shadow overflow-hidden sm:rounded-md">
+          {canDelete && !loading && filteredFptks.length > 0 && (
+            <div className="px-4 py-3 border-b border-gray-200 bg-gray-50 flex flex-wrap items-center justify-between gap-3">
+              <label className="inline-flex items-center gap-2 text-sm text-gray-700 cursor-pointer select-none">
+                <input
+                  type="checkbox"
+                  className="h-4 w-4 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
+                  checked={allVisibleSelected}
+                  ref={(el) => {
+                    if (el) el.indeterminate = someVisibleSelected
+                  }}
+                  onChange={handleToggleSelectAllVisible}
+                  disabled={selectionBusy}
+                />
+                <span>Select all in this list ({filteredFptks.length})</span>
+              </label>
+              <div className="flex items-center gap-2">
+                <span className="text-sm text-gray-600">
+                  {selectedIds.length} selected
+                </span>
+                <button
+                  type="button"
+                  onClick={handleDeleteSelected}
+                  disabled={selectedIds.length === 0 || selectionBusy}
+                  className={`inline-flex items-center px-3 py-1.5 border text-sm font-medium rounded-md ${
+                    selectedIds.length === 0 || selectionBusy
+                      ? 'border-gray-200 text-gray-400 bg-gray-100 cursor-not-allowed'
+                      : 'border-red-300 text-red-700 bg-white hover:bg-red-50'
+                  }`}
+                >
+                  <TrashIcon className="h-4 w-4 mr-1.5" />
+                  {bulkDeleting ? 'Deleting…' : `Delete selected (${selectedIds.length})`}
+                </button>
+              </div>
+            </div>
+          )}
           {loading ? (
             <div className="p-6 text-center">
               <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600 mx-auto"></div>
@@ -1108,7 +1226,17 @@ export default function FPTKPage() {
               {filteredFptks.map((fptk) => (
                 <li key={fptk.id}>
                   <div className="px-4 py-4 flex items-center justify-between hover:bg-gray-50">
-                    <div className="flex items-center">
+                    <div className="flex items-center min-w-0 flex-1">
+                      {canDelete && (
+                        <input
+                          type="checkbox"
+                          className="h-4 w-4 mr-3 shrink-0 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
+                          checked={selectedIds.includes(fptk.id)}
+                          onChange={() => togglePositionSelection(fptk.id)}
+                          disabled={selectionBusy}
+                          aria-label={`Select ${fptk.title || fptk.position}`}
+                        />
+                      )}
                       <div className="flex-shrink-0">
                         <div className="h-10 w-10 rounded-full bg-indigo-100 flex items-center justify-center">
                           <BriefcaseIcon className="h-6 w-6 text-indigo-600" />
@@ -1155,6 +1283,22 @@ export default function FPTKPage() {
                         <DocumentDuplicateIcon className="h-4 w-4 mr-1" />
                         Copy
                       </button>
+                      {canDelete && (
+                        <button
+                          type="button"
+                          onClick={() => handleDeleteJobPosting(fptk)}
+                          disabled={selectionBusy}
+                          className={`text-sm font-medium flex items-center ${
+                            deletingId === fptk.id
+                              ? 'text-red-300 cursor-wait'
+                              : 'text-red-600 hover:text-red-800'
+                          }`}
+                          title="Delete position (Super Admin)"
+                        >
+                          <TrashIcon className="h-4 w-4 mr-1" />
+                          {deletingId === fptk.id ? 'Deleting…' : 'Delete'}
+                        </button>
+                      )}
                     </div>
                   </div>
                 </li>
