@@ -433,10 +433,18 @@ export function parseFPTKExcelFile(file: File): Promise<FPTKUploadResult> {
       const arrayBuffer = await file.arrayBuffer()
       const workbook = new ExcelJS.Workbook()
       await workbook.xlsx.load(arrayBuffer)
-      
-      // Get the first worksheet
-      const worksheet = workbook.worksheets[0]
-      
+
+      // Pick the first non-hidden worksheet with at least a header + one data row.
+      // Templates include a veryHidden `_lists` sheet which must be ignored.
+      const visibleSheets = (workbook.worksheets || []).filter(
+        (ws: any) => ws && ws.state !== 'veryHidden'
+      )
+      const worksheet =
+        visibleSheets.find((ws: any) => (ws?.rowCount || 0) >= 2) ||
+        visibleSheets[0] ||
+        (workbook.worksheets || []).find((ws: any) => (ws?.rowCount || 0) >= 2) ||
+        workbook.worksheets?.[0]
+
       if (!worksheet) {
         throw new Error('No worksheet found in the Excel file')
       }
