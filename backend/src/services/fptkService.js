@@ -1,5 +1,6 @@
 const prisma = require('../config/database');
 const logger = require('../utils/logger');
+const { buildHrbpFptkFilterFromUser } = require('../utils/hrbpScope');
 const masterOfficeLocationService = require('./masterOfficeLocationService');
 const masterDivisionService = require('./masterDivisionService');
 
@@ -902,19 +903,14 @@ function buildInternalFptkListWhere(filters = {}, user = null) {
     const userRole = user.role;
     const userFirstName = user.firstName;
     const userDivision = user.division;
-    const userPt = user.pt;
-    const userArea = user.area;
-    const userAreaDetail = user.areaDetail;
-
     if ((userRole === 'HIRING_MANAGER' || userRole === 'HIRING_MANAGER') && userFirstName) {
       where.hiringManager = userFirstName;
     } else if ((userRole === 'Head of Division' || userRole === 'DEPARTMENT_HEAD') && userDivision) {
       where.division = userDivision;
     } else if (userRole === 'HRBP') {
-      if (userPt && userArea && userAreaDetail) {
-        where.pt = userPt;
-        where.area = userArea;
-        where.areaDetail = userAreaDetail;
+      const hrbp = buildHrbpFptkFilterFromUser(user);
+      if (hrbp) {
+        Object.assign(where, hrbp);
       } else {
         where.id = '00000000-0000-0000-0000-000000000000';
       }
@@ -1030,10 +1026,6 @@ async function getSummaryByPosition(user = null) {
     const userRole = user.role;
     const userFirstName = user.firstName;
     const userDivision = user.division;
-    const userPt = user.pt;
-    const userArea = user.area;
-    const userAreaDetail = user.areaDetail;
-
     if ((userRole === 'HIRING_MANAGER' || userRole === 'HIRING_MANAGER') && userFirstName) {
       fptkWhere.hiringManager = userFirstName;
       applicationWhere.fptk = { hiringManager: userFirstName };
@@ -1041,11 +1033,10 @@ async function getSummaryByPosition(user = null) {
       fptkWhere.division = userDivision;
       applicationWhere.fptk = { division: userDivision };
     } else if (userRole === 'HRBP') {
-      if (userPt && userArea && userAreaDetail) {
-        fptkWhere.pt = userPt;
-        fptkWhere.area = userArea;
-        fptkWhere.areaDetail = userAreaDetail;
-        applicationWhere.fptk = { pt: userPt, area: userArea, areaDetail: userAreaDetail };
+      const hrbp = buildHrbpFptkFilterFromUser(user);
+      if (hrbp) {
+        Object.assign(fptkWhere, hrbp);
+        applicationWhere.fptk = hrbp;
       } else {
         fptkWhere.id = '00000000-0000-0000-0000-000000000000';
         applicationWhere.id = '00000000-0000-0000-0000-000000000000';

@@ -6,6 +6,52 @@ import { useRouter } from 'next/navigation'
 import Layout from '@/components/Layout/Layout'
 import { PlusIcon, MagnifyingGlassIcon, UserGroupIcon, EnvelopeIcon, PhoneIcon, BriefcaseIcon, EyeIcon, EyeSlashIcon } from '@heroicons/react/24/outline'
 import { AdminUsersAPI, MasterDivisionAPI, MasterOfficeLocationAPI, MenuAccessAPI } from '@/lib/api'
+import MultiSelectDropdown from '@/components/MultiSelectDropdown'
+
+/** Matches backend `hrbpScope` storage (multiple values joined with ||) */
+const HRBP_STORE_SEP = '||'
+
+function parseHrbpStored(value?: string | null): string[] {
+  if (!value?.trim()) return []
+  return value.split(HRBP_STORE_SEP).map((s) => s.trim()).filter(Boolean)
+}
+
+function serializeHrbpStored(parts: string[]): string {
+  return parts.map((p) => p.trim()).filter(Boolean).join(HRBP_STORE_SEP)
+}
+
+function getValidAreasForPts(pts: string[], officeLocations: any[]): Set<string> {
+  const s = new Set<string>()
+  officeLocations.forEach((loc) => {
+    if (pts.includes(loc?.pt) && loc?.area) s.add(loc.area)
+  })
+  return s
+}
+
+function getValidDetailsFor(pts: string[], areas: string[], officeLocations: any[]): Set<string> {
+  const s = new Set<string>()
+  officeLocations.forEach((loc) => {
+    if (pts.includes(loc?.pt) && areas.includes(loc?.area) && loc?.areaDetail) {
+      s.add(loc.areaDetail)
+    }
+  })
+  return s
+}
+
+function formatHrbpDisplayLine(pt?: string, area?: string, areaDetail?: string) {
+  const fmt = (raw?: string) =>
+    raw
+      ? parseHrbpStored(raw).join(', ')
+      : ''
+  const parts: string[] = []
+  const p = fmt(pt)
+  const a = fmt(area)
+  const d = fmt(areaDetail)
+  if (p) parts.push(`PT: ${p}`)
+  if (a) parts.push(`Area: ${a}`)
+  if (d) parts.push(`Detail: ${d}`)
+  return parts.join(' • ')
+}
 
 interface TeamMember {
   id: string
@@ -49,9 +95,9 @@ const [newMember, setNewMember] = useState({
     role: 'TA_TEAM',
     division: '',
     sectionName: '',
-    pt: '',
-    area: '',
-    areaDetail: ''
+    pt: [] as string[],
+    area: [] as string[],
+    areaDetail: [] as string[],
   })
   const [editMember, setEditMember] = useState({
     firstName: '',
@@ -61,9 +107,9 @@ const [newMember, setNewMember] = useState({
     role: '',
     division: '',
     sectionName: '',
-    pt: '',
-    area: '',
-    areaDetail: '',
+    pt: [] as string[],
+    area: [] as string[],
+    areaDetail: [] as string[],
     resetPassword: false
   })
   const [divisions, setDivisions] = useState<{ id: string, divisionName: string, sectionName: string }[]>([])
@@ -228,10 +274,10 @@ const handleSaveMenuAccess = async () => {
   }, [officeLocations])
 
   const newMemberAreaOptions = useMemo(() => {
-    if (!newMember.pt) return []
+    if (!newMember.pt.length) return []
     const set = new Set<string>()
     officeLocations.forEach((loc) => {
-      if (loc?.pt === newMember.pt && loc?.area) {
+      if (newMember.pt.includes(loc?.pt) && loc?.area) {
         set.add(loc.area)
       }
     })
@@ -239,10 +285,14 @@ const handleSaveMenuAccess = async () => {
   }, [newMember.pt, officeLocations])
 
   const newMemberAreaDetailOptions = useMemo(() => {
-    if (!newMember.pt || !newMember.area) return []
+    if (!newMember.pt.length || !newMember.area.length) return []
     const set = new Set<string>()
     officeLocations.forEach((loc) => {
-      if (loc?.pt === newMember.pt && loc?.area === newMember.area && loc?.areaDetail) {
+      if (
+        newMember.pt.includes(loc?.pt) &&
+        newMember.area.includes(loc?.area) &&
+        loc?.areaDetail
+      ) {
         set.add(loc.areaDetail)
       }
     })
@@ -250,10 +300,10 @@ const handleSaveMenuAccess = async () => {
   }, [newMember.pt, newMember.area, officeLocations])
 
   const editMemberAreaOptions = useMemo(() => {
-    if (!editMember.pt) return []
+    if (!editMember.pt.length) return []
     const set = new Set<string>()
     officeLocations.forEach((loc) => {
-      if (loc?.pt === editMember.pt && loc?.area) {
+      if (editMember.pt.includes(loc?.pt) && loc?.area) {
         set.add(loc.area)
       }
     })
@@ -261,10 +311,14 @@ const handleSaveMenuAccess = async () => {
   }, [editMember.pt, officeLocations])
 
   const editMemberAreaDetailOptions = useMemo(() => {
-    if (!editMember.pt || !editMember.area) return []
+    if (!editMember.pt.length || !editMember.area.length) return []
     const set = new Set<string>()
     officeLocations.forEach((loc) => {
-      if (loc?.pt === editMember.pt && loc?.area === editMember.area && loc?.areaDetail) {
+      if (
+        editMember.pt.includes(loc?.pt) &&
+        editMember.area.includes(loc?.area) &&
+        loc?.areaDetail
+      ) {
         set.add(loc.areaDetail)
       }
     })
@@ -485,13 +539,13 @@ const handleSaveMenuAccess = async () => {
       errors.password = 'Password must be at least 6 characters'
     }
     if (member.role === 'HRBP') {
-      if (!member.pt?.trim()) {
+      if (!member.pt?.length) {
         errors.pt = 'PT is required for HRBP role'
       }
-      if (!member.area?.trim()) {
+      if (!member.area?.length) {
         errors.area = 'Area is required for HRBP role'
       }
-      if (!member.areaDetail?.trim()) {
+      if (!member.areaDetail?.length) {
         errors.areaDetail = 'Area Detail is required for HRBP role'
       }
     }
@@ -508,9 +562,9 @@ const handleSaveMenuAccess = async () => {
       role: member.role,
       division: member.division,
       sectionName: member.sectionName || '',
-      pt: member.pt || '',
-      area: member.area || '',
-      areaDetail: member.areaDetail || '',
+      pt: parseHrbpStored(member.pt),
+      area: parseHrbpStored(member.area),
+      areaDetail: parseHrbpStored(member.areaDetail),
       resetPassword: false
     })
     setValidationErrors({})
@@ -543,14 +597,14 @@ const handleSaveMenuAccess = async () => {
         division: newMember.division || '',
         sectionName: newMember.sectionName || '',
         password: newMember.password || defaultPassword,
-        pt: newMember.pt || '',
-        area: newMember.area || '',
-        areaDetail: newMember.areaDetail || '',
+        pt: serializeHrbpStored(newMember.pt),
+        area: serializeHrbpStored(newMember.area),
+        areaDetail: serializeHrbpStored(newMember.areaDetail),
       })
       // Reload team members to get fresh data
       await loadTeamMembers()
       setIsAddOpen(false)
-      setNewMember({ firstName: '', lastName: '', email: '', phone: '', password: '', role: 'TA_TEAM', division: '', sectionName: '', pt: '', area: '', areaDetail: '' })
+      setNewMember({ firstName: '', lastName: '', email: '', phone: '', password: '', role: 'TA_TEAM', division: '', sectionName: '', pt: [], area: [], areaDetail: [] })
       setValidationErrors({})
       setShowPassword(false)
       alert('Team member created successfully!')
@@ -581,9 +635,9 @@ const handleSaveMenuAccess = async () => {
         role: editMember.role,
         division: editMember.division || '',
         sectionName: editMember.sectionName || '',
-        pt: editMember.pt || '',
-        area: editMember.area || '',
-        areaDetail: editMember.areaDetail || '',
+        pt: serializeHrbpStored(editMember.pt),
+        area: serializeHrbpStored(editMember.area),
+        areaDetail: serializeHrbpStored(editMember.areaDetail),
       })
       if (editMember.resetPassword && canManageMenu) {
         await AdminUsersAPI.resetPassword(editingMember.id, defaultPassword)
@@ -843,7 +897,7 @@ const handleSaveMenuAccess = async () => {
                         </div>
                         {(member.pt || member.area || member.areaDetail) && (
                           <div className="mt-1 text-sm text-gray-500">
-                            <p>{[member.pt, member.area, member.areaDetail].filter(Boolean).join(' • ')}</p>
+                            <p>{formatHrbpDisplayLine(member.pt, member.area, member.areaDetail)}</p>
                           </div>
                         )}
                         <div className="mt-1 text-sm text-gray-500">
@@ -1004,16 +1058,16 @@ const handleSaveMenuAccess = async () => {
             setIsAddOpen(false)
             setValidationErrors({})
             setShowPassword(false)
-            setNewMember({ firstName: '', lastName: '', email: '', phone: '', password: '', role: 'TA_TEAM', division: '', sectionName: '', pt: '', area: '', areaDetail: '' })
+            setNewMember({ firstName: '', lastName: '', email: '', phone: '', password: '', role: 'TA_TEAM', division: '', sectionName: '', pt: [], area: [], areaDetail: [] })
           }}>
-            <div className="bg-white rounded-lg shadow-xl w-full max-w-lg mx-4" onClick={(e) => e.stopPropagation()}>
+            <div className="bg-white rounded-lg shadow-xl w-full max-w-3xl mx-4 max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
               <div className="px-6 py-4 border-b flex justify-between items-center">
                 <h2 className="text-lg font-semibold text-gray-900">Add User</h2>
                 <button className="text-gray-500 hover:text-gray-700" onClick={() => {
                   setIsAddOpen(false)
                   setValidationErrors({})
                   setShowPassword(false)
-                  setNewMember({ firstName: '', lastName: '', email: '', phone: '', password: '', role: 'TA_TEAM', division: '', sectionName: '', pt: '', area: '', areaDetail: '' })
+                  setNewMember({ firstName: '', lastName: '', email: '', phone: '', password: '', role: 'TA_TEAM', division: '', sectionName: '', pt: [], area: [], areaDetail: [] })
                 }}>✕</button>
               </div>
               <div className="px-6 py-4 space-y-3">
@@ -1131,7 +1185,18 @@ const handleSaveMenuAccess = async () => {
                   </div>
                   <div>
                     <label className="block text-sm text-gray-700 mb-1">Role</label>
-                    <select className="w-full border rounded-md px-3 py-2 text-sm" value={newMember.role} onChange={(e) => setNewMember({ ...newMember, role: e.target.value })}>
+                    <select
+                      className="w-full border rounded-md px-3 py-2 text-sm"
+                      value={newMember.role}
+                      onChange={(e) => {
+                        const role = e.target.value
+                        setNewMember({
+                          ...newMember,
+                          role,
+                          ...(role !== 'HRBP' ? { pt: [], area: [], areaDetail: [] } : {}),
+                        })
+                      }}
+                    >
                       {ROLE_OPTIONS.map(role => (
                         <option key={role} value={role}>
                           {role.replace('_', ' ')}
@@ -1160,84 +1225,55 @@ const handleSaveMenuAccess = async () => {
                     </select>
                   </div>
                 </div>
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                  <div>
-                    <label className="block text-sm text-gray-700 mb-1">
-                      PT {newMember.role === 'HRBP' && <span className="text-red-500">*</span>}
-                    </label>
-                    <select
-                      className={`w-full border rounded-md px-3 py-2 text-sm ${validationErrors.pt ? 'border-red-500' : ''}`}
-                      value={newMember.pt}
-                      onChange={(e) => {
-                        setNewMember({ ...newMember, pt: e.target.value, area: '', areaDetail: '' })
-                        if (validationErrors.pt) {
-                          setValidationErrors({ ...validationErrors, pt: '' })
-                        }
-                      }}
-                    >
-                      <option value="">Select PT</option>
-                      {ptOptions.map((pt) => (
-                        <option key={pt} value={pt}>
-                          {pt}
-                        </option>
-                      ))}
-                    </select>
-                    {validationErrors.pt && (
-                      <p className="mt-1 text-sm text-red-500">{validationErrors.pt}</p>
-                    )}
-                  </div>
-                  <div>
-                    <label className="block text-sm text-gray-700 mb-1">
-                      Area {newMember.role === 'HRBP' && <span className="text-red-500">*</span>}
-                    </label>
-                    <select
-                      className={`w-full border rounded-md px-3 py-2 text-sm ${validationErrors.area ? 'border-red-500' : ''}`}
-                      value={newMember.area}
-                      onChange={(e) => {
-                        setNewMember({ ...newMember, area: e.target.value, areaDetail: '' })
-                        if (validationErrors.area) {
-                          setValidationErrors({ ...validationErrors, area: '' })
-                        }
-                      }}
-                      disabled={!newMember.pt || newMemberAreaOptions.length === 0}
-                    >
-                      <option value="">{newMember.pt ? 'Select Area' : 'Select PT first'}</option>
-                      {newMemberAreaOptions.map((area) => (
-                        <option key={area} value={area}>
-                          {area}
-                        </option>
-                      ))}
-                    </select>
-                    {validationErrors.area && (
-                      <p className="mt-1 text-sm text-red-500">{validationErrors.area}</p>
-                    )}
-                  </div>
-                  <div>
-                    <label className="block text-sm text-gray-700 mb-1">
-                      Area Detail {newMember.role === 'HRBP' && <span className="text-red-500">*</span>}
-                    </label>
-                    <select
-                      className={`w-full border rounded-md px-3 py-2 text-sm ${validationErrors.areaDetail ? 'border-red-500' : ''}`}
-                      value={newMember.areaDetail}
-                      onChange={(e) => {
-                        setNewMember({ ...newMember, areaDetail: e.target.value })
-                        if (validationErrors.areaDetail) {
-                          setValidationErrors({ ...validationErrors, areaDetail: '' })
-                        }
-                      }}
-                      disabled={!newMember.area || newMemberAreaDetailOptions.length === 0}
-                    >
-                      <option value="">{newMember.area ? 'Select Area Detail' : 'Select Area first'}</option>
-                      {newMemberAreaDetailOptions.map((detail) => (
-                        <option key={detail} value={detail}>
-                          {detail}
-                        </option>
-                      ))}
-                    </select>
-                    {validationErrors.areaDetail && (
-                      <p className="mt-1 text-sm text-red-500">{validationErrors.areaDetail}</p>
-                    )}
-                  </div>
+                <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+                  <MultiSelectDropdown
+                    label={`PT${newMember.role === 'HRBP' ? ' *' : ''}`}
+                    options={ptOptions}
+                    value={newMember.pt}
+                    error={!!validationErrors.pt}
+                    placeholder="Select PT"
+                    searchPlaceholder="Search PT..."
+                    onChange={(nextPt) => {
+                      setNewMember((prev) => {
+                        const validAreas = getValidAreasForPts(nextPt, officeLocations)
+                        const nextArea = prev.area.filter((a) => validAreas.has(a))
+                        const validDetails = getValidDetailsFor(nextPt, nextArea, officeLocations)
+                        const nextDetail = prev.areaDetail.filter((d) => validDetails.has(d))
+                        return { ...prev, pt: nextPt, area: nextArea, areaDetail: nextDetail }
+                      })
+                      if (validationErrors.pt) setValidationErrors({ ...validationErrors, pt: '' })
+                    }}
+                  />
+                  <MultiSelectDropdown
+                    label={`Area${newMember.role === 'HRBP' ? ' *' : ''}`}
+                    options={newMemberAreaOptions}
+                    value={newMember.area}
+                    error={!!validationErrors.area}
+                    placeholder={newMember.pt.length ? 'Select Area' : 'Select PT first'}
+                    searchPlaceholder="Search Area..."
+                    onChange={(nextArea) => {
+                      setNewMember((prev) => {
+                        const validDetails = getValidDetailsFor(prev.pt, nextArea, officeLocations)
+                        const nextDetail = prev.areaDetail.filter((d) => validDetails.has(d))
+                        return { ...prev, area: nextArea, areaDetail: nextDetail }
+                      })
+                      if (validationErrors.area) setValidationErrors({ ...validationErrors, area: '' })
+                    }}
+                    className={!newMember.pt.length ? 'opacity-60 pointer-events-none' : undefined}
+                  />
+                  <MultiSelectDropdown
+                    label={`Area Detail${newMember.role === 'HRBP' ? ' *' : ''}`}
+                    options={newMemberAreaDetailOptions}
+                    value={newMember.areaDetail}
+                    error={!!validationErrors.areaDetail}
+                    placeholder={newMember.area.length ? 'Select Area Detail' : 'Select Area first'}
+                    searchPlaceholder="Search Detail..."
+                    onChange={(nextDetail) => {
+                      setNewMember((prev) => ({ ...prev, areaDetail: nextDetail }))
+                      if (validationErrors.areaDetail) setValidationErrors({ ...validationErrors, areaDetail: '' })
+                    }}
+                    className={!newMember.area.length ? 'opacity-60 pointer-events-none' : undefined}
+                  />
                 </div>
               </div>
               <div className="px-6 py-4 border-t flex justify-end gap-2">
@@ -1247,7 +1283,7 @@ const handleSaveMenuAccess = async () => {
                     setIsAddOpen(false)
                     setValidationErrors({})
                     setShowPassword(false)
-                    setNewMember({ firstName: '', lastName: '', email: '', phone: '', password: '', role: 'TA_TEAM', division: '', sectionName: '', pt: '', area: '', areaDetail: '' })
+                    setNewMember({ firstName: '', lastName: '', email: '', phone: '', password: '', role: 'TA_TEAM', division: '', sectionName: '', pt: [], area: [], areaDetail: [] })
                   }}
                 >
                   Cancel
@@ -1269,7 +1305,7 @@ const handleSaveMenuAccess = async () => {
             setIsEditOpen(false)
             setValidationErrors({})
           }}>
-            <div className="bg-white rounded-lg shadow-xl w-full max-w-lg mx-4" onClick={(e) => e.stopPropagation()}>
+            <div className="bg-white rounded-lg shadow-xl w-full max-w-3xl mx-4 max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
               <div className="px-6 py-4 border-b flex justify-between items-center">
                 <h2 className="text-lg font-semibold text-gray-900">Edit User</h2>
                 <button className="text-gray-500 hover:text-gray-700" onClick={() => {
@@ -1336,7 +1372,18 @@ const handleSaveMenuAccess = async () => {
                   </div>
                   <div>
                     <label className="block text-sm text-gray-700 mb-1">Role</label>
-                    <select className="w-full border rounded-md px-3 py-2 text-sm" value={editMember.role} onChange={(e) => setEditMember({ ...editMember, role: e.target.value })}>
+                    <select
+                      className="w-full border rounded-md px-3 py-2 text-sm"
+                      value={editMember.role}
+                      onChange={(e) => {
+                        const role = e.target.value
+                        setEditMember({
+                          ...editMember,
+                          role,
+                          ...(role !== 'HRBP' ? { pt: [], area: [], areaDetail: [] } : {}),
+                        })
+                      }}
+                    >
                       {ROLE_OPTIONS.map(role => (
                         <option key={role} value={role}>
                           {role.replace('_', ' ')}
@@ -1365,84 +1412,55 @@ const handleSaveMenuAccess = async () => {
                     </select>
                   </div>
                 </div>
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                  <div>
-                    <label className="block text-sm text-gray-700 mb-1">
-                      PT {editMember.role === 'HRBP' && <span className="text-red-500">*</span>}
-                    </label>
-                    <select
-                      className={`w-full border rounded-md px-3 py-2 text-sm ${validationErrors.pt ? 'border-red-500' : ''}`}
-                      value={editMember.pt}
-                      onChange={(e) => {
-                        setEditMember({ ...editMember, pt: e.target.value, area: '', areaDetail: '' })
-                        if (validationErrors.pt) {
-                          setValidationErrors({ ...validationErrors, pt: '' })
-                        }
-                      }}
-                    >
-                      <option value="">Select PT</option>
-                      {ptOptions.map((pt) => (
-                        <option key={pt} value={pt}>
-                          {pt}
-                        </option>
-                      ))}
-                    </select>
-                    {validationErrors.pt && (
-                      <p className="mt-1 text-sm text-red-500">{validationErrors.pt}</p>
-                    )}
-                  </div>
-                  <div>
-                    <label className="block text-sm text-gray-700 mb-1">
-                      Area {editMember.role === 'HRBP' && <span className="text-red-500">*</span>}
-                    </label>
-                    <select
-                      className={`w-full border rounded-md px-3 py-2 text-sm ${validationErrors.area ? 'border-red-500' : ''}`}
-                      value={editMember.area}
-                      onChange={(e) => {
-                        setEditMember({ ...editMember, area: e.target.value, areaDetail: '' })
-                        if (validationErrors.area) {
-                          setValidationErrors({ ...validationErrors, area: '' })
-                        }
-                      }}
-                      disabled={!editMember.pt || editMemberAreaOptions.length === 0}
-                    >
-                      <option value="">{editMember.pt ? 'Select Area' : 'Select PT first'}</option>
-                      {editMemberAreaOptions.map((area) => (
-                        <option key={area} value={area}>
-                          {area}
-                        </option>
-                      ))}
-                    </select>
-                    {validationErrors.area && (
-                      <p className="mt-1 text-sm text-red-500">{validationErrors.area}</p>
-                    )}
-                  </div>
-                  <div>
-                    <label className="block text-sm text-gray-700 mb-1">
-                      Area Detail {editMember.role === 'HRBP' && <span className="text-red-500">*</span>}
-                    </label>
-                    <select
-                      className={`w-full border rounded-md px-3 py-2 text-sm ${validationErrors.areaDetail ? 'border-red-500' : ''}`}
-                      value={editMember.areaDetail}
-                      onChange={(e) => {
-                        setEditMember({ ...editMember, areaDetail: e.target.value })
-                        if (validationErrors.areaDetail) {
-                          setValidationErrors({ ...validationErrors, areaDetail: '' })
-                        }
-                      }}
-                      disabled={!editMember.area || editMemberAreaDetailOptions.length === 0}
-                    >
-                      <option value="">{editMember.area ? 'Select Area Detail' : 'Select Area first'}</option>
-                      {editMemberAreaDetailOptions.map((detail) => (
-                        <option key={detail} value={detail}>
-                          {detail}
-                        </option>
-                      ))}
-                    </select>
-                    {validationErrors.areaDetail && (
-                      <p className="mt-1 text-sm text-red-500">{validationErrors.areaDetail}</p>
-                    )}
-                  </div>
+                <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+                  <MultiSelectDropdown
+                    label={`PT${editMember.role === 'HRBP' ? ' *' : ''}`}
+                    options={ptOptions}
+                    value={editMember.pt}
+                    error={!!validationErrors.pt}
+                    placeholder="Select PT"
+                    searchPlaceholder="Search PT..."
+                    onChange={(nextPt) => {
+                      setEditMember((prev) => {
+                        const validAreas = getValidAreasForPts(nextPt, officeLocations)
+                        const nextArea = prev.area.filter((a) => validAreas.has(a))
+                        const validDetails = getValidDetailsFor(nextPt, nextArea, officeLocations)
+                        const nextDetail = prev.areaDetail.filter((d) => validDetails.has(d))
+                        return { ...prev, pt: nextPt, area: nextArea, areaDetail: nextDetail }
+                      })
+                      if (validationErrors.pt) setValidationErrors({ ...validationErrors, pt: '' })
+                    }}
+                  />
+                  <MultiSelectDropdown
+                    label={`Area${editMember.role === 'HRBP' ? ' *' : ''}`}
+                    options={editMemberAreaOptions}
+                    value={editMember.area}
+                    error={!!validationErrors.area}
+                    placeholder={editMember.pt.length ? 'Select Area' : 'Select PT first'}
+                    searchPlaceholder="Search Area..."
+                    onChange={(nextArea) => {
+                      setEditMember((prev) => {
+                        const validDetails = getValidDetailsFor(prev.pt, nextArea, officeLocations)
+                        const nextDetail = prev.areaDetail.filter((d) => validDetails.has(d))
+                        return { ...prev, area: nextArea, areaDetail: nextDetail }
+                      })
+                      if (validationErrors.area) setValidationErrors({ ...validationErrors, area: '' })
+                    }}
+                    className={!editMember.pt.length ? 'opacity-60 pointer-events-none' : undefined}
+                  />
+                  <MultiSelectDropdown
+                    label={`Area Detail${editMember.role === 'HRBP' ? ' *' : ''}`}
+                    options={editMemberAreaDetailOptions}
+                    value={editMember.areaDetail}
+                    error={!!validationErrors.areaDetail}
+                    placeholder={editMember.area.length ? 'Select Area Detail' : 'Select Area first'}
+                    searchPlaceholder="Search Detail..."
+                    onChange={(nextDetail) => {
+                      setEditMember((prev) => ({ ...prev, areaDetail: nextDetail }))
+                      if (validationErrors.areaDetail) setValidationErrors({ ...validationErrors, areaDetail: '' })
+                    }}
+                    className={!editMember.area.length ? 'opacity-60 pointer-events-none' : undefined}
+                  />
                 </div>
                 {canManageMenu && (
                   <div className="border-t pt-3 mt-3 space-y-3">

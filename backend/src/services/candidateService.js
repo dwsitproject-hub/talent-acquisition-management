@@ -1,4 +1,5 @@
 const prisma = require('../config/database');
+const { buildHrbpFptkFilterFromUser } = require('../utils/hrbpScope');
 const bcrypt = require('bcryptjs');
 const { encrypt, decrypt } = require('../utils/encryption');
 const logger = require('../utils/logger');
@@ -861,10 +862,6 @@ async function searchCandidates(filters, pagination, user = null) {
     const userRole = user.role;
     const userFirstName = user.firstName;
     const userDivision = user.division;
-    const userPt = user.pt;
-    const userArea = user.area;
-    const userAreaDetail = user.areaDetail;
-
     if ((userRole === 'HIRING_MANAGER' || userRole === 'HIRING_MANAGER') && userFirstName) {
       // HIRING_MANAGER: only see candidates where Position.Hiring Manager = Team.First Name
       // Filter candidates that have applications with matching hiring manager
@@ -886,20 +883,14 @@ async function searchCandidates(filters, pagination, user = null) {
         }
       ];
     } else if (userRole === 'HRBP') {
-      // HRBP: only see candidates where Position.PT = Team.PT AND Position.Area = Team.Area AND Position.Area Detail = Team.Area Detail
-      // All three fields must be present and match
-      if (userPt && userArea && userAreaDetail) {
+      const hrbp = buildHrbpFptkFilterFromUser(user);
+      if (hrbp) {
         where.applications = {
           some: {
-            fptk: {
-              pt: userPt,
-              area: userArea,
-              areaDetail: userAreaDetail,
-            }
-          }
+            fptk: hrbp,
+          },
         };
       } else {
-        // If any field is missing, return no results (HRBP must have all three fields)
         where.id = '00000000-0000-0000-0000-000000000000'; // Non-existent ID to return empty results
       }
     }

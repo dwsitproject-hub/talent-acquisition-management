@@ -1,6 +1,7 @@
 const bcrypt = require('bcryptjs');
 const prisma = require('../config/database');
 const logger = require('../utils/logger');
+const { serializeHrbpFields } = require('../utils/hrbpScope');
 
 // Map frontend role names to backend enum values
 function mapRoleToEnum(role) {
@@ -95,7 +96,8 @@ async function createUser(data) {
   } = data;
 
   const hashed = await bcrypt.hash(password || 'DefaultPassword123!', 12);
-  
+  const hrbp = serializeHrbpFields({ pt, area, areaDetail });
+
   // Map role to enum value
   const mappedRole = mapRoleToEnum(role);
   logger.info(`Creating user with role: "${role}" -> mapped to: "${mappedRole}"`);
@@ -112,9 +114,9 @@ async function createUser(data) {
       role: mappedRole, // Prisma will map enum correctly
       division: division || null,
       department: sectionName || null,
-      pt: pt || null,
-      area: area || null,
-      areaDetail: areaDetail || null,
+      pt: hrbp.pt,
+      area: hrbp.area,
+      areaDetail: hrbp.areaDetail,
       isActive: true,
       isEmailVerified: true,
       emailVerifiedAt: new Date(),
@@ -138,6 +140,11 @@ async function updateUser(id, data) {
   
   // Use Prisma client to avoid enum type name mismatch issues
   // Prisma handles enum mapping correctly
+  const hrbp = serializeHrbpFields({
+    pt: data.pt,
+    area: data.area,
+    areaDetail: data.areaDetail,
+  });
   const updateData = {
     firstName: data.firstName,
     lastName: data.lastName,
@@ -146,9 +153,9 @@ async function updateUser(id, data) {
     role: mappedRole, // Prisma will map enum correctly
     division: toNullIfEmpty(data.division),
     department: toNullIfEmpty(data.sectionName),
-    pt: toNullIfEmpty(data.pt),
-    area: toNullIfEmpty(data.area),
-    areaDetail: toNullIfEmpty(data.areaDetail),
+    pt: hrbp.pt,
+    area: hrbp.area,
+    areaDetail: hrbp.areaDetail,
   };
   
   logger.info(`Updating user ${id} with data:`, {
