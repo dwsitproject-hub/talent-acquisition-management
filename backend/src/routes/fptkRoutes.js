@@ -1,6 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const { authenticate, authorize, optionalAuth } = require('../middleware/auth');
+const { requireMenuCreate } = require('../middleware/menuAccessAuth');
 const { asyncHandler } = require('../middleware/errorHandler');
 const fptkService = require('../services/fptkService');
 const { validationRules, validate } = require('../middleware/validator');
@@ -13,7 +14,7 @@ const { validationRules, validate } = require('../middleware/validator');
 router.post(
   '/',
   authenticate,
-  authorize('HIRING_MANAGER', 'TA_TEAM', 'SUPER_ADMIN'),
+  requireMenuCreate('/fptk', ['HIRING_MANAGER', 'TA_TEAM', 'SUPER_ADMIN']),
   validationRules.createFPTK,
   validate,
   asyncHandler(async (req, res) => {
@@ -107,6 +108,7 @@ router.get(
       department: req.query.department,
       isPublished: req.query.isPublished,
       search: req.query.search,
+      currentStatus: req.query.currentStatus,
     };
     
     const pagination = {
@@ -137,6 +139,48 @@ router.get(
     const result = await fptkService.getSummaryByPosition(req.user);
     res.json({
       success: true,
+      data: result,
+    });
+  })
+);
+
+/**
+ * @route   GET /api/fptk/counts-by-current-status
+ * @desc    Row counts per Current Status (scoped like list; optional search only)
+ * @access  Private
+ */
+router.get(
+  '/counts-by-current-status',
+  authenticate,
+  authorize('TA_TEAM', 'HRBP', 'SUPER_ADMIN', 'HIRING_MANAGER', 'CHRO', 'DEPARTMENT_HEAD'),
+  asyncHandler(async (req, res) => {
+    const filters = {
+      search: req.query.search,
+    };
+    const data = await fptkService.getFptkCurrentStatusCounts(filters, req.user);
+    res.json({
+      success: true,
+      data,
+    });
+  })
+);
+
+/**
+ * @route   POST /api/fptk/bulk-delete
+ * @desc    Permanently delete multiple FPTKs (and related applications)
+ * @access  Private (Super Admin only)
+ */
+router.post(
+  '/bulk-delete',
+  authenticate,
+  authorize('SUPER_ADMIN'),
+  asyncHandler(async (req, res) => {
+    const ids = Array.isArray(req.body?.ids) ? req.body.ids : [];
+    const result = await fptkService.deleteFPTKsBulk(ids);
+
+    res.json({
+      success: true,
+      message: `${result.deletedCount} position(s) deleted successfully`,
       data: result,
     });
   })
@@ -218,6 +262,28 @@ router.put(
       success: true,
       message: 'FPTK updated successfully',
       data: fptk,
+    });
+  })
+);
+
+/**
+ * @route   DELETE /api/fptk/:id
+ * @desc    Permanently delete FPTK (and related applications)
+ * @access  Private (Super Admin only)
+ */
+router.delete(
+  '/:id',
+  authenticate,
+  authorize('SUPER_ADMIN'),
+  validationRules.uuidParam('id'),
+  validate,
+  asyncHandler(async (req, res) => {
+    const result = await fptkService.deleteFPTK(req.params.id);
+
+    res.json({
+      success: true,
+      message: 'Position deleted successfully',
+      data: result,
     });
   })
 );

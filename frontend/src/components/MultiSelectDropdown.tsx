@@ -15,6 +15,7 @@ type Props = {
   placeholder?: string
   searchPlaceholder?: string
   className?: string
+  error?: boolean
 }
 
 const normalizeOptions = (options: Array<Option | string>): Option[] =>
@@ -28,6 +29,7 @@ export default function MultiSelectDropdown({
   placeholder = 'Select...',
   searchPlaceholder = 'Type to search...',
   className,
+  error = false,
 }: Props) {
   const [query, setQuery] = useState('')
   const normalized = useMemo(() => normalizeOptions(options), [options])
@@ -53,8 +55,9 @@ export default function MultiSelectDropdown({
           <>
             <Popover.Button
               className={clsx(
-                'w-full border border-gray-300 rounded-md px-3 py-2 text-sm bg-white text-left flex items-center justify-between',
-                open && 'ring-2 ring-indigo-500 border-indigo-500'
+                'w-full border rounded-md px-3 py-2 text-sm bg-white text-left flex items-center justify-between',
+                error ? 'border-red-500' : 'border-gray-300',
+                open && (error ? 'ring-2 ring-red-200' : 'ring-2 ring-indigo-500 border-indigo-500')
               )}
             >
               <span className={clsx(value.length === 0 ? 'text-gray-400' : 'text-gray-900')}>{selectedText}</span>

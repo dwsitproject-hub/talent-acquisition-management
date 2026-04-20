@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { useAuth } from '@/contexts/AuthContext'
 import { useRouter } from 'next/navigation'
 import Layout from '@/components/Layout/Layout'
@@ -17,8 +17,13 @@ const mapEmploymentType = (value?: string): JobType => {
   return 'full-time'
 }
 
-import { PlusIcon, MagnifyingGlassIcon, BriefcaseIcon, EyeIcon, PencilIcon, ArrowUpTrayIcon, DocumentArrowDownIcon, XMarkIcon, DocumentDuplicateIcon } from '@heroicons/react/24/outline'
-import { parseFPTKExcelFile, generateFPTKTemplate, FPTKUploadResult } from '@/utils/fptkExcelParser'
+import { PlusIcon, MagnifyingGlassIcon, BriefcaseIcon, EyeIcon, PencilIcon, ArrowUpTrayIcon, DocumentArrowDownIcon, XMarkIcon, DocumentDuplicateIcon, TrashIcon } from '@heroicons/react/24/outline'
+import {
+  parseFPTKExcelFile,
+  generateFPTKTemplate,
+  getPositionNameForFailedExport,
+  FPTKUploadResult,
+} from '@/utils/fptkExcelParser'
 import { FPTKAPI, MenuAccessAPI } from '@/lib/api'
 import MultiSelectDropdown from '@/components/MultiSelectDropdown'
 
@@ -364,6 +369,14 @@ export default function FPTKPage() {
   const autoEditHandledRef = useRef(false)
   const [menuAccess, setMenuAccess] = useState<Record<string, any>>({})
   const [menuAccessLoading, setMenuAccessLoading] = useState(true)
+  const [deletingId, setDeletingId] = useState<string | null>(null)
+  const [bulkDeleting, setBulkDeleting] = useState(false)
+  const [selectedIds, setSelectedIds] = useState<string[]>([])
+  const [page, setPage] = useState(1)
+  const [pageSize, setPageSize] = useState<10 | 50 | 100>(50)
+  const [listPagination, setListPagination] = useState({ total: 0, totalPages: 1 })
+  const [statusCounts, setStatusCounts] = useState<Record<string, number>>({})
+  const statusFilterKey = useMemo(() => [...statusFilters].sort().join('|'), [statusFilters])
 
   useEffect(() => {
     if (!isLoading && !isAuthenticated) {
@@ -374,25 +387,55 @@ export default function FPTKPage() {
   const loadFPTKs = async () => {
     try {
       setLoading(true)
-      const response = await FPTKAPI.getAll({ search: searchTerm }, { page: 1, limit: 100 })
-      // Map backend FPTK to frontend FPTK format
-      const mappedFPTKs: FPTK[] = response.data.map((fptk: any) => mapApiFptk(fptk))
+      const currentStatusParam =
+        statusFilters.length > 0 ? statusFilters.map((s) => s.trim()).join(',') : undefined
+      const [response, counts] = await Promise.all([
+        FPTKAPI.getAll(
+          {
+            search: searchTerm,
+            ...(currentStatusParam ? { currentStatus: currentStatusParam } : {}),
+          },
+          { page, limit: pageSize }
+        ),
+        FPTKAPI.getCountsByCurrentStatus(searchTerm),
+      ])
+      const mappedFPTKs: FPTK[] = (response.data || []).map((fptk: any) => mapApiFptk(fptk))
       setFptks(mappedFPTKs)
+      const pag = response.pagination || {}
+      setListPagination({
+        total: typeof pag.total === 'number' ? pag.total : mappedFPTKs.length,
+        totalPages: Math.max(1, pag.totalPages ?? 1),
+      })
+      setStatusCounts(counts || {})
     } catch (error) {
       console.error('Error loading FPTKs:', error)
       alert('Failed to load positions. Please try again.')
       setFptks([])
+      setListPagination({ total: 0, totalPages: 1 })
     } finally {
       setLoading(false)
     }
   }
 
+  const fptkListBootRef = useRef(true)
   useEffect(() => {
-    if (isAuthenticated && !isLoading) {
-      loadFPTKs()
+    if (!isAuthenticated || isLoading) return
+    if (fptkListBootRef.current) {
+      fptkListBootRef.current = false
+      return
     }
+    setPage(1)
+  }, [searchTerm, pageSize, statusFilterKey, isAuthenticated, isLoading])
+
+  useEffect(() => {
+    if (!isAuthenticated || isLoading) return
+    const delay = searchTerm ? 300 : 0
+    const timer = setTimeout(() => {
+      loadFPTKs()
+    }, delay)
+    return () => clearTimeout(timer)
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isAuthenticated, isLoading])
+  }, [page, pageSize, searchTerm, statusFilterKey, isAuthenticated, isLoading])
 
   // Deep-link: /fptk?edit=<id> opens Edit modal directly
   useEffect(() => {
@@ -407,15 +450,9 @@ export default function FPTKPage() {
     handleEditJobPosting(found)
   }, [isAuthenticated, isLoading, fptks])
 
-  // Reload FPTKs when search term changes (with debounce)
   useEffect(() => {
-    if (!isAuthenticated || isLoading) return
-    const timer = setTimeout(() => {
-      loadFPTKs()
-    }, 300)
-    return () => clearTimeout(timer)
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [searchTerm])
+    setSelectedIds((prev) => prev.filter((id) => fptks.some((f) => f.id === id)))
+  }, [fptks])
 
   useEffect(() => {
     let isMounted = true
@@ -561,6 +598,31 @@ export default function FPTKPage() {
     } catch (error: any) {
       console.error('Error copying position:', error)
       alert(error.response?.data?.message || 'Failed to copy position. Please try again.')
+    }
+  }
+
+  const handleDeleteJobPosting = async (jobPosting: FPTK) => {
+    const label = jobPosting.title || jobPosting.position || 'this position'
+    const confirmed = window.confirm(
+      `Delete "${label}" permanently? This removes the position and all related applications. This cannot be undone.`
+    )
+    if (!confirmed) return
+    try {
+      setDeletingId(jobPosting.id)
+      await FPTKAPI.delete(jobPosting.id)
+      if (selectedJobPosting?.id === jobPosting.id) {
+        setIsViewModalOpen(false)
+        setIsEditModalOpen(false)
+        setSelectedJobPosting(null)
+      }
+      setFptks((prev) => prev.filter((f) => f.id !== jobPosting.id))
+      setSelectedIds((prev) => prev.filter((id) => id !== jobPosting.id))
+      alert('Position deleted.')
+    } catch (error: any) {
+      console.error('Error deleting position:', error)
+      alert(error.response?.data?.message || 'Failed to delete position. Please try again.')
+    } finally {
+      setDeletingId(null)
     }
   }
 
@@ -825,8 +887,7 @@ export default function FPTKPage() {
 
           const rows = result.failed.map((item: any, idx: number) => {
             const rowNum = item?.row ?? (idx + 1)
-            const position = (item?.data?.position || item?.data?.Position || '—')
-              .toString()
+            const position = getPositionNameForFailedExport(item?.data)
               .replaceAll('"', '""')
             const errors = (Array.isArray(item?.errors) ? item.errors.join('; ') : '')
               .toString()
@@ -895,24 +956,9 @@ export default function FPTKPage() {
   const perms = cfg.permissions || { view: visibleRoles, create: ['SUPER_ADMIN','TA_TEAM','HIRING_MANAGER'], edit: ['SUPER_ADMIN','TA_TEAM','HIRING_MANAGER'] }
   const canCreate = (perms.create || []).includes(roleName) || (perms.create || []).includes('*')
   const canEdit = (perms.edit || []).includes(roleName) || (perms.edit || []).includes('*')
-  // Check if user can upload (SUPER_ADMIN, TA_TEAM, HRBP)
-  const canUpload = ['SUPER_ADMIN', 'TA_TEAM', 'HRBP'].includes(roleName) || ['SUPER_ADMIN', 'TA_TEAM', 'HRBP'].includes(backendRole)
-  
-  // Debug: Log role check
-  console.log('FPTK Page - Role check:', { roleName, canUpload, visibleRoles })
+  const canDelete = backendRole === 'SUPER_ADMIN'
 
-  // Filter and sort FPTKs
   const filteredFptks = fptks
-    .filter(fptk => {
-      // Filter by status (OR)
-      if (statusFilters.length > 0) {
-        const currentStatus = ((fptk as any).currentStatus || DEFAULT_CURRENT_STATUS).trim()
-        if (!statusFilters.includes(currentStatus)) {
-          return false
-        }
-      }
-      return true
-    })
     .sort((a, b) => {
       if (!sortBy) return 0
       
@@ -935,6 +981,56 @@ export default function FPTKPage() {
   // Get unique statuses for filter dropdown
   const uniqueStatuses = CURRENT_STATUS_OPTIONS as unknown as string[]
 
+  const visibleRowIds = filteredFptks.map((f) => f.id)
+  const selectedVisibleCount = selectedIds.filter((id) => visibleRowIds.includes(id)).length
+  const allVisibleSelected = visibleRowIds.length > 0 && selectedVisibleCount === visibleRowIds.length
+  const someVisibleSelected = selectedVisibleCount > 0 && !allVisibleSelected
+
+  const togglePositionSelection = (id: string) => {
+    setSelectedIds((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]))
+  }
+
+  const handleToggleSelectAllVisible = () => {
+    if (visibleRowIds.length === 0) return
+    if (allVisibleSelected) {
+      setSelectedIds((prev) => prev.filter((id) => !visibleRowIds.includes(id)))
+    } else {
+      setSelectedIds((prev) => [...new Set([...prev, ...visibleRowIds])])
+    }
+  }
+
+  const handleDeleteSelected = async () => {
+    if (selectedIds.length === 0) return
+    const toDelete = selectedIds.filter((id) => fptks.some((f) => f.id === id))
+    if (toDelete.length === 0) {
+      setSelectedIds([])
+      return
+    }
+    const confirmed = window.confirm(
+      `Delete ${toDelete.length} position(s) permanently? This removes each position and its related applications. This cannot be undone.`
+    )
+    if (!confirmed) return
+    try {
+      setBulkDeleting(true)
+      await FPTKAPI.deleteBulk(toDelete)
+      setFptks((prev) => prev.filter((f) => !toDelete.includes(f.id)))
+      if (selectedJobPosting && toDelete.includes(selectedJobPosting.id)) {
+        setIsViewModalOpen(false)
+        setIsEditModalOpen(false)
+        setSelectedJobPosting(null)
+      }
+      setSelectedIds([])
+      alert(`${toDelete.length} position(s) deleted.`)
+    } catch (error: any) {
+      console.error('Error bulk deleting positions:', error)
+      alert(error.response?.data?.message || 'Failed to delete positions. Please try again.')
+    } finally {
+      setBulkDeleting(false)
+    }
+  }
+
+  const selectionBusy = bulkDeleting || deletingId !== null
+
   return (
     <Layout>
       <div>
@@ -947,7 +1043,7 @@ export default function FPTKPage() {
           </p>
             </div>
             <div className="flex gap-2">
-              {canUpload && (
+              {canCreate && (
                 <>
                   <button
                     onClick={handleDownloadTemplate}
@@ -1036,6 +1132,18 @@ export default function FPTKPage() {
                 </button>
               )}
             </div>
+            <div className="flex items-center gap-2">
+              <label className="text-sm font-medium text-gray-700 whitespace-nowrap">Per page</label>
+              <select
+                value={pageSize}
+                onChange={(e) => setPageSize(Number(e.target.value) as 10 | 50 | 100)}
+                className="block pl-3 pr-8 py-2 border border-gray-300 rounded-md leading-5 bg-white text-sm focus:outline-none focus:ring-1 focus:ring-indigo-500"
+              >
+                <option value={10}>10</option>
+                <option value={50}>50</option>
+                <option value={100}>100</option>
+              </select>
+            </div>
           </div>
         </div>
 
@@ -1047,9 +1155,10 @@ export default function FPTKPage() {
           </p>
           <div className="flex flex-wrap gap-2">
             {CURRENT_STATUS_OPTIONS.map((st) => {
-              const count = fptks.filter(
-                (f) => ((f as any).currentStatus || DEFAULT_CURRENT_STATUS).trim() === st
-              ).length
+              const count =
+                statusCounts[st] ??
+                statusCounts[(st || '').trim()] ??
+                (st === DEFAULT_CURRENT_STATUS ? statusCounts[''] ?? 0 : 0)
               const active = statusFilters.includes(st)
               return (
                 <button
@@ -1081,6 +1190,41 @@ export default function FPTKPage() {
 
         {/* FPTK List */}
         <div id="fptk-position-list" className="bg-white shadow overflow-hidden sm:rounded-md">
+          {canDelete && !loading && filteredFptks.length > 0 && (
+            <div className="px-4 py-3 border-b border-gray-200 bg-gray-50 flex flex-wrap items-center justify-between gap-3">
+              <label className="inline-flex items-center gap-2 text-sm text-gray-700 cursor-pointer select-none">
+                <input
+                  type="checkbox"
+                  className="h-4 w-4 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
+                  checked={allVisibleSelected}
+                  ref={(el) => {
+                    if (el) el.indeterminate = someVisibleSelected
+                  }}
+                  onChange={handleToggleSelectAllVisible}
+                  disabled={selectionBusy}
+                />
+                <span>Select all in this list ({filteredFptks.length})</span>
+              </label>
+              <div className="flex items-center gap-2">
+                <span className="text-sm text-gray-600">
+                  {selectedIds.length} selected
+                </span>
+                <button
+                  type="button"
+                  onClick={handleDeleteSelected}
+                  disabled={selectedIds.length === 0 || selectionBusy}
+                  className={`inline-flex items-center px-3 py-1.5 border text-sm font-medium rounded-md ${
+                    selectedIds.length === 0 || selectionBusy
+                      ? 'border-gray-200 text-gray-400 bg-gray-100 cursor-not-allowed'
+                      : 'border-red-300 text-red-700 bg-white hover:bg-red-50'
+                  }`}
+                >
+                  <TrashIcon className="h-4 w-4 mr-1.5" />
+                  {bulkDeleting ? 'Deleting…' : `Delete selected (${selectedIds.length})`}
+                </button>
+              </div>
+            </div>
+          )}
           {loading ? (
             <div className="p-6 text-center">
               <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600 mx-auto"></div>
@@ -1108,7 +1252,17 @@ export default function FPTKPage() {
               {filteredFptks.map((fptk) => (
                 <li key={fptk.id}>
                   <div className="px-4 py-4 flex items-center justify-between hover:bg-gray-50">
-                    <div className="flex items-center">
+                    <div className="flex items-center min-w-0 flex-1">
+                      {canDelete && (
+                        <input
+                          type="checkbox"
+                          className="h-4 w-4 mr-3 shrink-0 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
+                          checked={selectedIds.includes(fptk.id)}
+                          onChange={() => togglePositionSelection(fptk.id)}
+                          disabled={selectionBusy}
+                          aria-label={`Select ${fptk.title || fptk.position}`}
+                        />
+                      )}
                       <div className="flex-shrink-0">
                         <div className="h-10 w-10 rounded-full bg-indigo-100 flex items-center justify-center">
                           <BriefcaseIcon className="h-6 w-6 text-indigo-600" />
@@ -1155,12 +1309,56 @@ export default function FPTKPage() {
                         <DocumentDuplicateIcon className="h-4 w-4 mr-1" />
                         Copy
                       </button>
+                      {canDelete && (
+                        <button
+                          type="button"
+                          onClick={() => handleDeleteJobPosting(fptk)}
+                          disabled={selectionBusy}
+                          className={`text-sm font-medium flex items-center ${
+                            deletingId === fptk.id
+                              ? 'text-red-300 cursor-wait'
+                              : 'text-red-600 hover:text-red-800'
+                          }`}
+                          title="Delete position (Super Admin)"
+                        >
+                          <TrashIcon className="h-4 w-4 mr-1" />
+                          {deletingId === fptk.id ? 'Deleting…' : 'Delete'}
+                        </button>
+                      )}
                     </div>
                   </div>
                 </li>
               ))}
             </ul>
           )}
+        </div>
+
+        <div className="mt-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 text-sm text-gray-600">
+          <span>
+            Showing {listPagination.total === 0 ? 0 : (page - 1) * pageSize + 1}–
+            {Math.min(page * pageSize, listPagination.total)} of {listPagination.total}
+          </span>
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              disabled={page <= 1 || loading}
+              onClick={() => setPage((p) => Math.max(1, p - 1))}
+              className="rounded-md border border-gray-300 bg-white px-3 py-1.5 text-sm hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              Previous
+            </button>
+            <span className="tabular-nums">
+              Page {page} / {listPagination.totalPages}
+            </span>
+            <button
+              type="button"
+              disabled={page >= listPagination.totalPages || loading}
+              onClick={() => setPage((p) => p + 1)}
+              className="rounded-md border border-gray-300 bg-white px-3 py-1.5 text-sm hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              Next
+            </button>
+          </div>
         </div>
 
         {/* Create Job Posting Modal */}

@@ -77,6 +77,7 @@ async function importMasterDivisions(rows) {
     const divisionName = toStringValue(row['division name']);
     const sectionName = toStringValue(row['section name']);
     const headOfDivisionName = toStringValue(row['head of division name']);
+    const hiringManagerName = toStringValue(row['hiring manager name']);
 
     if (!divisionName || !sectionName || !headOfDivisionName) {
       result.failed += 1;
@@ -88,7 +89,12 @@ async function importMasterDivisions(rows) {
     }
 
     try {
-      await masterDivisionService.createDivision({ divisionName, sectionName, headOfDivisionName });
+      await masterDivisionService.createDivision({
+        divisionName,
+        sectionName,
+        headOfDivisionName,
+        hiringManagerName,
+      });
       result.created += 1;
     } catch (e) {
       result.failed += 1;

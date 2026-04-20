@@ -395,6 +395,9 @@ export default function CandidatesPage() {
   const autoViewHandledRef = useRef(false)
   const [searchTerm, setSearchTerm] = useState('')
   const [statusFilter, setStatusFilter] = useState<CandidateStatus | 'all'>('all')
+  const [page, setPage] = useState(1)
+  const [pageSize, setPageSize] = useState<10 | 50 | 100>(50)
+  const [listMeta, setListMeta] = useState({ total: 0, totalPages: 1 })
   const [isAddModalOpen, setIsAddModalOpen] = useState(false)
   const [isViewModalOpen, setIsViewModalOpen] = useState(false)
   const [isEditModalOpen, setIsEditModalOpen] = useState(false)
@@ -406,38 +409,58 @@ export default function CandidatesPage() {
   const [menuAccess, setMenuAccess] = useState<Record<string, any>>({})
   const [menuAccessLoading, setMenuAccessLoading] = useState(true)
 
-  // Load candidates from API
+  // Load candidates from API (A–Z by name; paged — when a status filter is set, all pages are merged then sliced client-side)
   const loadCandidates = async () => {
     try {
-      console.log('LOAD CANDIDATES - Fetching candidates from API...')
-      const response = await CandidatesAPI.getAll({ search: searchTerm }, { page: 1, limit: 100 })
-      console.log('LOAD CANDIDATES - API response:', JSON.stringify(response, null, 2))
-      const candidatesData = response.data || []
-      console.log('LOAD CANDIDATES - candidatesData length:', candidatesData.length)
-      
-      // Map backend candidates to frontend format
-      const mappedCandidates = candidatesData.map((candidate: any) => mapApiCandidate(candidate))
-      
-      console.log('LOAD CANDIDATES - Mapped candidates count:', mappedCandidates.length)
-      if (mappedCandidates.length > 0) {
-        console.log('LOAD CANDIDATES - Sample mapped candidate:', JSON.stringify({
-          id: mappedCandidates[0].id,
-          division: mappedCandidates[0].division,
-          positionAppliedFor: (mappedCandidates[0] as any).positionAppliedFor,
-          userDivision: mappedCandidates[0].user?.division
-        }, null, 2))
+      if (statusFilter === 'all') {
+        const response = await CandidatesAPI.getAll(
+          { search: searchTerm, sortBy: 'name' },
+          { page, limit: pageSize }
+        )
+        const candidatesData = response.data || []
+        const mappedCandidates = candidatesData.map((candidate: any) => mapApiCandidate(candidate))
+        setCandidates(mappedCandidates)
+        const pag = response.pagination || {}
+        setListMeta({
+          total: typeof pag.total === 'number' ? pag.total : mappedCandidates.length,
+          totalPages: Math.max(1, pag.totalPages ?? 1),
+        })
+        return
       }
-      
-      setCandidates(mappedCandidates)
+
+      const merged: any[] = []
+      let p = 1
+      let totalApiPages = 1
+      do {
+        const response = await CandidatesAPI.getAll(
+          { search: searchTerm, sortBy: 'name' },
+          { page: p, limit: 100 }
+        )
+        merged.push(...(response.data || []))
+        totalApiPages = response.pagination?.totalPages ?? 1
+        p++
+      } while (p <= totalApiPages)
+
+      const mapped = merged.map((c: any) => mapApiCandidate(c)).filter((c) => c.status === statusFilter)
+      const total = mapped.length
+      const totalPages = Math.max(1, Math.ceil(total / pageSize))
+      const safePage = Math.min(page, totalPages)
+      if (safePage !== page) {
+        setPage(safePage)
+        return
+      }
+      const start = (safePage - 1) * pageSize
+      setCandidates(mapped.slice(start, start + pageSize))
+      setListMeta({ total, totalPages })
     } catch (error: any) {
       console.error('Error loading candidates:', error)
-      // Fallback to localStorage if API fails (only in browser)
       if (typeof window !== 'undefined') {
         try {
           const savedCandidates = localStorage.getItem('candidates')
           if (savedCandidates) {
             const parsedCandidates = JSON.parse(savedCandidates)
             setCandidates(parsedCandidates)
+            setListMeta({ total: parsedCandidates.length, totalPages: 1 })
           }
         } catch (e) {
           console.warn('Could not load candidates from localStorage:', e)
@@ -446,11 +469,24 @@ export default function CandidatesPage() {
     }
   }
 
+  const candidatesListBootRef = useRef(true)
   useEffect(() => {
-    if (isAuthenticated && !isLoading) {
-      loadCandidates()
+    if (!isAuthenticated || isLoading) return
+    if (candidatesListBootRef.current) {
+      candidatesListBootRef.current = false
+      return
     }
-  }, [isAuthenticated, isLoading])
+    setPage(1)
+  }, [searchTerm, statusFilter, pageSize, isAuthenticated, isLoading])
+
+  useEffect(() => {
+    if (!isAuthenticated || isLoading) return
+    const delay = searchTerm ? 400 : 0
+    const timer = setTimeout(() => {
+      loadCandidates()
+    }, delay)
+    return () => clearTimeout(timer)
+  }, [page, pageSize, searchTerm, statusFilter, isAuthenticated, isLoading])
 
   // Deep-link: /candidates?view=<id> opens View Candidate modal
   useEffect(() => {
@@ -542,21 +578,16 @@ export default function CandidatesPage() {
     router.push('/')
     return null
   }
-  const perms = cfg.permissions || { view: visibleRoles, create: ['SUPER_ADMIN','HRBP','TA_TEAM'], edit: ['SUPER_ADMIN','HRBP','TA_TEAM'] }
+  const perms = cfg.permissions || {
+    view: visibleRoles,
+    create: ['SUPER_ADMIN', 'Management', 'HRBP', 'TA_TEAM'],
+    edit: ['SUPER_ADMIN', 'Management', 'HRBP', 'TA_TEAM'],
+  }
   const canCreate = (perms.create || []).includes(roleName) || (perms.create || []).includes('*')
   const canEdit = (perms.edit || []).includes(roleName) || (perms.edit || []).includes('*')
-  const canGenerateLink = ['SUPER_ADMIN', 'TA_TEAM', 'HRBP'].includes(roleName)
+  const canGenerateLink = canEdit
 
-  const filteredCandidates = candidates.filter(candidate => {
-    const matchesSearch = 
-      candidate.personalInfo.firstName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      candidate.personalInfo.lastName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      candidate.contactInfo.email.toLowerCase().includes(searchTerm.toLowerCase())
-    
-    const matchesStatus = statusFilter === 'all' || candidate.status === statusFilter
-    
-    return matchesSearch && matchesStatus
-  })
+  const displayCandidates = candidates
 
   interface UploadFilesPayload {
     cvFile: File | null
@@ -1060,6 +1091,18 @@ export default function CandidatesPage() {
               <option value="withdrawn">Withdrawn</option>
             </select>
           </div>
+          <div className="flex items-center gap-2 sm:ml-auto">
+            <label className="text-sm text-gray-600 whitespace-nowrap">Rows per page</label>
+            <select
+              className="block rounded-md border-0 py-1.5 pl-3 pr-8 text-gray-900 ring-1 ring-inset ring-gray-300 focus:ring-2 focus:ring-indigo-600 sm:text-sm"
+              value={pageSize}
+              onChange={(e) => setPageSize(Number(e.target.value) as 10 | 50 | 100)}
+            >
+              <option value={10}>10</option>
+              <option value={50}>50</option>
+              <option value={100}>100</option>
+            </select>
+          </div>
         </div>
 
         {/* Candidates Table */}
@@ -1097,10 +1140,7 @@ export default function CandidatesPage() {
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-200 bg-white">
-                    {filteredCandidates.map((candidate) => {
-                      console.log('Candidate data:', candidate)
-                      console.log('Position Applied For:', (candidate as any).positionAppliedFor)
-                      console.log('Professional Info:', candidate.professionalInfo)
+                    {displayCandidates.map((candidate) => {
                       return (
                       <tr key={candidate.id}>
                         <td className="whitespace-nowrap py-4 pl-4 pr-3 text-sm sm:pl-6">
@@ -1230,7 +1270,37 @@ export default function CandidatesPage() {
           </div>
         </div>
 
-        {filteredCandidates.length === 0 && (
+        <div className="mt-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 text-sm text-gray-600">
+          <span>
+            {listMeta.total === 0
+              ? 'Showing 0 of 0'
+              : `Showing ${(page - 1) * pageSize + 1}–${Math.min(page * pageSize, listMeta.total)} of ${listMeta.total}`}
+            {statusFilter !== 'all' ? ' (filtered by status)' : ''}
+          </span>
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              disabled={page <= 1}
+              onClick={() => setPage((p) => Math.max(1, p - 1))}
+              className="rounded-md border border-gray-300 bg-white px-3 py-1.5 text-sm hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              Previous
+            </button>
+            <span className="tabular-nums">
+              Page {page} / {listMeta.totalPages}
+            </span>
+            <button
+              type="button"
+              disabled={page >= listMeta.totalPages}
+              onClick={() => setPage((p) => p + 1)}
+              className="rounded-md border border-gray-300 bg-white px-3 py-1.5 text-sm hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              Next
+            </button>
+          </div>
+        </div>
+
+        {displayCandidates.length === 0 && (
           <div className="text-center py-12">
             <div className="text-gray-500">No candidates found matching your criteria.</div>
           </div>

@@ -34,7 +34,7 @@ async function createAdminUser() {
         department: 'Human Resources',
         division: 'Talent Acquisition',
         isActive: true,
-        emailVerified: true,
+        isEmailVerified: true,
         lastLoginAt: new Date(),
       }
     });

@@ -1,5 +1,25 @@
 import ExcelJS from 'exceljs'
 import { FPTK, JobType, FPTKStatus, Priority } from '@/types'
+import { MasterOfficeLocationAPI, MasterDivisionAPI } from '@/lib/api'
+import {
+  FPTK_TEMPLATE_HEADERS,
+  FPTK_STATUS_FKTK_OPTIONS,
+  FPTK_EMPLOYMENT_TYPE_OPTIONS,
+  FPTK_PRIORITY_OPTIONS,
+  FPTK_CRITERIA_OPTIONS,
+  FPTK_ADDITIONAL_OR_REPLACEMENT_OPTIONS,
+  FPTK_CURRENT_STATUS_OPTIONS,
+  FPTK_APPLIED_CANDIDATE_STATUS_OPTIONS,
+  normalizeExcelEnum,
+  normalizeEmploymentTypeForPayload,
+  isAllowedAppliedCandidateStatus,
+  getAppliedCandidateHeaderDefs,
+  ALLOWED_STATUS_FKTK,
+  ALLOWED_PRIORITY,
+  ALLOWED_CRITERIA,
+  ALLOWED_ADDITIONAL_OR_REPLACEMENT,
+  ALLOWED_CURRENT_STATUS,
+} from '@/utils/fptkExcelOptions'
 
 export interface FPTKUploadResult {
   success: FPTK[]
@@ -53,6 +73,12 @@ const FIELD_MAPPING: Record<string, keyof FPTKExcelRow> = {
   'Section': 'section',
   'Hiring Manager': 'hiringManager',
   'Position': 'position',
+  'Position Name': 'position',
+  'Position Title': 'position',
+  'Job Title': 'position',
+  'Job Position': 'position',
+  'Nama Posisi': 'position',
+  'Jabatan': 'position',
   'Employment Type': 'employmentType',
   'Type Grade': 'typeGrade',
   'Grade2': 'grade2',
@@ -78,22 +104,7 @@ const FIELD_MAPPING: Record<string, keyof FPTKExcelRow> = {
   'Request Date': 'requestDate',
 }
 
-const APPLIED_CANDIDATE_HEADER_MAP: Array<{
-  fullName: string
-  email: string
-  status: string
-}> = Array.from({ length: 5 }).map((_, idx) => {
-  const n = idx + 1
-  return {
-    fullName: `Applied Candidate ${n} Full Name`,
-    email: `Applied Candidate ${n} Email`,
-    status: `Applied Candidate ${n} Status`,
-  }
-})
-
-const VALID_PRIORITIES = ['P0', 'P1', 'P2']
-const VALID_EMPLOYMENT_TYPES = ['Kontrak', 'Probation', 'Full-time', 'Fulltime', 'Part-time', 'Parttime', 'Contract']
-const VALID_ADDITIONAL_OR_REPLACEMENT = ['Additional', 'Replacement', 'Additional/Replacement']
+const APPLIED_CANDIDATE_HEADER_MAP = getAppliedCandidateHeaderDefs()
 
 const excelCellToString = (value: any): string => {
   if (value === undefined || value === null) return ''
@@ -122,10 +133,68 @@ const excelCellToString = (value: any): string => {
   }
 }
 
-function validateAndConvertFPTK(row: FPTKExcelRow, rowNumber: number): { valid: boolean; errors: string[]; fptk?: FPTK } {
+/**
+ * Best-effort position name for failed-upload CSV: Excel row (position), parsed FPTK (title/position), or API payload.
+ */
+export function getPositionNameForFailedExport(data: any): string {
+  if (!data || typeof data !== 'object') return '—'
+  const candidates = [
+    data.position,
+    data.Position,
+    data.title,
+    data.Title,
+    data.positionTitle,
+  ]
+  for (const c of candidates) {
+    if (c === undefined || c === null) continue
+    const s = typeof c === 'object' ? excelCellToString(c) : String(c)
+    const t = s.trim()
+    if (t) return t
+  }
+  return '—'
+}
+
+export interface FptkValidationContext {
+  allowedPt: Set<string>
+  officeLocations: Array<{ pt?: string; area?: string; areaDetail?: string }>
+  divisions: Array<{ divisionName?: string; sectionName?: string }>
+}
+
+export function buildFptkValidationContext(
+  officeLocations: any[],
+  divisions: any[]
+): FptkValidationContext {
+  const allowedPt = new Set(
+    officeLocations.map((l) => (l.pt || '').toString().trim()).filter(Boolean)
+  )
+  return { allowedPt, officeLocations, divisions }
+}
+
+function indexToColumnLetter(index0: number): string {
+  let n = index0 + 1
+  let s = ''
+  while (n > 0) {
+    const r = (n - 1) % 26
+    s = String.fromCharCode(65 + r) + s
+    n = Math.floor((n - 1) / 26)
+  }
+  return s
+}
+
+function validateAndConvertFPTK(
+  row: FPTKExcelRow,
+  rowNumber: number,
+  ctx: FptkValidationContext
+): { valid: boolean; errors: string[]; fptk?: FPTK } {
   const errors: string[] = []
-  
-  // Required fields
+
+  const ptRaw = row.pt?.toString().trim() || ''
+  if (!ptRaw) {
+    errors.push('PT is required')
+  } else if (!ctx.allowedPt.has(ptRaw)) {
+    errors.push(`PT "${ptRaw}" is not registered in Master Office Location`)
+  }
+
   if (!row.section || !row.section.toString().trim()) {
     errors.push('Section is required')
   }
@@ -148,72 +217,148 @@ function validateAndConvertFPTK(row: FPTKExcelRow, rowNumber: number): { valid: 
     errors.push('Additional or Replacement is required')
   }
 
-  // Validate Priority (P0, P1, P2) - store the original value, not mapped
+  const divisionStr = row.division?.toString().trim() || ''
+  if (!divisionStr) {
+    errors.push('Division is required')
+  }
+  if (divisionStr) {
+    const divNames = new Set(
+      ctx.divisions.map((d) => (d.divisionName || '').toString().trim()).filter(Boolean)
+    )
+    const hasDiv = [...divNames].some((d) => normalizeExcelEnum(d) === normalizeExcelEnum(divisionStr))
+    if (!hasDiv) {
+      errors.push(`Division "${divisionStr}" is not found in Master Division`)
+    }
+  }
+
+  const sectionStr = row.section?.toString().trim() || ''
+  if (divisionStr && sectionStr) {
+    const ok = ctx.divisions.some(
+      (d) =>
+        normalizeExcelEnum(d.divisionName || '') === normalizeExcelEnum(divisionStr) &&
+        normalizeExcelEnum(d.sectionName || '') === normalizeExcelEnum(sectionStr)
+    )
+    if (!ok) {
+      errors.push(`Section "${sectionStr}" is not valid for Division "${divisionStr}" in master data`)
+    }
+  }
+
+  if (ptRaw && row.area?.toString().trim()) {
+    const areaOk = ctx.officeLocations.some(
+      (l) =>
+        (l.pt || '').toString().trim() === ptRaw &&
+        normalizeExcelEnum(l.area || '') === normalizeExcelEnum(row.area?.toString() || '')
+    )
+    if (!areaOk) {
+      errors.push(`Area "${row.area}" is not valid for PT "${ptRaw}"`)
+    }
+  }
+
+  if (ptRaw && row.area?.toString().trim() && row.areaDetail?.toString().trim()) {
+    const tripleOk = ctx.officeLocations.some(
+      (l) =>
+        (l.pt || '').toString().trim() === ptRaw &&
+        normalizeExcelEnum(l.area || '') === normalizeExcelEnum(row.area?.toString() || '') &&
+        normalizeExcelEnum((l as any).areaDetail || '') === normalizeExcelEnum(row.areaDetail?.toString() || '')
+    )
+    if (!tripleOk) {
+      errors.push(
+        `Area Detail "${row.areaDetail}" is not valid for PT "${ptRaw}" and Area "${row.area}"`
+      )
+    }
+  }
+
+  const sf = row.statusFktk?.toString().trim() || ''
+  if (sf && !ALLOWED_STATUS_FKTK.has(normalizeExcelEnum(sf))) {
+    errors.push(
+      `Invalid Status FKTK: "${row.statusFktk}". Use: ${FPTK_STATUS_FKTK_OPTIONS.join(' or ')}`
+    )
+  }
+
+  const empNorm = normalizeEmploymentTypeForPayload(row.employmentType?.toString())
+  if (row.employmentType?.toString().trim() && !empNorm) {
+    errors.push(
+      `Invalid Employment Type: "${row.employmentType}". Use: ${FPTK_EMPLOYMENT_TYPE_OPTIONS.join(', ')}`
+    )
+  }
+
+  if (!row.employmentType?.toString().trim()) {
+    errors.push('Employment Type is required')
+  }
+
+  const pr = row.priority?.toString().trim() || ''
+  if (pr && !ALLOWED_PRIORITY.has(normalizeExcelEnum(pr))) {
+    errors.push(`Invalid Priority: "${row.priority}". Use: ${FPTK_PRIORITY_OPTIONS.join(', ')}`)
+  }
+
   let priorityValue: Priority = 'medium'
-  let priorityOriginalValue = '' // Store original P0/P1/P2 value
-  if (row.priority) {
-    const priorityStr = row.priority.toString().trim().toUpperCase()
-    if (VALID_PRIORITIES.includes(priorityStr)) {
-      // Store the original value (P0, P1, P2)
+  let priorityOriginalValue = ''
+  if (pr) {
+    const priorityStr = pr.toUpperCase()
+    if (['P0', 'P1', 'P2'].includes(priorityStr)) {
       priorityOriginalValue = priorityStr
-      // Map P0, P1, P2 to FPTK priority levels for legacy compatibility
-      priorityValue = priorityStr === 'P0' ? 'urgent' : 
-                      priorityStr === 'P1' ? 'high' : 
-                      priorityStr === 'P2' ? 'medium' : 'low'
-    } else {
-      // If not a valid priority, still store the original value
-      priorityOriginalValue = row.priority.toString().trim()
+      priorityValue =
+        priorityStr === 'P0' ? 'urgent' : priorityStr === 'P1' ? 'high' : priorityStr === 'P2' ? 'medium' : 'low'
     }
   }
 
-  // Validate Employment Type
-  let jobType: JobType = 'full-time'
-  if (row.employmentType) {
-    const empTypeStr = row.employmentType.toString().trim()
-    if (empTypeStr === 'Kontrak' || empTypeStr.toLowerCase() === 'contract') {
-      jobType = 'contract'
-    } else if (empTypeStr === 'Probation' || empTypeStr.toLowerCase().includes('fulltime') || empTypeStr.toLowerCase().includes('full-time')) {
-      jobType = 'full-time'
-    } else if (empTypeStr.toLowerCase().includes('parttime') || empTypeStr.toLowerCase().includes('part-time')) {
-      jobType = 'part-time'
-    } else {
-      errors.push(`Invalid Employment Type: ${row.employmentType}. Should be one of: Kontrak, Probation, Full-time, Part-time`)
-    }
+  const crit = row.criteria?.toString().trim() || ''
+  if (crit && !ALLOWED_CRITERIA.has(normalizeExcelEnum(crit))) {
+    errors.push(`Invalid Criteria: "${row.criteria}". Use: ${FPTK_CRITERIA_OPTIONS.join(' or ')}`)
   }
 
-  // Validate Additional or Replacement
-  if (row.additionalOrReplacement && !VALID_ADDITIONAL_OR_REPLACEMENT.includes(row.additionalOrReplacement.toString().trim())) {
-    errors.push(`Invalid Additional or Replacement: ${row.additionalOrReplacement}. Must be one of: ${VALID_ADDITIONAL_OR_REPLACEMENT.join(', ')}`)
+  const addRep = row.additionalOrReplacement?.toString().trim() || ''
+  if (addRep && !ALLOWED_ADDITIONAL_OR_REPLACEMENT.has(normalizeExcelEnum(addRep))) {
+    errors.push(
+      `Invalid Additional or Replacement: "${row.additionalOrReplacement}". Use: ${FPTK_ADDITIONAL_OR_REPLACEMENT_OPTIONS.join(' or ')}`
+    )
   }
 
-  // Validate Current Status - use the value from Column U "Current Status" directly
-  let status: FPTKStatus = 'draft'
-  // Use currentStatus from Excel directly, don't override with statusFktk
   let currentStatus = row.currentStatus?.toString().trim() || 'Pending FKTK'
-  
-  // Only map status enum if currentStatus is provided
+  if (currentStatus && !ALLOWED_CURRENT_STATUS.has(normalizeExcelEnum(currentStatus))) {
+    errors.push(
+      `Invalid Current Status: "${row.currentStatus}". Use: ${FPTK_CURRENT_STATUS_OPTIONS.join(', ')}`
+    )
+  }
+
+  let status: FPTKStatus = 'draft'
   if (row.currentStatus) {
     const statusStr = row.currentStatus.toString().toLowerCase().trim()
     const validStatuses: FPTKStatus[] = ['draft', 'approved', 'open', 'partially_filled', 'filled', 'cancelled', 'expired']
     if (validStatuses.includes(statusStr as FPTKStatus)) {
       status = statusStr as FPTKStatus
     } else {
-      // Map common status strings to enum values for status field
       const statusMap: Record<string, FPTKStatus> = {
-        'open': 'open',
+        open: 'open',
         're-open': 'open',
         'pending fktk': 'draft',
-        'hold': 'draft',
-        'cancel': 'cancelled',
-        'cancelled': 'cancelled',
+        hold: 'draft',
+        cancel: 'cancelled',
+        cancelled: 'cancelled',
         'internal movement': 'draft',
-        'close': 'filled',
+        close: 'filled',
       }
       status = statusMap[statusStr] || 'draft'
     }
   } else {
     currentStatus = 'Pending FKTK'
   }
+
+  if (row.appliedCandidates && row.appliedCandidates.length > 0) {
+    row.appliedCandidates.forEach((ac, idx) => {
+      if (ac.status && !isAllowedAppliedCandidateStatus(ac.status)) {
+        errors.push(
+          `Applied Candidate ${idx + 1} Status "${ac.status}" is not a valid option (see template list)`
+        )
+      }
+    })
+  }
+
+  let jobType: JobType = 'full-time'
+  const empCanonical = normalizeEmploymentTypeForPayload(row.employmentType?.toString())
+  if (empCanonical === 'Contract') jobType = 'contract'
+  else if (empCanonical === 'Internship') jobType = 'internship'
+  else if (empCanonical === 'Full Time Employee') jobType = 'full-time'
 
   if (errors.length > 0) {
     return { valid: false, errors }
@@ -254,7 +399,7 @@ function validateAndConvertFPTK(row: FPTKExcelRow, rowNumber: number): { valid: 
     noFktk: row.noFktk?.toString().trim() || '',
     statusFktk: row.statusFktk?.toString().trim() || '',
     section: row.section?.toString().trim() || '',
-    employmentType: row.employmentType?.toString().trim() || '',
+    employmentType: empCanonical || row.employmentType?.toString().trim() || '',
     typeGrade: row.typeGrade?.toString().trim() || '',
     grade2: row.grade2?.toString().trim() || '',
     // Store original priority value (P0, P1, P2) in both priority and urgentNormal for compatibility
@@ -277,23 +422,35 @@ function validateAndConvertFPTK(row: FPTKExcelRow, rowNumber: number): { valid: 
 }
 
 export function parseFPTKExcelFile(file: File): Promise<FPTKUploadResult> {
-  return new Promise(async (resolve, reject) => {
+  return (async () => {
     try {
+      const [officeLocations, divisions] = await Promise.all([
+        MasterOfficeLocationAPI.getAll().catch(() => [] as any[]),
+        MasterDivisionAPI.getAll().catch(() => [] as any[]),
+      ])
+      const ctx = buildFptkValidationContext(officeLocations || [], divisions || [])
+
       const arrayBuffer = await file.arrayBuffer()
       const workbook = new ExcelJS.Workbook()
       await workbook.xlsx.load(arrayBuffer)
-      
-      // Get the first worksheet
-      const worksheet = workbook.worksheets[0]
-      
+
+      // Pick the first non-hidden worksheet with at least a header + one data row.
+      // Templates include a veryHidden `_lists` sheet which must be ignored.
+      const visibleSheets = (workbook.worksheets || []).filter(
+        (ws: any) => ws && ws.state !== 'veryHidden'
+      )
+      const worksheet =
+        visibleSheets.find((ws: any) => (ws?.rowCount || 0) >= 2) ||
+        visibleSheets[0] ||
+        (workbook.worksheets || []).find((ws: any) => (ws?.rowCount || 0) >= 2) ||
+        workbook.worksheets?.[0]
+
       if (!worksheet) {
-        reject(new Error('No worksheet found in the Excel file'))
-        return
+        throw new Error('No worksheet found in the Excel file')
       }
 
       if (worksheet.rowCount < 2) {
-        reject(new Error('Excel file must have at least 2 rows (header and data)'))
-        return
+        throw new Error('Excel file must have at least 2 rows (header and data)')
       }
 
       // Get headers (first row)
@@ -390,6 +547,10 @@ export function parseFPTKExcelFile(file: File): Promise<FPTKUploadResult> {
                 value = new Date().toISOString().split('T')[0]
               }
             }
+
+            if (mapping.fieldKey === 'position') {
+              value = excelCellToString(value).trim()
+            }
             
             rowData[mapping.fieldKey] = value
           }
@@ -423,7 +584,7 @@ export function parseFPTKExcelFile(file: File): Promise<FPTKUploadResult> {
         }
 
         // Validate and convert
-        const validationResult = validateAndConvertFPTK(rowData, i)
+        const validationResult = validateAndConvertFPTK(rowData, i, ctx)
         
         if (validationResult.valid && validationResult.fptk) {
           // Store row number in the FPTK object for error tracking
@@ -441,94 +602,161 @@ export function parseFPTKExcelFile(file: File): Promise<FPTKUploadResult> {
         }
       }
 
-      resolve({
+      return {
         success,
         failed,
         total: success.length + failed.length,
         successCount: success.length,
-        failedCount: failed.length
-      })
+        failedCount: failed.length,
+      }
     } catch (error) {
-      reject(new Error(`Failed to parse Excel file: ${error instanceof Error ? error.message : 'Unknown error'}`))
+      throw new Error(`Failed to parse Excel file: ${error instanceof Error ? error.message : 'Unknown error'}`)
     }
-  })
+  })()
 }
 
-export async function generateFPTKTemplate(): Promise<void> {
-  const headers = [
-    'PT',
-    'No FKTK',
-    'Status FKTK',
-    'Division',
-    'Section',
-    'Hiring Manager',
-    'Position',
-    'Employment Type',
-    'Type Grade',
-    'Grade2',
-    'Priority',
-    'Priority by month-year',
-    'Job Specification and Qualifications',
-    'Criteria',
-    'Area',
-    'Area Detail',
-    'Additional or Replacement',
-    'Replacement Name',
-    'Resign Reason',
-    'Total Request',
-    'Current Status',
-    'Request Date',
-    ...APPLIED_CANDIDATE_HEADER_MAP.flatMap((h) => [h.fullName, h.email, h.status]),
-  ]
+const TEMPLATE_MAX_ROW = 2000
 
-  const exampleRow = [
-    'PT ABC',
+export async function generateFPTKTemplate(): Promise<void> {
+  const [officeLocations, divisions] = await Promise.all([
+    MasterOfficeLocationAPI.getAll().catch(() => [] as any[]),
+    MasterDivisionAPI.getAll().catch(() => [] as any[]),
+  ])
+
+  const ptList = (Array.from(
+    new Set((officeLocations || []).map((l: any) => (l.pt || '').toString().trim()).filter(Boolean))
+  ) as string[]).sort((a, b) => a.localeCompare(b))
+
+  const headers = [...FPTK_TEMPLATE_HEADERS]
+
+  const examplePt = ptList[0] || ''
+  const locForPt = (officeLocations || []).find((l: any) => (l.pt || '').toString().trim() === examplePt)
+  const exampleArea = (locForPt as any)?.area?.toString?.() || ''
+  const exampleAreaDetail = (locForPt as any)?.areaDetail?.toString?.() || ''
+  const exampleDivision = divisions?.[0]?.divisionName || ''
+  const exampleSection =
+    divisions?.find((d: any) => d.divisionName === exampleDivision)?.sectionName || ''
+
+  const exampleRow: (string | number)[] = [
+    examplePt,
     'FKTK-001',
-    'Active',
-    'Engineering',
-    'IT',
+    'Pending',
+    exampleDivision,
+    exampleSection,
     'John Manager',
     'Software Engineer',
-    'Kontrak',
+    'Contract',
     'Senior',
-    'Grade 2',
+    'G2',
     'P0',
     '2024-12',
     'Develop and maintain software applications. Bachelor degree required.',
-    'Technical',
-    'HO',
-    'Jakarta',
+    'Staff',
+    exampleArea,
+    exampleAreaDetail,
     'Additional',
     '',
     '',
-    '1',
+    1,
     'Pending FKTK',
-    '2024-01-15'
-    // Applied candidates columns intentionally left blank in example
+    '2024-01-15',
   ]
+  while (exampleRow.length < headers.length) {
+    exampleRow.push('')
+  }
 
   const workbook = new ExcelJS.Workbook()
+  const listSheet = workbook.addWorksheet('_lists', { state: 'veryHidden' })
+
+  let col = 1
+  const ref: Record<string, string> = {}
+  const refOrder: string[] = []
+
+  const writeCol = (values: string[]) => {
+    const c = col
+    const letter = indexToColumnLetter(c - 1)
+    refOrder.push(letter)
+    values.forEach((v, i) => {
+      listSheet.getCell(i + 1, c).value = v
+    })
+    ref[letter] = `'_lists'!$${letter}$1:$${letter}$${Math.max(1, values.length)}`
+    col += 1
+  }
+
+  writeCol(ptList.length ? ptList : [''])
+  writeCol([...FPTK_STATUS_FKTK_OPTIONS])
+  writeCol([...FPTK_EMPLOYMENT_TYPE_OPTIONS])
+  writeCol([...FPTK_PRIORITY_OPTIONS])
+  writeCol([...FPTK_CRITERIA_OPTIONS])
+  writeCol([...FPTK_ADDITIONAL_OR_REPLACEMENT_OPTIONS])
+  writeCol([...FPTK_CURRENT_STATUS_OPTIONS])
+  writeCol([...FPTK_APPLIED_CANDIDATE_STATUS_OPTIONS])
+
+  const [
+    ptLetter,
+    statusFktkLetter,
+    empLetter,
+    priLetter,
+    critLetter,
+    addLetter,
+    curLetter,
+    appLetter,
+  ] = refOrder
+
   const worksheet = workbook.addWorksheet('FPTK Template')
-
-  // Add headers
   worksheet.addRow(headers)
-  
-  // Add example row
   worksheet.addRow(exampleRow)
+  worksheet.columns = headers.map(() => ({ width: 26 }))
 
-  // Set column widths
-  worksheet.columns = headers.map(() => ({ width: 25 }))
-
-  // Style header row
   const headerRow = worksheet.getRow(1)
   headerRow.font = { bold: true }
   headerRow.fill = {
     type: 'pattern',
     pattern: 'solid',
-    fgColor: { argb: 'FFE0E0E0' }
+    fgColor: { argb: 'FFE0E0E0' },
   }
 
-  // Generate file and download
+  const hi = (name: string) => headers.indexOf(name)
+  const addDv = (
+    headerName: string,
+    formulae: string[],
+    errorText: string,
+    allowBlank = false
+  ) => {
+    const idx = hi(headerName)
+    if (idx < 0) return
+    const L = indexToColumnLetter(idx)
+    const range = `${L}2:${L}${TEMPLATE_MAX_ROW}`
+    ;(worksheet as any).dataValidations.add(range, {
+      type: 'list',
+      allowBlank,
+      showErrorMessage: true,
+      errorStyle: 'error',
+      errorTitle: 'Invalid value',
+      error: errorText,
+      formulae,
+    })
+  }
+
+  if (ptList.length) {
+    addDv('PT', [ref[ptLetter]], 'Choose a PT from Master Office Location.', false)
+  }
+  addDv('Status FKTK', [ref[statusFktkLetter]], `Use: ${FPTK_STATUS_FKTK_OPTIONS.join(' or ')}`, true)
+  addDv('Employment Type', [ref[empLetter]], `Use: ${FPTK_EMPLOYMENT_TYPE_OPTIONS.join(', ')}`, false)
+  addDv('Priority', [ref[priLetter]], `Use: ${FPTK_PRIORITY_OPTIONS.join(', ')}`, true)
+  addDv('Criteria', [ref[critLetter]], `Use: ${FPTK_CRITERIA_OPTIONS.join(' or ')}`, false)
+  addDv('Additional or Replacement', [ref[addLetter]], `Use: ${FPTK_ADDITIONAL_OR_REPLACEMENT_OPTIONS.join(' or ')}`, false)
+  addDv('Current Status', [ref[curLetter]], `Use: ${FPTK_CURRENT_STATUS_OPTIONS.join(', ')}`, false)
+
+  for (let n = 1; n <= 5; n++) {
+    addDv(
+      `Applied Candidate ${n} Status`,
+      [ref[appLetter]],
+      'Pick a status from the list (same options as in the Position form).',
+      true
+    )
+  }
+
   const buffer = await workbook.xlsx.writeBuffer()
   const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' })
   const url = window.URL.createObjectURL(blob)
