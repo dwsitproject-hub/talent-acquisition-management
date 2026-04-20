@@ -916,13 +916,13 @@ model RecruitmentMetric {
 // ==================== MASTER DATA ====================
 
 model MasterDivision {
-  id                String    @id @default(uuid())
-  divisionName      String
-  sectionName       String
+  id                 String    @id @default(uuid())
+  divisionName       String
+  sectionName        String
   headOfDivisionName String
-  hiringManagerName String    @default("")
-  createdAt         DateTime  @default(now())
-  updatedAt         DateTime  @updatedAt
+  hiringManagerName  String    @default("")
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
 
   @@unique([divisionName, sectionName])
   @@index([divisionName])
