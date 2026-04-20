@@ -578,10 +578,14 @@ export default function CandidatesPage() {
     router.push('/')
     return null
   }
-  const perms = cfg.permissions || { view: visibleRoles, create: ['SUPER_ADMIN','HRBP','TA_TEAM'], edit: ['SUPER_ADMIN','HRBP','TA_TEAM'] }
+  const perms = cfg.permissions || {
+    view: visibleRoles,
+    create: ['SUPER_ADMIN', 'Management', 'HRBP', 'TA_TEAM'],
+    edit: ['SUPER_ADMIN', 'Management', 'HRBP', 'TA_TEAM'],
+  }
   const canCreate = (perms.create || []).includes(roleName) || (perms.create || []).includes('*')
   const canEdit = (perms.edit || []).includes(roleName) || (perms.edit || []).includes('*')
-  const canGenerateLink = ['SUPER_ADMIN', 'TA_TEAM', 'HRBP'].includes(roleName)
+  const canGenerateLink = canEdit
 
   const displayCandidates = candidates
 

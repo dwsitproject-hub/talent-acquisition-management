@@ -4,8 +4,8 @@ export async function seedLocalStorage(page: Page) {
   await page.addInitScript(() => {
     // Master Division
     const masterDivisions = [
-      { id: 'div-1', divisionName: 'Engineering', sectionName: 'Platform', headOfDivisionName: 'Alice' },
-      { id: 'div-2', divisionName: 'Commercial', sectionName: 'Sales Ops', headOfDivisionName: 'Bob' }
+      { id: 'div-1', divisionName: 'Engineering', sectionName: 'Platform', headOfDivisionName: 'Alice', hiringManagerName: '' },
+      { id: 'div-2', divisionName: 'Commercial', sectionName: 'Sales Ops', headOfDivisionName: 'Bob', hiringManagerName: '' }
     ]
     localStorage.setItem('masterDivisions', JSON.stringify(masterDivisions))
 

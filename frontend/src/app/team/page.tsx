@@ -148,6 +148,17 @@ const routes: Array<{
     },
   },
   {
+    path: '/candidates',
+    label: 'Candidates',
+    defaults: {
+      visibleRoles: ['SUPER_ADMIN', 'Management', 'Head of Division', 'HRBP', 'TA_TEAM'],
+      permissions: {
+        create: ['SUPER_ADMIN', 'Management', 'HRBP', 'TA_TEAM'],
+        edit: ['SUPER_ADMIN', 'Management', 'HRBP', 'TA_TEAM'],
+      },
+    },
+  },
+  {
     path: '/summary-by-position',
     label: 'Summary by Position',
     defaults: {

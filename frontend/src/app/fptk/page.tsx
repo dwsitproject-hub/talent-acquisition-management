@@ -956,12 +956,7 @@ export default function FPTKPage() {
   const perms = cfg.permissions || { view: visibleRoles, create: ['SUPER_ADMIN','TA_TEAM','HIRING_MANAGER'], edit: ['SUPER_ADMIN','TA_TEAM','HIRING_MANAGER'] }
   const canCreate = (perms.create || []).includes(roleName) || (perms.create || []).includes('*')
   const canEdit = (perms.edit || []).includes(roleName) || (perms.edit || []).includes('*')
-  // Check if user can upload (SUPER_ADMIN, TA_TEAM, HRBP)
-  const canUpload = ['SUPER_ADMIN', 'TA_TEAM', 'HRBP'].includes(roleName) || ['SUPER_ADMIN', 'TA_TEAM', 'HRBP'].includes(backendRole)
   const canDelete = backendRole === 'SUPER_ADMIN'
-  
-  // Debug: Log role check
-  console.log('FPTK Page - Role check:', { roleName, canUpload, visibleRoles })
 
   const filteredFptks = fptks
     .sort((a, b) => {
@@ -1048,7 +1043,7 @@ export default function FPTKPage() {
           </p>
             </div>
             <div className="flex gap-2">
-              {canUpload && (
+              {canCreate && (
                 <>
                   <button
                     onClick={handleDownloadTemplate}

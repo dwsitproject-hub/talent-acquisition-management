@@ -5,7 +5,21 @@ import { useAuth } from '@/contexts/AuthContext'
 import { useRouter } from 'next/navigation'
 import Layout from '@/components/Layout/Layout'
 import { PlusIcon, PencilIcon, TrashIcon, EyeIcon } from '@heroicons/react/24/outline'
-import { MasterDivisionAPI, AdminUsersAPI } from '@/lib/api'
+import { MasterDivisionAPI, AdminUsersAPI, MenuAccessAPI } from '@/lib/api'
+
+function mapEnumToRole(role: string): string {
+  const roleMap: Record<string, string> = {
+    SUPER_ADMIN: 'SUPER_ADMIN',
+    CHRO: 'Management',
+    DEPARTMENT_HEAD: 'Head of Division',
+    HRBP: 'HRBP',
+    TA_TEAM: 'TA_TEAM',
+    HIRING_MANAGER: 'HIRING_MANAGER',
+    INTERVIEWER: 'INTERVIEWER',
+    CANDIDATE: 'CANDIDATE',
+  }
+  return roleMap[role] || role
+}
 import BulkUploadModal from '@/components/BulkUploadModal'
 
 interface Division {
@@ -13,8 +27,31 @@ interface Division {
   divisionName: string
   sectionName: string
   headOfDivisionName: string
+  hiringManagerName: string
   createdAt: string
   updatedAt: string
+}
+
+/** Users with Hiring Manager or Head of Division role (deduped by id) for master division dropdowns. */
+async function loadHiringManagerSelectOptions(): Promise<Array<{ firstName: string; lastName: string }>> {
+  try {
+    const [hm, hod] = await Promise.all([
+      AdminUsersAPI.list('', 'HIRING_MANAGER'),
+      AdminUsersAPI.list('', 'Head of Division'),
+    ])
+    const byId = new Map<string, { firstName: string; lastName: string }>()
+    for (const u of [...(hm || []), ...(hod || [])]) {
+      if (!u?.id) continue
+      if (!byId.has(u.id)) {
+        byId.set(u.id, { firstName: u.firstName || '', lastName: u.lastName || '' })
+      }
+    }
+    return Array.from(byId.values()).sort((a, b) =>
+      `${a.firstName} ${a.lastName}`.trim().localeCompare(`${b.firstName} ${b.lastName}`.trim())
+    )
+  } catch {
+    return []
+  }
 }
 
 export default function MasterDivisionPage() {
@@ -30,6 +67,8 @@ export default function MasterDivisionPage() {
   const [isViewModalOpen, setIsViewModalOpen] = useState(false)
   const [selectedDivision, setSelectedDivision] = useState<Division | null>(null)
   const [isBulkUploadOpen, setIsBulkUploadOpen] = useState(false)
+  const [menuAccess, setMenuAccess] = useState<Record<string, any>>({})
+  const [menuAccessLoading, setMenuAccessLoading] = useState(true)
 
   useEffect(() => {
     if (!isLoading && !isAuthenticated) {
@@ -37,11 +76,40 @@ export default function MasterDivisionPage() {
     }
   }, [isAuthenticated, isLoading, router])
 
+  useEffect(() => {
+    let isMounted = true
+    const loadMenuAccess = async () => {
+      if (!isAuthenticated || isLoading || !isMounted) return
+      try {
+        const access = await MenuAccessAPI.get()
+        if (isMounted) setMenuAccess(access || {})
+      } catch {
+        if (isMounted) setMenuAccess({})
+      } finally {
+        if (isMounted) setMenuAccessLoading(false)
+      }
+    }
+    if (isAuthenticated && !isLoading) {
+      loadMenuAccess()
+    } else {
+      setMenuAccess({})
+      setMenuAccessLoading(false)
+    }
+    return () => {
+      isMounted = false
+    }
+  }, [isAuthenticated, isLoading])
+
   const loadDivisions = async (search?: string) => {
     try {
       setLoading(true)
       const data = await MasterDivisionAPI.getAll(search || searchTerm)
-      setDivisions(data)
+      setDivisions(
+        (data || []).map((d: Division) => ({
+          ...d,
+          hiringManagerName: d.hiringManagerName ?? '',
+        }))
+      )
     } catch (error) {
       console.error('Error loading divisions:', error)
       alert('Failed to load divisions. Please try again.')
@@ -58,7 +126,10 @@ export default function MasterDivisionPage() {
   const handleAddDivision = async (divisionData: Omit<Division, 'id' | 'createdAt' | 'updatedAt'>) => {
     try {
       const newDivision = await MasterDivisionAPI.create(divisionData)
-      setDivisions(prev => [...prev, newDivision])
+      setDivisions((prev) => [
+        ...prev,
+        { ...newDivision, hiringManagerName: newDivision.hiringManagerName ?? '' },
+      ])
       setIsAddModalOpen(false)
     } catch (error: any) {
       console.error('Error adding division:', error)
@@ -72,8 +143,15 @@ export default function MasterDivisionPage() {
         divisionName: divisionData.divisionName,
         sectionName: divisionData.sectionName,
         headOfDivisionName: divisionData.headOfDivisionName,
+        hiringManagerName: divisionData.hiringManagerName,
       })
-      setDivisions(prev => prev.map(div => div.id === divisionData.id ? updatedDivision : div))
+      setDivisions((prev) =>
+        prev.map((div) =>
+          div.id === divisionData.id
+            ? { ...updatedDivision, hiringManagerName: updatedDivision.hiringManagerName ?? '' }
+            : div
+        )
+      )
       setIsEditModalOpen(false)
       setSelectedDivision(null)
     } catch (error: any) {
@@ -126,18 +204,25 @@ export default function MasterDivisionPage() {
     return null
   }
 
-  // Access control
-  const roleName = (user as any)?.role?.name || (user as any)?.role || 'TA_TEAM'
-  const menuAccess = (() => { 
-    if (typeof window === 'undefined') return {}
-    try { 
-      return JSON.parse(localStorage.getItem('menuAccess') || 'null') || {} 
-    } catch { 
-      return {} 
-    } 
-  })()
+  const backendRole = (user as any)?.role?.name || (user as any)?.role || 'TA_TEAM'
+  const roleName = mapEnumToRole(backendRole)
   const cfg = menuAccess['/masters/division'] || {}
-  const visibleRoles: string[] = cfg.visibleRoles && cfg.visibleRoles.length ? cfg.visibleRoles : ['SUPER_ADMIN','TA_TEAM']
+  const visibleRoles: string[] = cfg.visibleRoles && cfg.visibleRoles.length ? cfg.visibleRoles : [
+    'SUPER_ADMIN',
+    'Management',
+    'Head of Division',
+    'HRBP',
+    'TA_TEAM',
+  ]
+
+  if (menuAccessLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-indigo-600"></div>
+      </div>
+    )
+  }
+
   if (!visibleRoles.includes(roleName)) {
     router.push('/')
     return null
@@ -152,20 +237,24 @@ export default function MasterDivisionPage() {
         <div className="mb-8">
           <h1 className="text-2xl font-bold text-gray-900">Master Division</h1>
           <p className="mt-1 text-sm text-gray-500">
-            Manage division information including division name, section name, and head of division
+            Manage division information including division name, section name, hiring manager, and head of division
           </p>
         </div>
 
         {/* Search and Add Button */}
-        <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-center">
+        <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-start">
           <div className="flex-1 max-w-lg">
             <input
               type="text"
-              placeholder="Search divisions..."
+              placeholder="Division, section, hiring manager, or head of division…"
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
+              aria-label="Search master divisions"
               className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
             />
+            <p className="mt-1 text-xs text-gray-500">
+              Matches division name, section name, hiring manager name, or head of division name (partial match, not case-sensitive).
+            </p>
           </div>
           <div className="flex items-center gap-2">
             <label className="text-sm text-gray-600 whitespace-nowrap">Per page</label>
@@ -212,6 +301,9 @@ export default function MasterDivisionPage() {
                       Section Name
                     </th>
                     <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Hiring Manager
+                    </th>
+                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                       Head of Division
                     </th>
                     <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
@@ -227,6 +319,9 @@ export default function MasterDivisionPage() {
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                         {division.sectionName}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                        {division.hiringManagerName?.trim() ? division.hiringManagerName : '—'}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                         {division.headOfDivisionName}
@@ -355,9 +450,11 @@ function AddDivisionModal({ isOpen, onClose, onSave }: AddDivisionModalProps) {
   const [formData, setFormData] = useState({
     divisionName: '',
     sectionName: '',
-    headOfDivisionName: ''
+    headOfDivisionName: '',
+    hiringManagerName: '',
   })
   const [headOfDivisionOptions, setHeadOfDivisionOptions] = useState<Array<{firstName: string, lastName: string}>>([])
+  const [hiringManagerOptions, setHiringManagerOptions] = useState<Array<{ firstName: string; lastName: string }>>([])
 
   useEffect(() => {
     if (isOpen) {
@@ -369,7 +466,15 @@ function AddDivisionModal({ isOpen, onClose, onSave }: AddDivisionModalProps) {
           console.error('Error loading head of division options:', error)
         }
       }
+      const loadHm = async () => {
+        try {
+          setHiringManagerOptions(await loadHiringManagerSelectOptions())
+        } catch (error) {
+          console.error('Error loading hiring manager options:', error)
+        }
+      }
       loadHeadOfDivisionOptions()
+      loadHm()
     }
   }, [isOpen])
 
@@ -377,7 +482,7 @@ function AddDivisionModal({ isOpen, onClose, onSave }: AddDivisionModalProps) {
     e.preventDefault()
     if (formData.divisionName && formData.sectionName && formData.headOfDivisionName) {
       onSave(formData)
-      setFormData({ divisionName: '', sectionName: '', headOfDivisionName: '' })
+      setFormData({ divisionName: '', sectionName: '', headOfDivisionName: '', hiringManagerName: '' })
     }
   }
 
@@ -412,6 +517,27 @@ function AddDivisionModal({ isOpen, onClose, onSave }: AddDivisionModalProps) {
                 className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500"
                 required
               />
+            </div>
+            <div className="mb-4">
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Hiring Manager <span className="font-normal text-gray-500">(optional)</span>
+              </label>
+              <p className="text-xs text-gray-500 mb-2">Users with Hiring Manager or Head of Division role</p>
+              <select
+                value={formData.hiringManagerName}
+                onChange={(e) => setFormData({ ...formData, hiringManagerName: e.target.value })}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500"
+              >
+                <option value="">None</option>
+                {hiringManagerOptions.map((user, index) => {
+                  const fullName = `${user.firstName} ${user.lastName}`.trim()
+                  return (
+                    <option key={index} value={fullName}>
+                      {fullName}
+                    </option>
+                  )
+                })}
+              </select>
             </div>
             <div className="mb-6">
               <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -468,9 +594,11 @@ function EditDivisionModal({ isOpen, onClose, division, onSave }: EditDivisionMo
   const [formData, setFormData] = useState({
     divisionName: division.divisionName,
     sectionName: division.sectionName,
-    headOfDivisionName: division.headOfDivisionName
+    headOfDivisionName: division.headOfDivisionName,
+    hiringManagerName: division.hiringManagerName ?? '',
   })
   const [headOfDivisionOptions, setHeadOfDivisionOptions] = useState<Array<{firstName: string, lastName: string}>>([])
+  const [hiringManagerOptions, setHiringManagerOptions] = useState<Array<{ firstName: string; lastName: string }>>([])
 
   useEffect(() => {
     if (isOpen) {
@@ -482,7 +610,15 @@ function EditDivisionModal({ isOpen, onClose, division, onSave }: EditDivisionMo
           console.error('Error loading head of division options:', error)
         }
       }
+      const loadHm = async () => {
+        try {
+          setHiringManagerOptions(await loadHiringManagerSelectOptions())
+        } catch (error) {
+          console.error('Error loading hiring manager options:', error)
+        }
+      }
       loadHeadOfDivisionOptions()
+      loadHm()
     }
   }, [isOpen])
 
@@ -490,7 +626,8 @@ function EditDivisionModal({ isOpen, onClose, division, onSave }: EditDivisionMo
     setFormData({
       divisionName: division.divisionName,
       sectionName: division.sectionName,
-      headOfDivisionName: division.headOfDivisionName
+      headOfDivisionName: division.headOfDivisionName,
+      hiringManagerName: division.hiringManagerName ?? '',
     })
   }, [division])
 
@@ -533,6 +670,37 @@ function EditDivisionModal({ isOpen, onClose, division, onSave }: EditDivisionMo
                 className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500"
                 required
               />
+            </div>
+            <div className="mb-4">
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Hiring Manager
+              </label>
+              <p className="text-xs text-gray-500 mb-2">Users with Hiring Manager or Head of Division role</p>
+              <select
+                value={formData.hiringManagerName}
+                onChange={(e) => setFormData({ ...formData, hiringManagerName: e.target.value })}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500"
+              >
+                <option value="">None / clear</option>
+                {(() => {
+                  const names = new Set(
+                    hiringManagerOptions.map((u) => `${u.firstName} ${u.lastName}`.trim())
+                  )
+                  const current = (formData.hiringManagerName || '').trim()
+                  const extra =
+                    current && !names.has(current)
+                      ? [{ firstName: current, lastName: '' }]
+                      : []
+                  return [...extra, ...hiringManagerOptions].map((user, index) => {
+                    const fullName = `${user.firstName} ${user.lastName}`.trim()
+                    return (
+                      <option key={`${fullName}-${index}`} value={fullName}>
+                        {fullName}
+                      </option>
+                    )
+                  })
+                })()}
+              </select>
             </div>
             <div className="mb-6">
               <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -600,6 +768,12 @@ function ViewDivisionModal({ isOpen, onClose, division }: ViewDivisionModalProps
             <div>
               <label className="block text-sm font-medium text-gray-700">Section Name</label>
               <p className="mt-1 text-sm text-gray-900">{division.sectionName}</p>
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700">Hiring Manager</label>
+              <p className="mt-1 text-sm text-gray-900">
+                {division.hiringManagerName?.trim() ? division.hiringManagerName : '—'}
+              </p>
             </div>
             <div>
               <label className="block text-sm font-medium text-gray-700">Head of Division</label>

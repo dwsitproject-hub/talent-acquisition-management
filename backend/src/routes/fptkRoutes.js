@@ -1,6 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const { authenticate, authorize, optionalAuth } = require('../middleware/auth');
+const { requireMenuCreate } = require('../middleware/menuAccessAuth');
 const { asyncHandler } = require('../middleware/errorHandler');
 const fptkService = require('../services/fptkService');
 const { validationRules, validate } = require('../middleware/validator');
@@ -13,7 +14,7 @@ const { validationRules, validate } = require('../middleware/validator');
 router.post(
   '/',
   authenticate,
-  authorize('HIRING_MANAGER', 'TA_TEAM', 'SUPER_ADMIN'),
+  requireMenuCreate('/fptk', ['HIRING_MANAGER', 'TA_TEAM', 'SUPER_ADMIN']),
   validationRules.createFPTK,
   validate,
   asyncHandler(async (req, res) => {

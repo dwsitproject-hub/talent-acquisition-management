@@ -1,6 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const { authenticate, authorize } = require('../middleware/auth');
+const { requireMenuCreate } = require('../middleware/menuAccessAuth');
 const adminUserController = require('../controllers/adminUserController');
 const menuAccessController = require('../controllers/menuAccessController');
 
@@ -11,13 +12,25 @@ router.use(authenticate);
 router.get('/users', authorize('SUPER_ADMIN', 'HRBP', 'TA_TEAM'), adminUserController.listUsers);
 
 // Download bulk upload template
-router.get('/users/bulk-template', authorize('SUPER_ADMIN', 'TA_TEAM'), adminUserController.bulkTemplate);
+router.get(
+  '/users/bulk-template',
+  requireMenuCreate('/team', ['SUPER_ADMIN', 'TA_TEAM']),
+  adminUserController.bulkTemplate
+);
 
 // Bulk upload users (CSV/XLSX)
-router.post('/users/bulk-upload', authorize('SUPER_ADMIN', 'TA_TEAM'), adminUserController.bulkUpload);
+router.post(
+  '/users/bulk-upload',
+  requireMenuCreate('/team', ['SUPER_ADMIN', 'TA_TEAM']),
+  adminUserController.bulkUpload
+);
 
 // Create user
-router.post('/users', authorize('SUPER_ADMIN', 'TA_TEAM'), adminUserController.createUser);
+router.post(
+  '/users',
+  requireMenuCreate('/team', ['SUPER_ADMIN', 'TA_TEAM']),
+  adminUserController.createUser
+);
 
 // Update user
 router.put('/users/:id', authorize('SUPER_ADMIN', 'TA_TEAM'), adminUserController.updateUser);

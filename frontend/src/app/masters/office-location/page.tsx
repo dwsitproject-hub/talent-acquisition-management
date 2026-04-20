@@ -5,7 +5,21 @@ import { useAuth } from '@/contexts/AuthContext'
 import { useRouter } from 'next/navigation'
 import Layout from '@/components/Layout/Layout'
 import { PlusIcon, PencilIcon, TrashIcon, EyeIcon } from '@heroicons/react/24/outline'
-import { MasterOfficeLocationAPI } from '@/lib/api'
+import { MasterOfficeLocationAPI, MenuAccessAPI } from '@/lib/api'
+
+function mapEnumToRole(role: string): string {
+  const roleMap: Record<string, string> = {
+    SUPER_ADMIN: 'SUPER_ADMIN',
+    CHRO: 'Management',
+    DEPARTMENT_HEAD: 'Head of Division',
+    HRBP: 'HRBP',
+    TA_TEAM: 'TA_TEAM',
+    HIRING_MANAGER: 'HIRING_MANAGER',
+    INTERVIEWER: 'INTERVIEWER',
+    CANDIDATE: 'CANDIDATE',
+  }
+  return roleMap[role] || role
+}
 import BulkUploadModal from '@/components/BulkUploadModal'
 
 interface OfficeLocation {
@@ -18,7 +32,7 @@ interface OfficeLocation {
 }
 
 export default function MasterOfficeLocationPage() {
-  const { isAuthenticated, isLoading } = useAuth()
+  const { isAuthenticated, isLoading, user } = useAuth()
   const router = useRouter()
   const [officeLocations, setOfficeLocations] = useState<OfficeLocation[]>([])
   const [loading, setLoading] = useState(true)
@@ -30,12 +44,38 @@ export default function MasterOfficeLocationPage() {
   const [isViewModalOpen, setIsViewModalOpen] = useState(false)
   const [selectedOfficeLocation, setSelectedOfficeLocation] = useState<OfficeLocation | null>(null)
   const [isBulkUploadOpen, setIsBulkUploadOpen] = useState(false)
+  const [menuAccess, setMenuAccess] = useState<Record<string, any>>({})
+  const [menuAccessLoading, setMenuAccessLoading] = useState(true)
 
   useEffect(() => {
     if (!isLoading && !isAuthenticated) {
       router.push('/login')
     }
   }, [isAuthenticated, isLoading, router])
+
+  useEffect(() => {
+    let isMounted = true
+    const loadMenuAccess = async () => {
+      if (!isAuthenticated || isLoading || !isMounted) return
+      try {
+        const access = await MenuAccessAPI.get()
+        if (isMounted) setMenuAccess(access || {})
+      } catch {
+        if (isMounted) setMenuAccess({})
+      } finally {
+        if (isMounted) setMenuAccessLoading(false)
+      }
+    }
+    if (isAuthenticated && !isLoading) {
+      loadMenuAccess()
+    } else {
+      setMenuAccess({})
+      setMenuAccessLoading(false)
+    }
+    return () => {
+      isMounted = false
+    }
+  }, [isAuthenticated, isLoading])
 
   const loadOfficeLocations = async (search?: string) => {
     try {
@@ -126,6 +166,38 @@ export default function MasterOfficeLocationPage() {
     return null
   }
 
+  const backendRole = (user as any)?.role?.name || (user as any)?.role || 'TA_TEAM'
+  const roleName = mapEnumToRole(backendRole)
+  const cfg = menuAccess['/masters/office-location'] || {}
+  const visibleRoles: string[] = cfg.visibleRoles && cfg.visibleRoles.length ? cfg.visibleRoles : [
+    'SUPER_ADMIN',
+    'Management',
+    'Head of Division',
+    'HRBP',
+    'TA_TEAM',
+  ]
+
+  if (menuAccessLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-indigo-600"></div>
+      </div>
+    )
+  }
+
+  if (!visibleRoles.includes(roleName)) {
+    router.push('/')
+    return null
+  }
+
+  const perms = cfg.permissions || {
+    view: visibleRoles,
+    create: ['SUPER_ADMIN', 'TA_TEAM'],
+    edit: ['SUPER_ADMIN', 'TA_TEAM'],
+  }
+  const canCreate = (perms.create || []).includes(roleName) || (perms.create || []).includes('*')
+  const canEdit = (perms.edit || []).includes(roleName) || (perms.edit || []).includes('*')
+
   return (
     <Layout>
       <div>
@@ -161,14 +233,24 @@ export default function MasterOfficeLocationPage() {
           </div>
           <div className="flex items-center gap-2 sm:ml-auto">
             <button
-              onClick={() => setIsBulkUploadOpen(true)}
-              className="inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-900 hover:bg-gray-50"
+              type="button"
+              disabled={!canCreate}
+              onClick={() => canCreate && setIsBulkUploadOpen(true)}
+              className={`inline-flex items-center px-4 py-2 border text-sm font-medium rounded-md ${
+                canCreate ? 'border-gray-300 text-gray-900 hover:bg-gray-50' : 'border-gray-200 text-gray-400 cursor-not-allowed'
+              }`}
             >
               Bulk Upload
             </button>
             <button
-              onClick={() => setIsAddModalOpen(true)}
-              className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
+              type="button"
+              disabled={!canCreate}
+              onClick={() => canCreate && setIsAddModalOpen(true)}
+              className={`inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white ${
+                canCreate
+                  ? 'bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500'
+                  : 'bg-gray-300 cursor-not-allowed'
+              }`}
             >
               <PlusIcon className="h-5 w-5 mr-2" />
               Add Office Location
@@ -221,17 +303,24 @@ export default function MasterOfficeLocationPage() {
                             <EyeIcon className="h-5 w-5" />
                           </button>
                           <button
+                            type="button"
+                            disabled={!canEdit}
                             onClick={() => {
+                              if (!canEdit) return
                               setSelectedOfficeLocation(officeLocation)
                               setIsEditModalOpen(true)
                             }}
-                            className="text-yellow-600 hover:text-yellow-900"
+                            className={
+                              canEdit ? 'text-yellow-600 hover:text-yellow-900' : 'text-gray-300 cursor-not-allowed'
+                            }
                           >
                             <PencilIcon className="h-5 w-5" />
                           </button>
                           <button
-                            onClick={() => handleDeleteOfficeLocation(officeLocation.id)}
-                            className="text-red-600 hover:text-red-900"
+                            type="button"
+                            disabled={!canEdit}
+                            onClick={() => canEdit && handleDeleteOfficeLocation(officeLocation.id)}
+                            className={canEdit ? 'text-red-600 hover:text-red-900' : 'text-gray-300 cursor-not-allowed'}
                           >
                             <TrashIcon className="h-5 w-5" />
                           </button>

@@ -20,5 +20,4 @@ uploads
 .docker
 Dockerfile*
 docker-compose*
-prisma/migrations/*/migration.sql
 

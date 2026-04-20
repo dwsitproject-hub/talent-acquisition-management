@@ -262,9 +262,11 @@ async function getAllApplications(filters, pagination, user = null) {
         },
         fptk: {
           select: {
+            id: true,
             fptkNumber: true,
             positionTitle: true,
             department: true,
+            priority: true,
           },
         },
         interviews: {
