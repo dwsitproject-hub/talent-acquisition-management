@@ -16,6 +16,19 @@ const geistMono = Geist_Mono({
 export const metadata: Metadata = {
   title: "KPN Talent Acquisition System",
   description: "Comprehensive talent acquisition and recruitment management system",
+  manifest: "/faveicon/site.webmanifest",
+  icons: {
+    icon: [
+      { url: "/faveicon/favicon-16x16.png", sizes: "16x16", type: "image/png" },
+      { url: "/faveicon/favicon-32x32.png", sizes: "32x32", type: "image/png" },
+    ],
+    shortcut: "/faveicon/favicon.ico",
+    apple: "/faveicon/apple-touch-icon.png",
+  },
+  appleWebApp: {
+    capable: true,
+    title: "KPN Talent Acquisition",
+  },
 };
 
 export default function RootLayout({

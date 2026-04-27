@@ -45,6 +45,7 @@ enum ApplicationStatus {
   HIRED
   REJECTED
   WITHDRAWN
+  KEEP_IN_VIEW
 }
 
 enum FPTKStatus {

@@ -24,7 +24,7 @@ import {
   getPositionNameForFailedExport,
   FPTKUploadResult,
 } from '@/utils/fptkExcelParser'
-import { FPTKAPI, MenuAccessAPI } from '@/lib/api'
+import { FPTKAPI, MasterOfficeLocationAPI, MenuAccessAPI } from '@/lib/api'
 import MultiSelectDropdown from '@/components/MultiSelectDropdown'
 
 const DEFAULT_CURRENT_STATUS = 'Pending FKTK'
@@ -125,6 +125,7 @@ const APPLICATION_STATUS_UI_LABELS: Record<string, string> = {
   HIRED: 'Hired',
   REJECTED: 'Rejected (Failed Interview / Assessment)',
   WITHDRAWN: 'Withdrawn',
+  KEEP_IN_VIEW: 'Keep In View',
 }
 
 const mapApplicationStatusToUi = (status?: string): string => {
@@ -323,12 +324,17 @@ const mapAppliedCandidatesForPayload = (candidates?: any[]) => {
   return candidates
     .map((candidate: any) => {
       if (!candidate) return null
+      const rawStatus = candidate.status || candidate.backendStatus || 'Applied'
+      const statusFromEnum =
+        typeof rawStatus === 'string' && /^[A-Z0-9_]+$/.test(rawStatus.trim()) && rawStatus.length > 1
+          ? APPLICATION_STATUS_UI_LABELS[rawStatus.trim() as keyof typeof APPLICATION_STATUS_UI_LABELS] || rawStatus
+          : rawStatus
       return {
         id: candidate.candidateId || candidate.id,
         candidateId: candidate.candidateId || candidate.id,
         fullName: candidate.fullName || candidate.name,
         email: candidate.email,
-        status: candidate.status || candidate.backendStatus || 'Applied',
+        status: candidate.status || statusFromEnum,
         appliedDate: candidate.appliedDate || candidate.appliedAt || new Date().toISOString(),
         source: candidate.source,
         // Include interview data if it exists
@@ -357,6 +363,10 @@ export default function FPTKPage() {
   const [loading, setLoading] = useState(true)
   const [searchTerm, setSearchTerm] = useState('')
   const [statusFilters, setStatusFilters] = useState<string[]>([])
+  const [ptFilter, setPtFilter] = useState<string[]>([])
+  const [areaFilter, setAreaFilter] = useState<string[]>([])
+  const [areaDetailFilter, setAreaDetailFilter] = useState<string[]>([])
+  const [officeLocations, setOfficeLocations] = useState<any[]>([])
   const [sortBy, setSortBy] = useState<'location' | 'areaDetail' | ''>('')
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc')
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false)
@@ -377,6 +387,58 @@ export default function FPTKPage() {
   const [listPagination, setListPagination] = useState({ total: 0, totalPages: 1 })
   const [statusCounts, setStatusCounts] = useState<Record<string, number>>({})
   const statusFilterKey = useMemo(() => [...statusFilters].sort().join('|'), [statusFilters])
+  const locationFilterKey = useMemo(
+    () =>
+      [
+        [...ptFilter].sort().join('|'),
+        [...areaFilter].sort().join('|'),
+        [...areaDetailFilter].sort().join('|'),
+      ].join('~'),
+    [ptFilter, areaFilter, areaDetailFilter]
+  )
+
+  useEffect(() => {
+    let isMounted = true
+    const load = async () => {
+      try {
+        const data = await MasterOfficeLocationAPI.getAll()
+        if (isMounted) {
+          setOfficeLocations(Array.isArray(data) ? data : [])
+        }
+      } catch (e) {
+        console.error('Error loading office locations:', e)
+        if (isMounted) setOfficeLocations([])
+      }
+    }
+    load()
+    return () => {
+      isMounted = false
+    }
+  }, [])
+
+  const ptOptions = useMemo(() => {
+    const s = new Set<string>()
+    officeLocations.forEach((loc: { pt?: string }) => {
+      if (loc?.pt) s.add(loc.pt)
+    })
+    return Array.from(s)
+  }, [officeLocations])
+
+  const areaOptions = useMemo(() => {
+    const s = new Set<string>()
+    officeLocations.forEach((loc: { area?: string }) => {
+      if (loc?.area) s.add(loc.area)
+    })
+    return Array.from(s)
+  }, [officeLocations])
+
+  const areaDetailOptions = useMemo(() => {
+    const s = new Set<string>()
+    officeLocations.forEach((loc: { areaDetail?: string }) => {
+      if (loc?.areaDetail) s.add(loc.areaDetail)
+    })
+    return Array.from(s)
+  }, [officeLocations])
 
   useEffect(() => {
     if (!isLoading && !isAuthenticated) {
@@ -389,15 +451,33 @@ export default function FPTKPage() {
       setLoading(true)
       const currentStatusParam =
         statusFilters.length > 0 ? statusFilters.map((s) => s.trim()).join(',') : undefined
+      const listParams: Parameters<typeof FPTKAPI.getAll>[0] = {
+        search: searchTerm,
+        ...(currentStatusParam ? { currentStatus: currentStatusParam } : {}),
+        ...(ptFilter.length
+          ? { pt: ptFilter.map((s) => s.trim()).filter(Boolean).join(',') }
+          : {}),
+        ...(areaFilter.length
+          ? { area: areaFilter.map((s) => s.trim()).filter(Boolean).join(',') }
+          : {}),
+        ...(areaDetailFilter.length
+          ? { areaDetail: areaDetailFilter.map((s) => s.trim()).filter(Boolean).join(',') }
+          : {}),
+      }
       const [response, counts] = await Promise.all([
-        FPTKAPI.getAll(
-          {
-            search: searchTerm,
-            ...(currentStatusParam ? { currentStatus: currentStatusParam } : {}),
-          },
-          { page, limit: pageSize }
-        ),
-        FPTKAPI.getCountsByCurrentStatus(searchTerm),
+        FPTKAPI.getAll(listParams, { page, limit: pageSize }),
+        FPTKAPI.getCountsByCurrentStatus({
+          ...(searchTerm?.trim() ? { search: searchTerm } : {}),
+          ...(ptFilter.length
+            ? { pt: ptFilter.map((s) => s.trim()).filter(Boolean).join(',') }
+            : {}),
+          ...(areaFilter.length
+            ? { area: areaFilter.map((s) => s.trim()).filter(Boolean).join(',') }
+            : {}),
+          ...(areaDetailFilter.length
+            ? { areaDetail: areaDetailFilter.map((s) => s.trim()).filter(Boolean).join(',') }
+            : {}),
+        }),
       ])
       const mappedFPTKs: FPTK[] = (response.data || []).map((fptk: any) => mapApiFptk(fptk))
       setFptks(mappedFPTKs)
@@ -425,7 +505,7 @@ export default function FPTKPage() {
       return
     }
     setPage(1)
-  }, [searchTerm, pageSize, statusFilterKey, isAuthenticated, isLoading])
+  }, [searchTerm, pageSize, statusFilterKey, locationFilterKey, isAuthenticated, isLoading])
 
   useEffect(() => {
     if (!isAuthenticated || isLoading) return
@@ -435,7 +515,7 @@ export default function FPTKPage() {
     }, delay)
     return () => clearTimeout(timer)
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [page, pageSize, searchTerm, statusFilterKey, isAuthenticated, isLoading])
+  }, [page, pageSize, searchTerm, statusFilterKey, locationFilterKey, isAuthenticated, isLoading])
 
   // Deep-link: /fptk?edit=<id> opens Edit modal directly
   useEffect(() => {
@@ -1091,8 +1171,34 @@ export default function FPTKPage() {
               className="block w-full pl-10 pr-3 py-2 border border-gray-300 rounded-md leading-5 bg-white placeholder-gray-500 focus:outline-none focus:placeholder-gray-400 focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
             />
           </div>
-          <div className="flex gap-4 items-center">
-            {/* Status Filter */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+            <MultiSelectDropdown
+              label="PT (entity)"
+              options={ptOptions}
+              value={ptFilter}
+              onChange={setPtFilter}
+              placeholder="All entities"
+              searchPlaceholder="Search PT..."
+            />
+            <MultiSelectDropdown
+              label="Area"
+              options={areaOptions}
+              value={areaFilter}
+              onChange={setAreaFilter}
+              placeholder="All areas"
+              searchPlaceholder="Search area..."
+            />
+            <MultiSelectDropdown
+              label="Area detail"
+              options={areaDetailOptions}
+              value={areaDetailFilter}
+              onChange={setAreaDetailFilter}
+              placeholder="All area details"
+              searchPlaceholder="Search area detail..."
+            />
+          </div>
+          <div className="flex flex-wrap gap-4 items-end">
+            {/* Status Filter (combined with PT/Area/Area detail via server query) */}
             <div className="min-w-[220px] flex-1 max-w-md">
               <MultiSelectDropdown
                 label="Filter by Current Status"
@@ -1151,7 +1257,8 @@ export default function FPTKPage() {
         <div className="mb-6">
           <h3 className="text-sm font-medium text-gray-900 mb-2">By Current Status</h3>
           <p className="text-xs text-gray-500 mb-3">
-            Counts reflect the current search. Click a status to filter the list below; click again to clear that filter.
+            Counts reflect the current search and PT/Area/Area detail filters. Click a status to filter the list
+            below; click again to clear that filter.
           </p>
           <div className="flex flex-wrap gap-2">
             {CURRENT_STATUS_OPTIONS.map((st) => {

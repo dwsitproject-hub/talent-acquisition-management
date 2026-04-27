@@ -62,6 +62,7 @@ export const FPTK_APPLIED_CANDIDATE_STATUS_OPTIONS = [
   'Hired',
   'Rejected (Failed Interview / Assessment)',
   'Withdrawn',
+  'Keep In View',
 ] as const
 
 export function normalizeExcelEnum(value: string | undefined | null): string {
@@ -100,8 +101,11 @@ export function isAllowedAppliedCandidateStatus(raw: string | undefined): boolea
   return ALLOWED_APPLIED_STATUS.has(normalizeExcelEnum(raw))
 }
 
+/** Excel template & parser: how many Applied Candidate triplets (name / email / status) to include per row. */
+export const FPTK_EXCEL_APPLIED_CANDIDATE_SLOT_COUNT = 50
+
 export function getAppliedCandidateHeaderDefs(): Array<{ fullName: string; email: string; status: string }> {
-  return Array.from({ length: 5 }, (_, idx) => {
+  return Array.from({ length: FPTK_EXCEL_APPLIED_CANDIDATE_SLOT_COUNT }, (_, idx) => {
     const n = idx + 1
     return {
       fullName: `Applied Candidate ${n} Full Name`,
@@ -113,7 +117,7 @@ export function getAppliedCandidateHeaderDefs(): Array<{ fullName: string; email
 
 const APPLIED_HEADER_SUFFIXES: string[] = (() => {
   const cols: string[] = []
-  for (let n = 1; n <= 5; n++) {
+  for (let n = 1; n <= FPTK_EXCEL_APPLIED_CANDIDATE_SLOT_COUNT; n++) {
     cols.push(
       `Applied Candidate ${n} Full Name`,
       `Applied Candidate ${n} Email`,

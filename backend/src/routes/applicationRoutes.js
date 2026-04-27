@@ -77,6 +77,7 @@ router.get(
     const filters = {
       status: req.query.status,
       fptkId: req.query.fptkId,
+      candidateId: req.query.candidateId,
       department: req.query.department,
       currentStage: req.query.currentStage,
       slaBreached: req.query.slaBreached,

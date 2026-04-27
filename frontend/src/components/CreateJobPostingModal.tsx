@@ -4,6 +4,11 @@ import { useState, useEffect, useMemo, useRef } from 'react'
 import { XMarkIcon } from '@heroicons/react/24/outline'
 import { MasterOfficeLocationAPI, MasterDivisionAPI, CandidatesAPI, AdminUsersAPI } from '@/lib/api'
 import { compressFile, formatFileSize } from '@/utils/fileCompression'
+import {
+  fptkRequiredFieldHighlightStyle,
+  getMissingFptkRequiredKeys,
+  type FptkRequiredKey,
+} from '@/utils/fptkFormRequired'
 
 interface CreateJobPostingModalProps {
   isOpen: boolean
@@ -40,6 +45,15 @@ export default function CreateJobPostingModal({ isOpen, onClose, onSave, editing
   })
 
   const [loading, setLoading] = useState(false)
+  const [showRequiredFieldHighlights, setShowRequiredFieldHighlights] = useState(false)
+  const missingRequiredKeys = useMemo(
+    () =>
+      showRequiredFieldHighlights
+        ? getMissingFptkRequiredKeys(formData as unknown as Record<string, unknown>)
+        : [],
+    [showRequiredFieldHighlights, formData]
+  )
+  const fInv = (key: FptkRequiredKey) => missingRequiredKeys.includes(key)
   const [divisions, setDivisions] = useState<any[]>([])
   const [officeLocations, setOfficeLocations] = useState<any[]>([])
   const [areaDetails, setAreaDetails] = useState<any[]>([])
@@ -441,6 +455,7 @@ export default function CreateJobPostingModal({ isOpen, onClose, onSave, editing
   // Populate form when editing
   useEffect(() => {
     if (editingJobPosting && isOpen) {
+      setShowRequiredFieldHighlights(false)
       setFormData({
         pt: editingJobPosting.pt || '',
         noFktk: editingJobPosting.noFktk || '',
@@ -483,6 +498,7 @@ export default function CreateJobPostingModal({ isOpen, onClose, onSave, editing
         remark: editingJobPosting.remark || ''
       })
     } else if (isOpen) {
+      setShowRequiredFieldHighlights(false)
       // Reset form for new open position
       setFormData({
         pt: '',
@@ -516,20 +532,13 @@ export default function CreateJobPostingModal({ isOpen, onClose, onSave, editing
     e.preventDefault()
     setLoading(true)
 
-    // Validate required fields
-    const requiredFields = ['pt', 'division', 'section', 'hiringManager', 'position', 'employmentType', 'criteria', 'area', 'areaDetail', 'additionalOrReplacement', 'requestDate', 'jobSpecification']
-    const missingFields = requiredFields.filter(field => {
-      const value = formData[field as keyof typeof formData]
-      if (!value) return true
-      if (typeof value === 'string' && !value.trim()) return true
-      return false
-    })
-    
-    if (missingFields.length > 0) {
-      alert(`Please fill in all required fields: ${missingFields.join(', ')}`)
+    const missing = getMissingFptkRequiredKeys(formData as unknown as Record<string, unknown>)
+    if (missing.length > 0) {
+      setShowRequiredFieldHighlights(true)
       setLoading(false)
       return
     }
+    setShowRequiredFieldHighlights(false)
 
     // Include applied candidates and area detail in the job posting data
     const jobPostingData = {
@@ -662,6 +671,7 @@ export default function CreateJobPostingModal({ isOpen, onClose, onSave, editing
   }
 
   const handleClose = () => {
+    setShowRequiredFieldHighlights(false)
     setFormData({
       pt: '',
       noFktk: '',
@@ -754,7 +764,7 @@ export default function CreateJobPostingModal({ isOpen, onClose, onSave, editing
                 display: 'block',
                 fontSize: '14px',
                 fontWeight: '500',
-                color: '#374151',
+                color: fInv('pt') ? '#b91c1c' : '#374151',
                 marginBottom: '6px'
               }}>
                 PT *
@@ -764,13 +774,15 @@ export default function CreateJobPostingModal({ isOpen, onClose, onSave, editing
                 value={formData.pt}
                 onChange={handleInputChange}
                 required
+                aria-invalid={fInv('pt')}
                 style={{
                   width: '100%',
                   padding: '8px 12px',
                   border: '1px solid #d1d5db',
                   borderRadius: '6px',
                   fontSize: '14px',
-                  backgroundColor: 'white'
+                  backgroundColor: 'white',
+                  ...fptkRequiredFieldHighlightStyle(fInv('pt'))
                 }}
               >
                 <option value="">Select PT</option>
@@ -930,7 +942,7 @@ export default function CreateJobPostingModal({ isOpen, onClose, onSave, editing
                 display: 'block',
                 fontSize: '14px',
                 fontWeight: '500',
-                color: '#374151',
+                color: fInv('division') ? '#b91c1c' : '#374151',
                 marginBottom: '6px'
               }}>
                 Division *
@@ -940,13 +952,15 @@ export default function CreateJobPostingModal({ isOpen, onClose, onSave, editing
                 value={formData.division}
                 onChange={handleInputChange}
                 required
+                aria-invalid={fInv('division')}
                 style={{
                   width: '100%',
                   padding: '8px 12px',
                   border: '1px solid #d1d5db',
                   borderRadius: '6px',
                   fontSize: '14px',
-                  backgroundColor: 'white'
+                  backgroundColor: 'white',
+                  ...fptkRequiredFieldHighlightStyle(fInv('division'))
                 }}
               >
                 <option value="">Select Division</option>
@@ -964,7 +978,7 @@ export default function CreateJobPostingModal({ isOpen, onClose, onSave, editing
                 display: 'block',
                 fontSize: '14px',
                 fontWeight: '500',
-                color: '#374151',
+                color: fInv('section') ? '#b91c1c' : '#374151',
                 marginBottom: '6px'
               }}>
                 Section *
@@ -974,13 +988,15 @@ export default function CreateJobPostingModal({ isOpen, onClose, onSave, editing
                 value={formData.section}
                 onChange={handleInputChange}
                 required
+                aria-invalid={fInv('section')}
                 style={{
                   width: '100%',
                   padding: '8px 12px',
                   border: '1px solid #d1d5db',
                   borderRadius: '6px',
                   fontSize: '14px',
-                  backgroundColor: 'white'
+                  backgroundColor: 'white',
+                  ...fptkRequiredFieldHighlightStyle(fInv('section'))
                 }}
               >
                 <option value="">Select Section</option>
@@ -1001,7 +1017,7 @@ export default function CreateJobPostingModal({ isOpen, onClose, onSave, editing
                 display: 'block',
                 fontSize: '14px',
                 fontWeight: '500',
-                color: '#374151',
+                color: fInv('hiringManager') ? '#b91c1c' : '#374151',
                 marginBottom: '6px'
               }}>
                 Hiring Manager *
@@ -1011,12 +1027,14 @@ export default function CreateJobPostingModal({ isOpen, onClose, onSave, editing
                 value={formData.hiringManager}
                 onChange={handleInputChange}
                 required
+                aria-invalid={fInv('hiringManager')}
                 style={{
                   width: '100%',
                   padding: '8px 12px',
                   border: '1px solid #d1d5db',
                   borderRadius: '6px',
-                  fontSize: '14px'
+                  fontSize: '14px',
+                  ...fptkRequiredFieldHighlightStyle(fInv('hiringManager'))
                 }}
               >
                 <option value="">Select Hiring Manager</option>
@@ -1037,7 +1055,7 @@ export default function CreateJobPostingModal({ isOpen, onClose, onSave, editing
                 display: 'block',
                 fontSize: '14px',
                 fontWeight: '500',
-                color: '#374151',
+                color: fInv('position') ? '#b91c1c' : '#374151',
                 marginBottom: '6px'
               }}>
                 Position *
@@ -1048,12 +1066,14 @@ export default function CreateJobPostingModal({ isOpen, onClose, onSave, editing
                 value={formData.position}
                 onChange={handleInputChange}
                 required
+                aria-invalid={fInv('position')}
                 style={{
                   width: '100%',
                   padding: '8px 12px',
                   border: '1px solid #d1d5db',
                   borderRadius: '6px',
-                  fontSize: '14px'
+                  fontSize: '14px',
+                  ...fptkRequiredFieldHighlightStyle(fInv('position'))
                 }}
               />
             </div>
@@ -1064,7 +1084,7 @@ export default function CreateJobPostingModal({ isOpen, onClose, onSave, editing
                 display: 'block',
                 fontSize: '14px',
                 fontWeight: '500',
-                color: '#374151',
+                color: fInv('employmentType') ? '#b91c1c' : '#374151',
                 marginBottom: '6px'
               }}>
                 Employment Type *
@@ -1074,13 +1094,15 @@ export default function CreateJobPostingModal({ isOpen, onClose, onSave, editing
                 value={formData.employmentType}
                 onChange={handleInputChange}
                 required
+                aria-invalid={fInv('employmentType')}
                 style={{
                   width: '100%',
                   padding: '8px 12px',
                   border: '1px solid #d1d5db',
                   borderRadius: '6px',
                   fontSize: '14px',
-                  backgroundColor: 'white'
+                  backgroundColor: 'white',
+                  ...fptkRequiredFieldHighlightStyle(fInv('employmentType'))
                 }}
               >
                 <option value="">Select Employment Type</option>
@@ -1181,7 +1203,7 @@ export default function CreateJobPostingModal({ isOpen, onClose, onSave, editing
                 display: 'block',
                 fontSize: '14px',
                 fontWeight: '500',
-                color: '#374151',
+                color: fInv('criteria') ? '#b91c1c' : '#374151',
                 marginBottom: '6px'
               }}>
                 Criteria *
@@ -1191,13 +1213,15 @@ export default function CreateJobPostingModal({ isOpen, onClose, onSave, editing
                 value={formData.criteria}
                 onChange={handleInputChange}
                 required
+                aria-invalid={fInv('criteria')}
                 style={{
                   width: '100%',
                   padding: '8px 12px',
                   border: '1px solid #d1d5db',
                   borderRadius: '6px',
                   fontSize: '14px',
-                  backgroundColor: 'white'
+                  backgroundColor: 'white',
+                  ...fptkRequiredFieldHighlightStyle(fInv('criteria'))
                 }}
               >
                 <option value="">Select Criteria</option>
@@ -1212,7 +1236,7 @@ export default function CreateJobPostingModal({ isOpen, onClose, onSave, editing
                 display: 'block',
                 fontSize: '14px',
                 fontWeight: '500',
-                color: '#374151',
+                color: fInv('area') ? '#b91c1c' : '#374151',
                 marginBottom: '6px'
               }}>
                 Area *
@@ -1223,13 +1247,15 @@ export default function CreateJobPostingModal({ isOpen, onClose, onSave, editing
                 onChange={handleInputChange}
                 required
                 disabled={!formData.pt}
+                aria-invalid={fInv('area')}
                 style={{
                   width: '100%',
                   padding: '8px 12px',
                   border: '1px solid #d1d5db',
                   borderRadius: '6px',
                   fontSize: '14px',
-                  backgroundColor: formData.pt ? 'white' : '#f3f4f6'
+                  backgroundColor: formData.pt ? 'white' : '#f3f4f6',
+                  ...fptkRequiredFieldHighlightStyle(fInv('area'))
                 }}
               >
                 <option value="">{formData.pt ? 'Select Area' : 'Select PT first'}</option>
@@ -1250,7 +1276,7 @@ export default function CreateJobPostingModal({ isOpen, onClose, onSave, editing
                 display: 'block',
                 fontSize: '14px',
                 fontWeight: '500',
-                color: '#374151',
+                color: fInv('areaDetail') ? '#b91c1c' : '#374151',
                 marginBottom: '6px'
               }}>
                 Area Detail *
@@ -1261,13 +1287,15 @@ export default function CreateJobPostingModal({ isOpen, onClose, onSave, editing
                 onChange={handleInputChange}
                 required
                 disabled={!formData.area}
+                aria-invalid={fInv('areaDetail')}
                 style={{
                   width: '100%',
                   padding: '8px 12px',
                   border: '1px solid #d1d5db',
                   borderRadius: '6px',
                   fontSize: '14px',
-                  backgroundColor: formData.area ? 'white' : '#f3f4f6'
+                  backgroundColor: formData.area ? 'white' : '#f3f4f6',
+                  ...fptkRequiredFieldHighlightStyle(fInv('areaDetail'))
                 }}
               >
                 <option value="">{formData.area ? 'Select Area Detail' : 'Select Area first'}</option>
@@ -1288,7 +1316,7 @@ export default function CreateJobPostingModal({ isOpen, onClose, onSave, editing
                 display: 'block',
                 fontSize: '14px',
                 fontWeight: '500',
-                color: '#374151',
+                color: fInv('additionalOrReplacement') ? '#b91c1c' : '#374151',
                 marginBottom: '6px'
               }}>
                 Additional or Replacement *
@@ -1298,13 +1326,15 @@ export default function CreateJobPostingModal({ isOpen, onClose, onSave, editing
                 value={formData.additionalOrReplacement}
                 onChange={handleInputChange}
                 required
+                aria-invalid={fInv('additionalOrReplacement')}
                 style={{
                   width: '100%',
                   padding: '8px 12px',
                   border: '1px solid #d1d5db',
                   borderRadius: '6px',
                   fontSize: '14px',
-                  backgroundColor: 'white'
+                  backgroundColor: 'white',
+                  ...fptkRequiredFieldHighlightStyle(fInv('additionalOrReplacement'))
                 }}
               >
                 <option value="">Select Type</option>
@@ -1372,7 +1402,7 @@ export default function CreateJobPostingModal({ isOpen, onClose, onSave, editing
                 display: 'block',
                 fontSize: '14px',
                 fontWeight: '500',
-                color: '#374151',
+                color: fInv('requestDate') ? '#b91c1c' : '#374151',
                 marginBottom: '6px'
               }}>
                 Request Date *
@@ -1383,12 +1413,14 @@ export default function CreateJobPostingModal({ isOpen, onClose, onSave, editing
                 value={formData.requestDate}
                 onChange={handleInputChange}
                 required
+                aria-invalid={fInv('requestDate')}
                 style={{
                   width: '100%',
                   padding: '8px 12px',
                   border: '1px solid #d1d5db',
                   borderRadius: '6px',
-                  fontSize: '14px'
+                  fontSize: '14px',
+                  ...fptkRequiredFieldHighlightStyle(fInv('requestDate'))
                 }}
               />
             </div>
@@ -1657,10 +1689,10 @@ export default function CreateJobPostingModal({ isOpen, onClose, onSave, editing
               display: 'block',
               fontSize: '14px',
               fontWeight: '500',
-              color: '#374151',
+              color: fInv('jobSpecification') ? '#b91c1c' : '#374151',
               marginBottom: '6px'
             }}>
-              Job Specification and Qualification
+              Job Specification and Qualification *
             </label>
             <textarea
               name="jobSpecification"
@@ -1668,13 +1700,15 @@ export default function CreateJobPostingModal({ isOpen, onClose, onSave, editing
               onChange={handleInputChange}
               rows={4}
               placeholder="Enter job specification and qualification requirements..."
+              aria-invalid={fInv('jobSpecification')}
               style={{
                 width: '100%',
                 padding: '8px 12px',
                 border: '1px solid #d1d5db',
                 borderRadius: '6px',
                 fontSize: '14px',
-                resize: 'vertical'
+                resize: 'vertical',
+                ...fptkRequiredFieldHighlightStyle(fInv('jobSpecification'))
               }}
             />
           </div>

@@ -343,18 +343,18 @@ const handleSaveMenuAccess = async () => {
   }, [isAuthenticated, isLoading, router])
 
   useEffect(() => {
-    if (isLoading) {
-      // Wait for auth to finish loading
-      return
-    }
-    
-    loadTeamMembers()
-  }, [isLoading])
+    if (isLoading || !isAuthenticated) return
+    const delay = searchTerm ? 350 : 0
+    const timer = setTimeout(() => {
+      loadTeamMembers(searchTerm, roleFilter)
+    }, delay)
+    return () => clearTimeout(timer)
+  }, [isLoading, isAuthenticated, searchTerm, roleFilter])
 
-  const loadTeamMembers = async () => {
+  const loadTeamMembers = async (search = '', role = 'all') => {
     try {
       setLoading(true)
-      const members = await AdminUsersAPI.list()
+      const members = await AdminUsersAPI.list(search, role !== 'all' ? role : undefined)
       // Map API response to TeamMember format
       const mappedMembers: TeamMember[] = (members || [])
         .map((m: any) => ({
@@ -493,18 +493,7 @@ const handleSaveMenuAccess = async () => {
     return null
   }
 
-  const filteredMembers = teamMembers.filter(member => {
-    const matchesSearch = 
-      member.firstName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      member.lastName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      member.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      (member.division || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
-      (member.sectionName || '').toLowerCase().includes(searchTerm.toLowerCase())
-    
-    const matchesRole = roleFilter === 'all' || member.role === roleFilter
-    
-    return matchesSearch && matchesRole
-  })
+  const filteredMembers = teamMembers
 
   const getRoleColor = (role: string) => {
     switch (role) {

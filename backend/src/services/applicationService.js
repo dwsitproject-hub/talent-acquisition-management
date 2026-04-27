@@ -207,6 +207,10 @@ async function getAllApplications(filters, pagination, user = null) {
     where.fptkId = filters.fptkId;
   }
 
+  if (filters.candidateId) {
+    where.candidateId = filters.candidateId;
+  }
+
   if (filters.department) {
     if (where.fptk) {
       where.fptk.department = filters.department;
@@ -229,6 +233,8 @@ async function getAllApplications(filters, pagination, user = null) {
       { candidate: { user: { lastName: { contains: filters.search, mode: 'insensitive' } } } },
       { candidate: { user: { email: { contains: filters.search, mode: 'insensitive' } } } },
       { applicationNumber: { contains: filters.search, mode: 'insensitive' } },
+      { fptk: { positionTitle: { contains: filters.search, mode: 'insensitive' } } },
+      { fptk: { department: { contains: filters.search, mode: 'insensitive' } } },
     ];
     // If where.OR already exists (from role filtering), combine with AND
     if (where.OR) {
@@ -318,6 +324,7 @@ async function updateApplicationStatus(applicationId, newStatus, userId, reason 
   // Determine stage based on status
   const stageMapping = {
     'SUBMITTED': 1,
+    'KEEP_IN_VIEW': 2,
     'SCREENING': 2,
     'PSYCHOMETRIC_TEST': 3,
     'TECHNICAL_TEST': 3,
@@ -357,6 +364,10 @@ async function updateApplicationStatus(applicationId, newStatus, userId, reason 
     updateData.rejectionReason = reason;
   } else if (newStatus === 'WITHDRAWN') {
     updateData.withdrawnAt = new Date();
+  } else if (newStatus === 'KEEP_IN_VIEW') {
+    updateData.rejectedAt = null;
+    updateData.rejectionReason = null;
+    updateData.withdrawnAt = null;
   }
 
   // Update application

@@ -10,6 +10,7 @@ import {
   FPTK_ADDITIONAL_OR_REPLACEMENT_OPTIONS,
   FPTK_CURRENT_STATUS_OPTIONS,
   FPTK_APPLIED_CANDIDATE_STATUS_OPTIONS,
+  FPTK_EXCEL_APPLIED_CANDIDATE_SLOT_COUNT,
   normalizeExcelEnum,
   normalizeEmploymentTypeForPayload,
   isAllowedAppliedCandidateStatus,
@@ -556,7 +557,7 @@ export function parseFPTKExcelFile(file: File): Promise<FPTKUploadResult> {
           }
         })
 
-        // Parse up to 5 applied candidates per row (optional)
+        // Parse applied candidate columns from template (optional)
         const appliedCandidates: Array<{ fullName: string; email: string; status: string }> = []
         APPLIED_CANDIDATE_HEADER_MAP.forEach((def) => {
           const fullNameIdx = headers.findIndex((h) => h.toLowerCase().trim() === def.fullName.toLowerCase())
@@ -748,7 +749,7 @@ export async function generateFPTKTemplate(): Promise<void> {
   addDv('Additional or Replacement', [ref[addLetter]], `Use: ${FPTK_ADDITIONAL_OR_REPLACEMENT_OPTIONS.join(' or ')}`, false)
   addDv('Current Status', [ref[curLetter]], `Use: ${FPTK_CURRENT_STATUS_OPTIONS.join(', ')}`, false)
 
-  for (let n = 1; n <= 5; n++) {
+  for (let n = 1; n <= FPTK_EXCEL_APPLIED_CANDIDATE_SLOT_COUNT; n++) {
     addDv(
       `Applied Candidate ${n} Status`,
       [ref[appLetter]],

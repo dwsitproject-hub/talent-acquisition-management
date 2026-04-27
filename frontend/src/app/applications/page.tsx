@@ -1,11 +1,12 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useAuth } from '@/contexts/AuthContext'
 import { useRouter } from 'next/navigation'
 import Layout from '@/components/Layout/Layout'
 import NewApplicationModal from '@/components/NewApplicationModal'
 import { Application } from '@/types'
+import { ApplicationsAPI } from '@/lib/api'
 import { PlusIcon, MagnifyingGlassIcon, EyeIcon, PencilIcon } from '@heroicons/react/24/outline'
 
 export default function ApplicationsPage() {
@@ -15,6 +16,9 @@ export default function ApplicationsPage() {
   const [loading, setLoading] = useState(true)
   const [searchTerm, setSearchTerm] = useState('')
   const [statusFilter, setStatusFilter] = useState('all')
+  const [page, setPage] = useState(1)
+  const [pageSize, setPageSize] = useState<10 | 50 | 100>(50)
+  const [listMeta, setListMeta] = useState({ total: 0, totalPages: 1 })
   const [isNewApplicationModalOpen, setIsNewApplicationModalOpen] = useState(false)
 
   useEffect(() => {
@@ -23,31 +27,69 @@ export default function ApplicationsPage() {
     }
   }, [isAuthenticated, isLoading, router])
 
-  useEffect(() => {
-    // Load applications from localStorage (only in browser)
-    if (typeof window !== 'undefined') {
-      try {
-        const storedApplications = localStorage.getItem('applications')
-        if (storedApplications) {
-          setApplications(JSON.parse(storedApplications))
-        }
-      } catch (error) {
-        console.warn('Could not load applications from localStorage:', error)
-      }
+  const loadApplications = async () => {
+    try {
+      setLoading(true)
+      const response = await ApplicationsAPI.getAll(
+        {
+          ...(statusFilter !== 'all' ? { status: statusFilter } : {}),
+          ...(searchTerm.trim() ? { search: searchTerm.trim() } : {}),
+        },
+        { page, limit: pageSize }
+      )
+      const mapped: Application[] = ((response as any).data || []).map((app: any) => ({
+        id: app.id,
+        candidateId: app.candidateId,
+        candidate: app.candidate,
+        fptkId: app.fptkId,
+        fptk: {
+          ...(app.fptk || {}),
+          title: app.fptk?.positionTitle || app.fptk?.title || '—',
+          department: app.fptk?.department || '—',
+          location: app.fptk?.department || '—',
+        },
+        status: (app.status || '').toString().toLowerCase(),
+        stage: app.currentStage,
+        appliedAt: app.appliedAt,
+        notes: app.notes || '',
+        documents: [],
+        interviews: app.interviews || [],
+        createdAt: app.createdAt,
+        updatedAt: app.updatedAt,
+      }))
+      setApplications(mapped)
+      const pag = (response as any).pagination || {}
+      setListMeta({
+        total: typeof pag.total === 'number' ? pag.total : mapped.length,
+        totalPages: Math.max(1, pag.totalPages ?? 1),
+      })
+    } catch (error) {
+      console.error('Failed to load applications:', error)
+      setApplications([])
+      setListMeta({ total: 0, totalPages: 1 })
+    } finally {
+      setLoading(false)
     }
-    setLoading(false)
-  }, [])
+  }
 
-  // Save applications to localStorage whenever applications change
+  const appListBootRef = useRef(true)
   useEffect(() => {
-    if (typeof window !== 'undefined' && applications.length > 0) {
-      try {
-        localStorage.setItem('applications', JSON.stringify(applications))
-      } catch (error) {
-        console.warn('Could not save applications to localStorage:', error)
-      }
+    if (!isAuthenticated || isLoading) return
+    if (appListBootRef.current) {
+      appListBootRef.current = false
+      return
     }
-  }, [applications])
+    setPage(1)
+  }, [searchTerm, statusFilter, pageSize, isAuthenticated, isLoading])
+
+  useEffect(() => {
+    if (!isAuthenticated || isLoading) return
+    const delay = searchTerm ? 350 : 0
+    const timer = setTimeout(() => {
+      loadApplications()
+    }, delay)
+    return () => clearTimeout(timer)
+  }, [page, pageSize, searchTerm, statusFilter, isAuthenticated, isLoading])
 
   const handleNewApplication = (applicationData: any) => {
     const newApplication: Application = {
@@ -81,24 +123,19 @@ export default function ApplicationsPage() {
     return null
   }
 
-  const filteredApplications = applications.filter(application => {
-    const matchesSearch = 
-      application.candidate.user.firstName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      application.candidate.user.lastName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      application.candidate.user.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      application.fptk.title.toLowerCase().includes(searchTerm.toLowerCase())
-    
-    const matchesStatus = statusFilter === 'all' || application.status === statusFilter
-    
-    return matchesSearch && matchesStatus
-  })
+  const filteredApplications = applications
 
   const getStatusColor = (status: string) => {
     switch (status) {
+      case 'draft':
+      case 'submitted':
       case 'applied':
         return 'bg-blue-100 text-blue-800'
+      case 'screening':
       case 'under_review':
         return 'bg-yellow-100 text-yellow-800'
+      case 'psychometric_test':
+      case 'technical_test':
       case 'shortlisted':
         return 'bg-green-100 text-green-800'
       case 'interview_scheduled':
@@ -161,16 +198,28 @@ export default function ApplicationsPage() {
             className="block w-full sm:w-auto px-3 py-2 border border-gray-300 rounded-md leading-5 bg-white focus:outline-none focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
           >
             <option value="all">All Status</option>
-            <option value="applied">Applied</option>
-            <option value="under_review">Under Review</option>
-            <option value="shortlisted">Shortlisted</option>
-            <option value="interview_scheduled">Interview Scheduled</option>
-            <option value="interviewed">Interviewed</option>
-            <option value="offer_extended">Offer Extended</option>
-            <option value="offer_accepted">Offer Accepted</option>
-            <option value="rejected">Rejected</option>
-            <option value="withdrawn">Withdrawn</option>
+            <option value="SUBMITTED">Applied</option>
+            <option value="SCREENING">Under Review</option>
+            <option value="TECHNICAL_TEST">Assessment</option>
+            <option value="INTERVIEW_SCHEDULED">Interview Scheduled</option>
+            <option value="INTERVIEW_COMPLETED">Interviewed</option>
+            <option value="OFFER_SENT">Offer Sent</option>
+            <option value="OFFER_ACCEPTED">Offer Accepted</option>
+            <option value="REJECTED">Rejected</option>
+            <option value="WITHDRAWN">Withdrawn</option>
           </select>
+          <div className="flex items-center gap-2 sm:ml-auto">
+            <label className="text-sm text-gray-600 whitespace-nowrap">Rows per page</label>
+            <select
+              className="block rounded-md border-0 py-1.5 pl-3 pr-8 text-gray-900 ring-1 ring-inset ring-gray-300 focus:ring-2 focus:ring-indigo-600 sm:text-sm"
+              value={pageSize}
+              onChange={(e) => setPageSize(Number(e.target.value) as 10 | 50 | 100)}
+            >
+              <option value={10}>10</option>
+              <option value={50}>50</option>
+              <option value={100}>100</option>
+            </select>
+          </div>
         </div>
 
         {/* Applications List */}
@@ -255,6 +304,35 @@ export default function ApplicationsPage() {
               ))}
             </ul>
           )}
+        </div>
+
+        <div className="mt-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 text-sm text-gray-600">
+          <span>
+            {listMeta.total === 0
+              ? 'Showing 0 of 0'
+              : `Showing ${(page - 1) * pageSize + 1}–${Math.min(page * pageSize, listMeta.total)} of ${listMeta.total}`}
+          </span>
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              disabled={page <= 1 || loading}
+              onClick={() => setPage((p) => Math.max(1, p - 1))}
+              className="rounded-md border border-gray-300 bg-white px-3 py-1.5 text-sm hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              Previous
+            </button>
+            <span className="tabular-nums">
+              Page {Math.min(page, listMeta.totalPages)} / {listMeta.totalPages}
+            </span>
+            <button
+              type="button"
+              disabled={page >= listMeta.totalPages || loading}
+              onClick={() => setPage((p) => p + 1)}
+              className="rounded-md border border-gray-300 bg-white px-3 py-1.5 text-sm hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              Next
+            </button>
+          </div>
         </div>
 
         {/* New Application Modal */}

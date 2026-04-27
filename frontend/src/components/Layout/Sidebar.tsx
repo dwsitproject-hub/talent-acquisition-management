@@ -11,6 +11,7 @@ import { MenuAccessAPI } from '@/lib/api'
 import {
   HomeIcon,
   UsersIcon,
+  EyeIcon,
   BriefcaseIcon,
   ChartBarIcon,
   CogIcon,
@@ -19,13 +20,25 @@ import {
   MapPinIcon,
 } from '@heroicons/react/24/outline'
 
-const baseNavigation = [
-  { name: 'Dashboard', href: '/', icon: HomeIcon },
-  { name: 'Candidates', href: '/candidates', icon: UsersIcon },
-  { name: 'Position', href: '/fptk', icon: BriefcaseIcon },
-  { name: 'Summary by Position', href: '/summary-by-position', icon: ChartBarIcon },
-  { name: 'Reports', href: '/reports', icon: ChartBarIcon },
-  { name: 'User Management', href: '/team', icon: UserGroupIcon },
+type NavChild = { name: string; href: string; icon: typeof UsersIcon }
+type TopNavItem =
+  | { kind: 'link'; name: string; href: string; icon: typeof HomeIcon }
+  | { kind: 'candidateGroup'; name: string; children: NavChild[] }
+
+const baseNavigation: TopNavItem[] = [
+  { kind: 'link', name: 'Dashboard', href: '/', icon: HomeIcon },
+  {
+    kind: 'candidateGroup',
+    name: 'Candidate',
+    children: [
+      { name: 'Candidates', href: '/candidates', icon: UsersIcon },
+      { name: 'KIV', href: '/candidates/kiv', icon: EyeIcon },
+    ],
+  },
+  { kind: 'link', name: 'Position', href: '/fptk', icon: BriefcaseIcon },
+  { kind: 'link', name: 'Summary by Position', href: '/summary-by-position', icon: ChartBarIcon },
+  { kind: 'link', name: 'Reports', href: '/reports', icon: ChartBarIcon },
+  { kind: 'link', name: 'User Management', href: '/team', icon: UserGroupIcon },
 ]
 
 const masterNavigation = [
@@ -40,6 +53,119 @@ const settingsNavigation = [
 interface SidebarProps {
   sidebarOpen: boolean
   setSidebarOpen: (open: boolean) => void
+}
+
+function getDefaultNavRoles(href: string): string[] {
+  const d: Record<string, string[]> = {
+    '/team': ['SUPER_ADMIN', 'TA_TEAM'],
+    '/candidates': [
+      'SUPER_ADMIN',
+      'Management',
+      'Head of Division',
+      'HRBP',
+      'TA_TEAM',
+      'HIRING_MANAGER',
+      'INTERVIEWER',
+    ],
+    '/candidates/kiv': [
+      'SUPER_ADMIN',
+      'Management',
+      'Head of Division',
+      'HRBP',
+      'TA_TEAM',
+      'HIRING_MANAGER',
+      'INTERVIEWER',
+    ],
+  }
+  return (
+    d[href] || [
+      'SUPER_ADMIN',
+      'Management',
+      'Head of Division',
+      'HRBP',
+      'TA_TEAM',
+      'HIRING_MANAGER',
+      'INTERVIEWER',
+    ]
+  )
+}
+
+function PrimaryNavList({
+  navigation,
+  pathname,
+  onLinkClick,
+}: {
+  navigation: TopNavItem[]
+  pathname: string
+  onLinkClick?: () => void
+}) {
+  const subActive = (href: string) =>
+    href === '/candidates' ? pathname === '/candidates' : pathname === href
+
+  return (
+    <>
+      {navigation.map((item) =>
+        item.kind === 'link' ? (
+          <li key={item.name}>
+            <Link
+              href={item.href}
+              onClick={onLinkClick}
+              className={cn(
+                pathname === item.href
+                  ? 'bg-gray-50 text-indigo-600'
+                  : 'text-gray-700 hover:text-indigo-600 hover:bg-gray-50',
+                'group flex gap-x-3 rounded-md p-2 text-sm leading-6 font-semibold'
+              )}
+            >
+              <item.icon
+                className={cn(
+                  pathname === item.href
+                    ? 'text-indigo-600'
+                    : 'text-gray-400 group-hover:text-indigo-600',
+                  'h-6 w-6 shrink-0'
+                )}
+                aria-hidden="true"
+              />
+              {item.name}
+            </Link>
+          </li>
+        ) : (
+          <li key={item.name} className="space-y-1">
+            <div className="px-2 text-xs font-semibold leading-6 text-gray-400 uppercase tracking-wider">
+              {item.name}
+            </div>
+            <ul className="ml-1 space-y-1 border-l-2 border-gray-100 pl-2">
+              {item.children.map((ch) => (
+                <li key={ch.href}>
+                  <Link
+                    href={ch.href}
+                    onClick={onLinkClick}
+                    className={cn(
+                      subActive(ch.href)
+                        ? 'bg-gray-50 text-indigo-600'
+                        : 'text-gray-700 hover:text-indigo-600 hover:bg-gray-50',
+                      'group flex gap-x-3 rounded-md p-2 text-sm leading-6 font-semibold'
+                    )}
+                  >
+                    <ch.icon
+                      className={cn(
+                        subActive(ch.href)
+                          ? 'text-indigo-600'
+                          : 'text-gray-400 group-hover:text-indigo-600',
+                        'h-5 w-5 shrink-0'
+                      )}
+                      aria-hidden="true"
+                    />
+                    {ch.name}
+                  </Link>
+                </li>
+              ))}
+            </ul>
+          </li>
+        )
+      )}
+    </>
+  )
 }
 
 // Map backend enum values to frontend role names
@@ -97,14 +223,17 @@ export default function Sidebar({ sidebarOpen, setSidebarOpen }: SidebarProps) {
     const roles = cfg && cfg.length ? cfg : defaultRoles
     return roles.includes(roleName)
   }
-  const navigation = baseNavigation.filter(item => {
-    // Defaults: Team only SUPER_ADMIN and TA_TEAM; others visible to all roles
-    const defaults: Record<string, string[]> = {
-      '/team': ['SUPER_ADMIN','TA_TEAM']
-    }
-    const defaultRoles = defaults[item.href] || ['SUPER_ADMIN','Management','Head of Division','HRBP','TA_TEAM','HIRING_MANAGER','INTERVIEWER']
-    return isVisible(item.href, defaultRoles)
-  })
+
+  const navigation: TopNavItem[] = baseNavigation
+    .map((item) => {
+      if (item.kind === 'link') {
+        return isVisible(item.href, getDefaultNavRoles(item.href)) ? item : null
+      }
+      const children = item.children.filter((ch) => isVisible(ch.href, getDefaultNavRoles(ch.href)))
+      if (children.length === 0) return null
+      return { kind: 'candidateGroup' as const, name: item.name, children }
+    })
+    .filter((x): x is TopNavItem => x !== null)
 
   // Filter master navigation by role using Menu Access Management
   const filteredMasterNavigation = masterNavigation.filter(item => {
@@ -173,30 +302,11 @@ export default function Sidebar({ sidebarOpen, setSidebarOpen }: SidebarProps) {
                     <ul role="list" className="flex flex-1 flex-col gap-y-7">
                       <li>
                         <ul role="list" className="-mx-2 space-y-1">
-                          {navigation.map((item) => (
-                            <li key={item.name}>
-                              <Link
-                                href={item.href}
-                                className={cn(
-                                  pathname === item.href
-                                    ? 'bg-gray-50 text-indigo-600'
-                                    : 'text-gray-700 hover:text-indigo-600 hover:bg-gray-50',
-                                  'group flex gap-x-3 rounded-md p-2 text-sm leading-6 font-semibold'
-                                )}
-                              >
-                                <item.icon
-                                  className={cn(
-                                    pathname === item.href
-                                      ? 'text-indigo-600'
-                                      : 'text-gray-400 group-hover:text-indigo-600',
-                                    'h-6 w-6 shrink-0'
-                                  )}
-                                  aria-hidden="true"
-                                />
-                                {item.name}
-                              </Link>
-                            </li>
-                          ))}
+                          <PrimaryNavList
+                            navigation={navigation}
+                            pathname={pathname}
+                            onLinkClick={() => setSidebarOpen(false)}
+                          />
                         </ul>
                       </li>
                       {filteredMasterNavigation.length > 0 && (
@@ -279,30 +389,7 @@ export default function Sidebar({ sidebarOpen, setSidebarOpen }: SidebarProps) {
             <ul role="list" className="flex flex-1 flex-col gap-y-7">
               <li>
                 <ul role="list" className="-mx-2 space-y-1">
-                  {navigation.map((item) => (
-                    <li key={item.name}>
-                      <Link
-                        href={item.href}
-                        className={cn(
-                          pathname === item.href
-                            ? 'bg-gray-50 text-indigo-600'
-                            : 'text-gray-700 hover:text-indigo-600 hover:bg-gray-50',
-                          'group flex gap-x-3 rounded-md p-2 text-sm leading-6 font-semibold'
-                        )}
-                      >
-                        <item.icon
-                          className={cn(
-                            pathname === item.href
-                              ? 'text-indigo-600'
-                              : 'text-gray-400 group-hover:text-indigo-600',
-                            'h-6 w-6 shrink-0'
-                          )}
-                          aria-hidden="true"
-                        />
-                        {item.name}
-                      </Link>
-                    </li>
-                  ))}
+                  <PrimaryNavList navigation={navigation} pathname={pathname} />
                 </ul>
               </li>
               {filteredMasterNavigation.length > 0 && (

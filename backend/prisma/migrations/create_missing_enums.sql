@@ -26,7 +26,8 @@ BEGIN
             'ONBOARDING',
             'HIRED',
             'REJECTED',
-            'WITHDRAWN'
+            'WITHDRAWN',
+            'KEEP_IN_VIEW'
         );
     END IF;
 END $$;

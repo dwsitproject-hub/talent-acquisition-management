@@ -1,8 +1,11 @@
 const prisma = require('../config/database');
+const { $Enums } = require('@prisma/client');
 const logger = require('../utils/logger');
 const { buildHrbpFptkFilterFromUser } = require('../utils/hrbpScope');
 const masterOfficeLocationService = require('./masterOfficeLocationService');
 const masterDivisionService = require('./masterDivisionService');
+
+const PRISMA_APP_STATUS_STRINGS = new Set(Object.values($Enums.ApplicationStatus));
 
 const UI_STATUS_TO_APP_STATUS_MAP = {
   'applied': 'SUBMITTED',
@@ -35,6 +38,7 @@ const UI_STATUS_TO_APP_STATUS_MAP = {
   'rejected': 'REJECTED',
   'rejected (failed interview / assessment)': 'REJECTED',
   'withdrawn': 'WITHDRAWN',
+  'keep in view': 'KEEP_IN_VIEW',
 };
 
 const FPTK_RELATION_INCLUDE = {
@@ -95,10 +99,55 @@ const FPTK_RELATION_INCLUDE = {
   },
 };
 
+/**
+ * Maps FPTK form / Excel labels to Prisma ApplicationStatus.
+ * Accepts UI labels ("Keep In View"), enum strings ("KEEP_IN_VIEW"), and underscore variants.
+ */
 function mapUiStatusToApplicationStatus(status) {
-  if (!status) return 'SUBMITTED';
-  const normalized = status.toString().trim().toLowerCase();
-  return UI_STATUS_TO_APP_STATUS_MAP[normalized] || 'SUBMITTED';
+  if (status === undefined || status === null) return 'SUBMITTED';
+  const raw = String(status).trim();
+  if (!raw) return 'SUBMITTED';
+  if (PRISMA_APP_STATUS_STRINGS.has(raw)) {
+    return raw;
+  }
+  const normalized = raw
+    .toLowerCase()
+    .replace(/[_-]+/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+  if (UI_STATUS_TO_APP_STATUS_MAP[normalized]) {
+    return UI_STATUS_TO_APP_STATUS_MAP[normalized];
+  }
+  return 'SUBMITTED';
+}
+
+/** Align with applicationService updateApplicationStatus stage rules */
+function currentStageForApplicationStatus(status, previousStage) {
+  const s = (status && String(status)) || 'SUBMITTED';
+  const stage = {
+    DRAFT: 1,
+    SUBMITTED: 1,
+    KEEP_IN_VIEW: 2,
+    SCREENING: 2,
+    PSYCHOMETRIC_TEST: 3,
+    TECHNICAL_TEST: 3,
+    INTERVIEW_SCHEDULED: 4,
+    INTERVIEW_COMPLETED: 4,
+    DOCUMENT_VERIFICATION: 5,
+    OFFER_PROPOSED: 6,
+    OFFER_APPROVED: 6,
+    OFFER_SENT: 6,
+    OFFER_ACCEPTED: 6,
+    OFFER_REJECTED: 6,
+    MEDICAL_CHECKUP_SCHEDULED: 7,
+    MEDICAL_CHECKUP_COMPLETED: 7,
+    CONTRACT_SENT: 8,
+    CONTRACT_SIGNED: 8,
+    ONBOARDING: 9,
+    HIRED: 9,
+  }[s];
+  if (stage !== undefined) return stage;
+  return previousStage != null && previousStage !== undefined ? previousStage : 1;
 }
 
 function normalizeAppliedCandidates(appliedCandidatesInput) {
@@ -120,7 +169,7 @@ function normalizeAppliedCandidates(appliedCandidatesInput) {
       candidateId: payload.candidateId || payload.id || null,
       email: payload.email ? payload.email.toString().trim().toLowerCase() : null,
       fullName: payload.fullName || payload.name || null,
-      status: payload.status,
+      status: payload.status || payload.backendStatus,
       appliedAt: payload.appliedAt || payload.appliedDate || payload.appliedOn,
       source: payload.source,
       interviews: payload.interviews || [], // Preserve interview data
@@ -202,6 +251,16 @@ function normalizeEmploymentForApi(raw) {
   return EMP_LEGACY[n] || null;
 }
 
+/** Match UI labels, Prisma enums, and underscore / hyphen variants (same as mapUiStatusToApplicationStatus). */
+function normAllowedAppliedStatusValue(value) {
+  return String(value || '')
+    .trim()
+    .toLowerCase()
+    .replace(/[_-]+/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
 /** Normalized allowed applied-candidate status labels (aligned with frontend template). */
 const ALLOWED_APPLIED_STATUS = new Set(
   [
@@ -226,7 +285,8 @@ const ALLOWED_APPLIED_STATUS = new Set(
     'Hired',
     'Rejected (Failed Interview / Assessment)',
     'Withdrawn',
-  ].map((s) => normField(s))
+    'Keep In View',
+  ].map((s) => normAllowedAppliedStatusValue(s))
 );
 
 async function validateFptkFormFields(payload) {
@@ -338,11 +398,15 @@ async function validateFptkFormFields(payload) {
   if (applied && Array.isArray(applied)) {
     applied.forEach((c, idx) => {
       const st = (c && c.status ? String(c.status) : '').trim();
-      if (st && !ALLOWED_APPLIED_STATUS.has(normField(st))) {
+      if (st) {
+        const key = normAllowedAppliedStatusValue(st);
+        const allowedByPrisma = PRISMA_APP_STATUS_STRINGS.has(st);
+        if (!allowedByPrisma && !ALLOWED_APPLIED_STATUS.has(key)) {
         throw httpError(
           400,
           `Invalid Applied Candidate ${idx + 1} Status: "${st}". Use a status from the Position form list.`
         );
+        }
       }
     });
   }
@@ -445,9 +509,6 @@ async function syncFptkApplicationsTx(tx, fptkId, appliedCandidates, options = {
   });
 
   const normalized = normalizeAppliedCandidates(appliedCandidates);
-  if (normalized.length > 5) {
-    throw httpError(400, 'Applied candidates limit exceeded (max 5)');
-  }
 
   const fptk = await tx.fPTK.findUnique({
     where: { id: fptkId },
@@ -506,6 +567,10 @@ async function syncFptkApplicationsTx(tx, fptkId, appliedCandidates, options = {
 
     const existing = existingByCandidate.get(candidateId);
     const status = mapUiStatusToApplicationStatus(item.status);
+    const currentStage = currentStageForApplicationStatus(
+      status,
+      existing && existing.currentStage != null ? existing.currentStage : 1
+    );
     const appliedAt = item.appliedAt ? new Date(item.appliedAt) : (existing ? existing.appliedAt : new Date());
     const source = item.source || existing?.source || 'SUGGESTED';
     let rejectedAtValue = null;
@@ -525,6 +590,7 @@ async function syncFptkApplicationsTx(tx, fptkId, appliedCandidates, options = {
         where: { id: existing.id },
         data: {
           status,
+          currentStage,
           appliedAt,
           source,
           rejectedAt: typeof rejectedAtValue !== 'undefined' ? rejectedAtValue : undefined,
@@ -539,6 +605,7 @@ async function syncFptkApplicationsTx(tx, fptkId, appliedCandidates, options = {
             candidateId,
             fptkId,
             status,
+            currentStage,
             appliedAt,
             source,
             appliedByUserId: options.userId || null,
@@ -953,15 +1020,22 @@ function buildInternalFptkListWhere(filters = {}, user = null) {
     where.priority = filters.priority;
   }
 
-  if (filters.currentStatus) {
-    const parts = String(filters.currentStatus)
+  const applyCsvInField = (field, raw) => {
+    if (raw == null || raw === '') return;
+    const parts = String(raw)
       .split(',')
       .map((s) => s.trim())
       .filter(Boolean);
     if (parts.length) {
-      where.currentStatus = { in: parts };
+      const value = parts.length === 1 ? parts[0] : { in: parts };
+      Object.assign(where, { [field]: value });
     }
-  }
+  };
+
+  applyCsvInField('currentStatus', filters.currentStatus);
+  applyCsvInField('pt', filters.pt);
+  applyCsvInField('area', filters.area);
+  applyCsvInField('areaDetail', filters.areaDetail);
 
   return where;
 }

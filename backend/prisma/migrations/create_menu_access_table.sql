@@ -21,6 +21,7 @@ VALUES
   (gen_random_uuid(), '/', 'Dashboard', ARRAY['SUPER_ADMIN','Management','Head of Division','HRBP','TA_TEAM','HIRING_MANAGER'], ARRAY[]::TEXT[], ARRAY[]::TEXT[], NOW(), NOW()),
   (gen_random_uuid(), '/fptk', 'Position', ARRAY['SUPER_ADMIN','Management','Head of Division','HRBP','TA_TEAM','HIRING_MANAGER'], ARRAY['SUPER_ADMIN','TA_TEAM','HIRING_MANAGER'], ARRAY['SUPER_ADMIN','Head of Division','HRBP','TA_TEAM','HIRING_MANAGER'], NOW(), NOW()),
   (gen_random_uuid(), '/candidates', 'Candidates', ARRAY['SUPER_ADMIN','Management','Head of Division','HRBP','TA_TEAM'], ARRAY['SUPER_ADMIN','HRBP','TA_TEAM'], ARRAY['SUPER_ADMIN','HRBP','TA_TEAM'], NOW(), NOW()),
+  (gen_random_uuid(), '/candidates/kiv', 'KIV', ARRAY['SUPER_ADMIN','Management','Head of Division','HRBP','TA_TEAM','HIRING_MANAGER','INTERVIEWER'], ARRAY['SUPER_ADMIN','HRBP','TA_TEAM'], ARRAY['SUPER_ADMIN','HRBP','TA_TEAM'], NOW(), NOW()),
   (gen_random_uuid(), '/summary-by-position', 'Summary by Position', ARRAY['SUPER_ADMIN','Management','Head of Division','HRBP','TA_TEAM','HIRING_MANAGER'], ARRAY[]::TEXT[], ARRAY[]::TEXT[], NOW(), NOW()),
   (gen_random_uuid(), '/reports', 'Reports', ARRAY['SUPER_ADMIN','Management','Head of Division','HRBP','TA_TEAM','HIRING_MANAGER'], ARRAY['SUPER_ADMIN','HRBP','TA_TEAM'], ARRAY['SUPER_ADMIN','HRBP','TA_TEAM'], NOW(), NOW()),
   (gen_random_uuid(), '/team', 'Team', ARRAY['SUPER_ADMIN','TA_TEAM'], ARRAY['SUPER_ADMIN','TA_TEAM'], ARRAY['SUPER_ADMIN','TA_TEAM'], NOW(), NOW()),

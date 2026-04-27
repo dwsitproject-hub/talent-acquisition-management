@@ -1,10 +1,12 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, type ReactNode } from 'react'
 import { XMarkIcon, DocumentArrowDownIcon, EyeIcon, PrinterIcon } from '@heroicons/react/24/outline'
 import { Candidate } from '@/types'
 import { generateFormDataDiriPDF } from '@/utils/pdfGenerator'
 import { formatFileSize } from '@/utils/fileCompression'
+import { ApplicationsAPI } from '@/lib/api'
+import { getApplicationStatusPillClass, mapApplicationStatusToUi } from '@/utils/applicationStatusUi'
 
 interface ViewCandidateModalProps {
   isOpen: boolean
@@ -16,6 +18,42 @@ export default function ViewCandidateModal({ isOpen, onClose, candidate }: ViewC
   const [activeTab, setActiveTab] = useState('personal')
   const [availablePositions, setAvailablePositions] = useState<any[]>([])
   const [canAssignNewPosition, setCanAssignNewPosition] = useState(false)
+  const [positionApplications, setPositionApplications] = useState<any[]>([])
+  const [loadingPositionApplications, setLoadingPositionApplications] = useState(false)
+
+  useEffect(() => {
+    if (!isOpen || !candidate?.id) {
+      setPositionApplications([])
+      return
+    }
+    let cancelled = false
+    setLoadingPositionApplications(true)
+    ;(async () => {
+      try {
+        const merged: any[] = []
+        let page = 1
+        const limit = 100
+        let totalPages = 1
+        do {
+          const res = await ApplicationsAPI.getAll({ candidateId: candidate.id }, { page, limit })
+          if (cancelled) return
+          const batch: any[] = (res as any).data || []
+          merged.push(...batch)
+          totalPages = (res as any).pagination?.totalPages ?? 1
+          page += 1
+        } while (page <= totalPages && !cancelled)
+        if (!cancelled) setPositionApplications(merged)
+      } catch (e) {
+        console.error('ViewCandidateModal: load applications', e)
+        if (!cancelled) setPositionApplications([])
+      } finally {
+        if (!cancelled) setLoadingPositionApplications(false)
+      }
+    })()
+    return () => {
+      cancelled = true
+    }
+  }, [isOpen, candidate?.id])
 
   // Debug: Log candidate files when modal opens
   useEffect(() => {
@@ -474,94 +512,119 @@ export default function ViewCandidateModal({ isOpen, onClose, candidate }: ViewC
             {activeTab === 'jobpostings' && (
               <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
                 <div>
-                  <h4 style={{ fontSize: '16px', fontWeight: '600', color: '#374151', marginBottom: '12px' }}>
-                    Position Applied For
+                  <h4 style={{ fontSize: '16px', fontWeight: '600', color: '#374151', marginBottom: '6px' }}>
+                    Position applied for
                   </h4>
-                  {(() => {
-                    // Get job postings from localStorage (only in browser)
-                    let jobPostings: any[] = []
-                    if (typeof window !== 'undefined') {
-                      try {
-                        const jobPostingsData = localStorage.getItem('jobPostings')
-                        jobPostings = jobPostingsData ? JSON.parse(jobPostingsData) : []
-                      } catch (error) {
-                        console.warn('Could not load job postings from localStorage:', error)
-                      }
-                    }
-                    
-                    // Build applied postings from candidate data
-                    const appliedTitles: string[] = Array.isArray((candidate as any).positionAppliedFor)
+                  <p style={{ fontSize: '12px', color: '#6b7280', marginBottom: '12px' }}>
+                    Statuses match Position detail: they come from the same application record for that role.
+                  </p>
+                  {loadingPositionApplications ? (
+                    <div
+                      style={{
+                        padding: '24px',
+                        textAlign: 'center',
+                        color: '#6b7280',
+                        fontSize: '14px',
+                        border: '1px solid #e5e7eb',
+                        borderRadius: '8px',
+                        backgroundColor: '#f9fafb',
+                      }}
+                    >
+                      Loading application pipeline…
+                    </div>
+                  ) : (() => {
+                    const titleNorm = (s: string) => (s || '').trim().toLowerCase()
+                    const appliedTitlesFromCandidate: string[] = Array.isArray((candidate as any).positionAppliedFor)
                       ? (candidate as any).positionAppliedFor
-                      : ((candidate as any).positionAppliedFor ? [(candidate as any).positionAppliedFor] : [])
-                    
-                    const appliedJobPostings = appliedTitles.map((title) => {
-                      const jp = jobPostings.find((j: any) => j.title === title) || {}
-                      return {
-                        id: `${title}`,
-                        title: title,
-                        department: jp.department || jp.division || '-',
-                        status: jp.status || 'Applied',
-                        appliedDate: candidate.applicationInfo?.appliedDate || candidate.createdAt || new Date().toISOString(),
-                      }
-                    })
-                    
-                    return appliedJobPostings.length > 0 ? (
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                        {appliedJobPostings.map((jobPosting) => (
-                          <div key={jobPosting.id} style={{
+                      : (candidate as any).positionAppliedFor
+                        ? [String((candidate as any).positionAppliedFor)]
+                        : []
+                    const fromApps = new Set(
+                      positionApplications.map((a) => titleNorm((a as any).fptk?.positionTitle || (a as any).fptk?.position || ''))
+                    )
+                    const orphanOnlyOnProfile = appliedTitlesFromCandidate.filter(
+                      (t) => t && t.trim() && !fromApps.has(titleNorm(t))
+                    )
+
+                    const rows: ReactNode[] = []
+
+                    positionApplications.forEach((app) => {
+                      const f = (app as any).fptk || {}
+                      const title = (f.positionTitle || f.position || 'Position').toString() || '—'
+                      const department = f.department || f.division || '—'
+                      const uiStatus = mapApplicationStatusToUi((app as any).status)
+                      const appliedAt = (app as any).appliedAt
+                      const pill = getApplicationStatusPillClass(uiStatus)
+                      rows.push(
+                        <div
+                          key={(app as any).id}
+                          style={{
                             padding: '16px',
                             backgroundColor: '#ffffff',
                             borderRadius: '10px',
                             border: '1px solid #e5e7eb',
-                            boxShadow: '0 1px 2px rgba(0,0,0,0.03)'
-                          }}>
-                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-                              <div>
-                                <h5 style={{ fontSize: '14px', fontWeight: '600', color: '#111827', margin: '0 0 6px 0' }}>
-                                  {jobPosting.title}
-                                </h5>
-                                <p style={{ fontSize: '12px', color: '#6b7280', margin: '0 0 4px 0' }}>
-                                  Division: {jobPosting.department}
-                                </p>
-                                <p style={{ fontSize: '12px', color: '#6b7280', margin: '0' }}>
-                                  Applied: {formatDate(jobPosting.appliedDate)}
-                                </p>
-                              </div>
-                              <div>
-                                <span style={{
+                            boxShadow: '0 1px 2px rgba(0,0,0,0.03)',
+                          }}
+                        >
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                            <div>
+                              <h5 style={{ fontSize: '14px', fontWeight: '600', color: '#111827', margin: '0 0 6px 0' }}>{title}</h5>
+                              <p style={{ fontSize: '12px', color: '#6b7280', margin: '0 0 4px 0' }}>Division: {department}</p>
+                              <p style={{ fontSize: '12px', color: '#6b7280', margin: 0 }}>Applied: {appliedAt ? formatDate(appliedAt) : '—'}</p>
+                            </div>
+                            <div>
+                              <span
+                                style={{
                                   padding: '4px 8px',
                                   borderRadius: '9999px',
                                   fontSize: '12px',
                                   fontWeight: '500',
-                                  backgroundColor: jobPosting.status === 'Applied' ? '#e0e7ff' : 
-                                                 jobPosting.status === 'Under Review' ? '#fef3c7' :
-                                                 jobPosting.status === 'Interview Scheduled' ? '#ddd6fe' :
-                                                 jobPosting.status === 'Offered' ? '#dcfce7' :
-                                                 jobPosting.status === 'On Boarding' ? '#d1fae5' : '#f3f4f6',
-                                  color: jobPosting.status === 'Applied' ? '#3730a3' : 
-                                        jobPosting.status === 'Under Review' ? '#92400e' :
-                                        jobPosting.status === 'Interview Scheduled' ? '#5b21b6' :
-                                        jobPosting.status === 'Offered' ? '#166534' :
-                                        jobPosting.status === 'On Boarding' ? '#065f46' : '#374151'
-                                }}>
-                                  {jobPosting.status}
-                                </span>
-                              </div>
+                                  backgroundColor: pill.backgroundColor,
+                                  color: pill.color,
+                                }}
+                              >
+                                {uiStatus}
+                              </span>
                             </div>
                           </div>
-                        ))}
-                      </div>
-                    ) : (
-                      <div style={{
-                        padding: '24px',
-                        backgroundColor: '#f9fafb',
-                        borderRadius: '8px',
-                        border: '1px solid #e5e7eb',
-                        textAlign: 'center'
-                      }}>
-                        <p style={{ fontSize: '14px', color: '#6b7280', margin: 0 }}>
-                          No open positions applied to yet.
-                        </p>
+                        </div>
+                      )
+                    })
+
+                    orphanOnlyOnProfile.forEach((title) => {
+                      rows.push(
+                        <div
+                          key={`orphan-${title}`}
+                          style={{
+                            padding: '16px',
+                            backgroundColor: '#fffbeb',
+                            borderRadius: '10px',
+                            border: '1px solid #fde68a',
+                          }}
+                        >
+                          <h5 style={{ fontSize: '14px', fontWeight: '600', color: '#111827', margin: '0 0 6px 0' }}>{title}</h5>
+                          <p style={{ fontSize: '12px', color: '#92400e', margin: 0 }}>
+                            Listed on profile but no application record. Status will show here once the candidate is in the
+                            position pipeline.
+                          </p>
+                        </div>
+                      )
+                    })
+
+                    if (rows.length > 0) {
+                      return <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>{rows}</div>
+                    }
+                    return (
+                      <div
+                        style={{
+                          padding: '24px',
+                          backgroundColor: '#f9fafb',
+                          borderRadius: '8px',
+                          border: '1px solid #e5e7eb',
+                          textAlign: 'center',
+                        }}
+                      >
+                        <p style={{ fontSize: '14px', color: '#6b7280', margin: 0 }}>No applications in the pipeline for this candidate yet.</p>
                       </div>
                     )
                   })()}

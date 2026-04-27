@@ -6,6 +6,7 @@ import { FPTK, Candidate } from '@/types'
 import ViewCandidateModal from './ViewCandidateModal'
 import { CandidatesAPI } from '@/lib/api'
 import { mapApiCandidate } from '@/app/candidates/page'
+import { mapApplicationStatusToUi } from '@/utils/applicationStatusUi'
 
 // Helper to get API base URL without /api
 const getApiBaseUrl = (): string => {
@@ -40,40 +41,6 @@ export default function ViewJobPostingModal({ isOpen, onClose, jobPosting, onSta
   const [isCandidateModalOpen, setIsCandidateModalOpen] = useState(false)
   const [loadingCandidate, setLoadingCandidate] = useState(false)
 
-  const mapAppliedStatusLabel = (status?: string) => {
-    if (!status) return 'Applied'
-    const normalized = status.toString().toUpperCase()
-    const lookup: Record<string, string> = {
-      DRAFT: 'Applied',
-      SUBMITTED: 'Applied',
-      SCREENING: 'Shortlisted',
-      PSYCHOMETRIC_TEST: 'Under Review',
-      TECHNICAL_TEST: 'Assessment',
-      INTERVIEW_SCHEDULED: 'Interview Scheduled',
-      INTERVIEW_COMPLETED: 'Interviewed',
-      DOCUMENT_VERIFICATION: 'Document Verification',
-      OFFER_PROPOSED: 'Offering Creation',
-      OFFER_APPROVED: 'Pending Feedback',
-      OFFER_SENT: 'Offer Sent',
-      OFFER_ACCEPTED: 'Offer Accepted',
-      OFFER_REJECTED: 'Offer Rejected',
-      MEDICAL_CHECKUP_SCHEDULED: 'Medical Checkup Scheduled',
-      MEDICAL_CHECKUP_COMPLETED: 'MCU',
-      CONTRACT_SENT: 'Contract Sent',
-      CONTRACT_SIGNED: 'Contract Signed',
-      ONBOARDING: 'On Boarding',
-      HIRED: 'Hired',
-      REJECTED: 'Rejected (Failed Interview / Assessment)',
-      WITHDRAWN: 'Withdrawn',
-    }
-    if (lookup[normalized]) return lookup[normalized]
-    return normalized
-      .toLowerCase()
-      .split('_')
-      .map(part => part.charAt(0).toUpperCase() + part.slice(1))
-      .join(' ')
-  }
-
   // Load applied candidates when job posting changes
   useEffect(() => {
     const loadAppliedCandidates = async () => {
@@ -88,7 +55,7 @@ export default function ViewJobPostingModal({ isOpen, onClose, jobPosting, onSta
       if (Array.isArray((jobPosting as any).appliedCandidates)) {
         candidates = (jobPosting as any).appliedCandidates.map((candidate: any) => ({
           ...candidate,
-          status: candidate.status || mapAppliedStatusLabel(candidate.backendStatus),
+          status: candidate.status || mapApplicationStatusToUi(candidate.backendStatus),
           backendStatus: candidate.backendStatus || candidate.status,
           skills: candidate.skills || [],
           interviews: candidate.interviews || [],
@@ -725,7 +692,9 @@ export default function ViewJobPostingModal({ isOpen, onClose, jobPosting, onSta
             {appliedCandidates.length > 0 ? (
               <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
                 {appliedCandidates.map((candidate: any) => {
-                  const statusLabel = candidate.status || candidate.backendStatus || 'Applied'
+                  const statusLabel = mapApplicationStatusToUi(
+                    (candidate.backendStatus || candidate.status || 'SUBMITTED') as string
+                  )
                   const appliedDate = candidate.appliedDate || candidate.appliedAt || candidate.createdAt
                   const skills = candidate.skills || []
                   return (

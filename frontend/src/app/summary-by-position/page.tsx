@@ -36,8 +36,22 @@ const DEFAULT_STATUSES: string[] = [
   'On Boarding',
   'Offer Rejected',
   'Rejected (Failed Interview / Assessment)',
-  'Withdrawn'
+  'Withdrawn',
+  'Keep In View',
 ]
+
+const isClosedPosition = (statusFktk: string) => {
+  const s = (statusFktk || '').toString().trim().toLowerCase()
+  return (
+    s.includes('cancel') ||
+    s.includes('on boarding') ||
+    s.includes('onboarding') ||
+    s.includes('boarding') ||
+    s.includes('signing')
+  )
+}
+
+type SummaryCardKey = 'open' | 'closed' | 'sla-0-30' | 'sla-31-60' | 'sla-61-90' | 'sla-91'
 
 export default function SummaryByPositionPage() {
   const [rows, setRows] = useState<SummaryRow[]>([])
@@ -47,6 +61,7 @@ export default function SummaryByPositionPage() {
   const [locationFilter, setLocationFilter] = useState<string[]>([])
   const [sortKey, setSortKey] = useState<keyof SummaryRow>('position')
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('asc')
+  const [activeCard, setActiveCard] = useState<SummaryCardKey | null>(null)
   const [divisions, setDivisions] = useState<string[]>([])
   const [locations, setLocations] = useState<string[]>([])
   const topScrollRef = useRef<HTMLDivElement | null>(null)
@@ -99,6 +114,7 @@ export default function SummaryByPositionPage() {
       'HIRED': 'Offer Accepted',
       'REJECTED': 'Rejected (Failed Interview / Assessment)',
       'WITHDRAWN': 'Withdrawn',
+      'KEEP_IN_VIEW': 'Keep In View',
     }
     return statusMap[status] || 'Applied'
   }
@@ -171,44 +187,56 @@ export default function SummaryByPositionPage() {
 
   const priorities = ['P0', 'P1', 'P2']
 
-  const filteredRows = rows.filter((r) => {
-    const priorityOk = priorityFilter.length === 0 || priorityFilter.includes(r.priority)
-    const divisionOk = divisionFilter.length === 0 || divisionFilter.includes(r.division)
-    const locationOk = locationFilter.length === 0 || locationFilter.includes(r.location)
-    return priorityOk && divisionOk && locationOk
-  })
+  const dropdownFilteredRows = useMemo(
+    () =>
+      rows.filter((r) => {
+        const priorityOk = priorityFilter.length === 0 || priorityFilter.includes(r.priority)
+        const divisionOk = divisionFilter.length === 0 || divisionFilter.includes(r.division)
+        const locationOk = locationFilter.length === 0 || locationFilter.includes(r.location)
+        return priorityOk && divisionOk && locationOk
+      }),
+    [rows, priorityFilter, divisionFilter, locationFilter]
+  )
 
-  const isClosedPosition = (statusFktk: string) => {
-    const s = (statusFktk || '').toString().trim().toLowerCase()
-    return (
-      s.includes('cancel') ||
-      s.includes('on boarding') ||
-      s.includes('onboarding') ||
-      s.includes('boarding') ||
-      s.includes('signing')
-    )
-  }
+  const tableRows = useMemo(() => {
+    if (!activeCard) return dropdownFilteredRows
+    switch (activeCard) {
+      case 'open':
+        return dropdownFilteredRows.filter((r) => !isClosedPosition(r.statusFktk))
+      case 'closed':
+        return dropdownFilteredRows.filter((r) => isClosedPosition(r.statusFktk))
+      case 'sla-0-30':
+        return dropdownFilteredRows.filter((r) => r.sla === '0-30 Days')
+      case 'sla-31-60':
+        return dropdownFilteredRows.filter((r) => r.sla === '31-60 Days')
+      case 'sla-61-90':
+        return dropdownFilteredRows.filter((r) => r.sla === '61-90 Days')
+      case 'sla-91':
+        return dropdownFilteredRows.filter((r) => r.sla === 'Above 91 Days')
+      default:
+        return dropdownFilteredRows
+    }
+  }, [dropdownFilteredRows, activeCard])
 
-  const openPositionCount = filteredRows.filter((r) => !isClosedPosition(r.statusFktk)).length
-  const closedPositionCount = filteredRows.filter((r) => isClosedPosition(r.statusFktk)).length
+  const openPositionCount = dropdownFilteredRows.filter((r) => !isClosedPosition(r.statusFktk)).length
+  const closedPositionCount = dropdownFilteredRows.filter((r) => isClosedPosition(r.statusFktk)).length
 
   const slaCounts = useMemo(() => {
-    const counts = {
+    const counts: Record<string, number> = {
       '0-30 Days': 0,
       '31-60 Days': 0,
       '61-90 Days': 0,
       'Above 91 Days': 0,
     }
-    filteredRows.forEach((r) => {
+    dropdownFilteredRows.forEach((r) => {
       if (r.sla in counts) {
-        // @ts-expect-error index
         counts[r.sla] += 1
       }
     })
     return counts
-  }, [filteredRows])
+  }, [dropdownFilteredRows])
 
-  const sortedRows = [...filteredRows].sort((a, b) => {
+  const sortedRows = [...tableRows].sort((a, b) => {
     const dir = sortDir === 'asc' ? 1 : -1
     const av = (a[sortKey] ?? '').toString().toLowerCase()
     const bv = (b[sortKey] ?? '').toString().toLowerCase()
@@ -224,6 +252,19 @@ export default function SummaryByPositionPage() {
       setSortKey(key)
       setSortDir('asc')
     }
+  }
+
+  const toggleCardFilter = (key: SummaryCardKey) => {
+    setActiveCard((prev) => (prev === key ? null : key))
+  }
+
+  const cardClass = (key: SummaryCardKey) => {
+    const on = activeCard === key
+    return [
+      'w-full text-left bg-white shadow rounded-lg px-4 py-5 sm:px-6',
+      'transition focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500',
+      on ? 'ring-2 ring-indigo-500 border border-indigo-200 bg-indigo-50/50' : 'hover:border hover:border-gray-200 cursor-pointer',
+    ].join(' ')
   }
 
   const sortIndicator = (key: keyof SummaryRow) => (
@@ -268,33 +309,42 @@ export default function SummaryByPositionPage() {
           />
         </div>
 
-        {/* Open / Closed cards */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
-          <div className="bg-white shadow rounded-lg px-4 py-5 sm:px-6">
+        <p className="text-sm text-gray-500">
+          Click a card to filter the table. Click the same card again to show all rows (still respects Priority, Division, Location).
+        </p>
+
+        {/* Open / Closed + SLA cards */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+          <button type="button" onClick={() => toggleCardFilter('open')} className={cardClass('open')}>
             <div className="text-sm font-medium text-gray-500">Open Position</div>
             <div className="mt-2 text-3xl font-semibold text-gray-900">{openPositionCount}</div>
-            <div className="mt-1 text-xs text-gray-400">Follows active filters</div>
-          </div>
-          <div className="bg-white shadow rounded-lg px-4 py-5 sm:px-6">
+            <div className="mt-1 text-xs text-gray-400">By Status FKTK • with dropdown filters</div>
+          </button>
+          <button type="button" onClick={() => toggleCardFilter('closed')} className={cardClass('closed')}>
             <div className="text-sm font-medium text-gray-500">Closed Position</div>
             <div className="mt-2 text-3xl font-semibold text-gray-900">{closedPositionCount}</div>
-            <div className="mt-1 text-xs text-gray-400">Follows active filters</div>
-          </div>
-          <div className="bg-white shadow rounded-lg px-4 py-5 sm:px-6">
+            <div className="mt-1 text-xs text-gray-400">By Status FKTK • with dropdown filters</div>
+          </button>
+          <button type="button" onClick={() => toggleCardFilter('sla-0-30')} className={cardClass('sla-0-30')}>
             <div className="text-sm font-medium text-gray-500">SLA 0-30 Days</div>
             <div className="mt-2 text-3xl font-semibold text-gray-900">{slaCounts['0-30 Days']}</div>
-            <div className="mt-1 text-xs text-gray-400">Working days (ID) • filtered</div>
-          </div>
-          <div className="bg-white shadow rounded-lg px-4 py-5 sm:px-6">
+            <div className="mt-1 text-xs text-gray-400">Working days (ID) • with dropdown filters</div>
+          </button>
+          <button type="button" onClick={() => toggleCardFilter('sla-31-60')} className={cardClass('sla-31-60')}>
             <div className="text-sm font-medium text-gray-500">SLA 31-60 Days</div>
             <div className="mt-2 text-3xl font-semibold text-gray-900">{slaCounts['31-60 Days']}</div>
-            <div className="mt-1 text-xs text-gray-400">Working days (ID) • filtered</div>
-          </div>
-          <div className="bg-white shadow rounded-lg px-4 py-5 sm:px-6">
+            <div className="mt-1 text-xs text-gray-400">Working days (ID) • with dropdown filters</div>
+          </button>
+          <button type="button" onClick={() => toggleCardFilter('sla-61-90')} className={cardClass('sla-61-90')}>
+            <div className="text-sm font-medium text-gray-500">SLA 61-90 Days</div>
+            <div className="mt-2 text-3xl font-semibold text-gray-900">{slaCounts['61-90 Days']}</div>
+            <div className="mt-1 text-xs text-gray-400">Working days (ID) • with dropdown filters</div>
+          </button>
+          <button type="button" onClick={() => toggleCardFilter('sla-91')} className={cardClass('sla-91')}>
             <div className="text-sm font-medium text-gray-500">SLA Above 91 Days</div>
             <div className="mt-2 text-3xl font-semibold text-gray-900">{slaCounts['Above 91 Days']}</div>
-            <div className="mt-1 text-xs text-gray-400">Working days (ID) • filtered</div>
-          </div>
+            <div className="mt-1 text-xs text-gray-400">Working days (ID) • with dropdown filters</div>
+          </button>
         </div>
 
         <div className="bg-white shadow rounded-lg overflow-hidden">
@@ -353,6 +403,13 @@ export default function SummaryByPositionPage() {
                   <tr>
                     <td colSpan={8 + allStatuses.length} className="px-4 py-6 text-center text-sm text-gray-500">
                       No data available. Create some positions and applied candidates to see the summary.
+                    </td>
+                  </tr>
+                )}
+                {rows.length > 0 && sortedRows.length === 0 && (
+                  <tr>
+                    <td colSpan={8 + allStatuses.length} className="px-4 py-6 text-center text-sm text-gray-500">
+                      No rows match the selected card filter. Clear the card or adjust Priority, Division, or Location.
                     </td>
                   </tr>
                 )}

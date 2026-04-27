@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useAuth } from '@/contexts/AuthContext'
 import { useRouter } from 'next/navigation'
 import Layout from '@/components/Layout/Layout'
@@ -16,11 +16,14 @@ import { DashboardAPI, CandidatesAPI, FPTKAPI, ApplicationsAPI } from '@/lib/api
 import { mapApiFptk } from './fptk/page'
 import { businessDaysDiffIndonesia } from '@/utils/indoBusinessDays'
 import {
-  getRollingWeekWindowBounds,
-  isTimestampInRange,
-  parseTimestamp,
-  weekOverWeekFromDataset,
-} from '@/utils/weekOverWeek'
+  getDashboardPeriodBounds,
+  itemTimestampInRange,
+  periodOverPeriodChange,
+  toMonthInputValue,
+  toWeekInputValue,
+  type DashboardTimeMode,
+  type DateRange,
+} from '@/utils/dashboardPeriod'
 
 const PRIORITY_FILTERS = ['ALL', 'P0', 'P1', 'P2'] as const
 
@@ -30,7 +33,13 @@ const normalizeUiCurrentStatus = (value?: string) => (value || '').trim().toLowe
 const isOpenCurrentStatusLabel = (value?: string) => {
   const s = normalizeUiCurrentStatus(value)
   if (!s) return true
-  return s === 'open' || s === 'pending fktk' || s === 're-open' || s === 'reopen'
+  return (
+    s === 'open' ||
+    s === 'pending fktk' ||
+    s === 're-open' ||
+    s === 'reopen' ||
+    s === 'internal movement'
+  )
 }
 
 /** Closed Positions card: Close | Internal Movement */
@@ -96,16 +105,6 @@ const getCurrentWeekRange = () => {
   endOfWeek.setDate(startOfWeek.getDate() + 6)
   endOfWeek.setHours(23, 59, 59, 999)
   return { startOfWeek, endOfWeek }
-}
-
-const getMonthRange = () => {
-  const startOfMonth = new Date()
-  startOfMonth.setDate(1)
-  startOfMonth.setHours(0, 0, 0, 0)
-  const endOfMonth = new Date(startOfMonth)
-  endOfMonth.setMonth(endOfMonth.getMonth() + 1)
-  endOfMonth.setMilliseconds(endOfMonth.getMilliseconds() - 1)
-  return { startOfMonth, endOfMonth }
 }
 
 const computePositionStatusByLocation = (positions: any[]): PositionStatusByLocation[] => {
@@ -181,49 +180,12 @@ const computeSlaByLocation = (positions: any[]): SLALocation[] => {
   return Object.values(data) as SLALocation[]
 }
 
-const getInterviewsThisWeekItems = (positions: any[]): DashboardListItem[] => {
-  const { startOfWeek, endOfWeek } = getCurrentWeekRange()
-  const items: DashboardListItem[] = []
-
-  const statusMatches = (raw: string) => {
-    const s = (raw || '').trim().toLowerCase()
-    return s === 'interview scheduled' || s === 'interviewed'
-  }
-
-  positions.forEach((position) => {
-    (position?.appliedCandidates || []).forEach((candidate: any) => {
-      if (!statusMatches(candidate?.status || '')) return
-      ;(candidate?.interviews || []).forEach((interview: any) => {
-        const date = parseDateValue(interview?.date || interview?.scheduledAt)
-        if (!date) return
-        if (isWithinRange(date, startOfWeek, endOfWeek)) {
-          const subtitleParts = [position?.title || position?.position || 'Unknown Position']
-          if (position?.department) {
-            subtitleParts.push(position.department)
-          }
-          items.push({
-            id: position?.id,
-            kind: position?.id ? ('fptk' as const) : undefined,
-            title: candidate?.fullName || candidate?.name || 'Unknown Candidate',
-            subtitle: subtitleParts.filter(Boolean).join(' • '),
-            meta: `${date.toLocaleDateString()}${interview?.time ? ` at ${interview.time}` : ''}`,
-          })
-        }
-      })
-    })
-  })
-
-  return items
-}
-
-const getHiredThisMonthItems = (positions: any[]): DashboardListItem[] => {
-  const { startOfMonth, endOfMonth } = getMonthRange()
+const getHiredInRangeItems = (positions: any[], range: DateRange): DashboardListItem[] => {
   return positions
     .filter((position) => {
       const s = normalizeUiCurrentStatus(position?.currentStatus || position?.status)
       if (s !== 'close') return false
-      const date = parseDateValue(position?.updatedAt)
-      return date ? isWithinRange(date, startOfMonth, endOfMonth) : false
+      return itemTimestampInRange(position?.updatedAt, range)
     })
     .map((position) => {
       const date = parseDateValue(position?.updatedAt)
@@ -235,6 +197,23 @@ const getHiredThisMonthItems = (positions: any[]): DashboardListItem[] => {
         meta: date ? `Updated ${date.toLocaleDateString()}` : undefined,
       }
     })
+}
+
+const asUpperStatus = (value: any) => (value || '').toString().trim().toUpperCase()
+
+const appActivityTs = (a: { updatedAt?: string | null; appliedAt?: string | null } | null | undefined) =>
+  a?.updatedAt || a?.appliedAt
+const fptkActivityTs = (p: { updatedAt?: string | null; createdAt?: string | null } | null | undefined) =>
+  p?.updatedAt || p?.createdAt
+
+const appInGroupInRange = (a: any, group: Set<string>, range: DateRange) =>
+  group.has(asUpperStatus(a?.status)) && itemTimestampInRange(appActivityTs(a), range)
+
+const APPLICATION_STATUS_GROUPS = {
+  totalCandidate: new Set(['SUBMITTED', 'SCREENING', 'OFFER_REJECTED']),
+  interview: new Set(['INTERVIEW_SCHEDULED', 'INTERVIEW_COMPLETED', 'TECHNICAL_TEST', 'REJECTED']),
+  offeringStage: new Set(['OFFER_PROPOSED', 'OFFER_APPROVED', 'OFFER_ACCEPTED', 'WITHDRAWN']),
+  mcu: new Set(['MEDICAL_CHECKUP_COMPLETED']),
 }
 
 const buildApplicationInsights = (
@@ -292,20 +271,6 @@ const buildApplicationInsights = (
   return { interviewItems }
 }
 
-const countInterviewsInDateRange = (applications: any[], start: Date, end: Date): number => {
-  let n = 0
-  for (const application of applications) {
-    const appStatus = (application?.status || '').toString().toUpperCase()
-    if (appStatus !== 'INTERVIEW_SCHEDULED' && appStatus !== 'INTERVIEW_COMPLETED') continue
-    for (const interview of application?.interviews || []) {
-      if (!interview?.scheduledAt) continue
-      const d = parseTimestamp(interview.scheduledAt)
-      if (d && isTimestampInRange(d, start, end)) n += 1
-    }
-  }
-  return n
-}
-
 export default function Dashboard() {
   const { isAuthenticated, isLoading } = useAuth()
   const router = useRouter()
@@ -349,53 +314,88 @@ export default function Dashboard() {
   } | null>(null)
   const [totalCandidatesQuery, setTotalCandidatesQuery] = useState('')
 
-const filteredPositions = useMemo(
-  () => filterPositionsByPriority(allPositions, priorityFilter),
-  [allPositions, priorityFilter]
-)
-const openPositionItems = useMemo<DashboardListItem[]>(() => {
-  return filteredPositions
-    .filter((position) => isOpenCurrentStatusLabel(position?.currentStatus || position?.status))
-    .map((position) => ({
-      id: position?.id,
-      kind: 'fptk' as const,
-      title: position?.title || position?.position || 'Unknown Position',
-      subtitle: `${position?.department || 'N/A'} • ${position?.location || 'N/A'}`,
-      meta: position?.currentStatus || position?.status || 'N/A',
-    }))
-}, [filteredPositions])
+  const [timeMode, setTimeMode] = useState<DashboardTimeMode>('month')
+  const [weekValue, setWeekValue] = useState(() => toWeekInputValue())
+  const [monthValue, setMonthValue] = useState(() => toMonthInputValue())
+  const [customStart, setCustomStart] = useState(() => {
+    const d = new Date()
+    const y = d.getFullYear()
+    const m = d.getMonth()
+    return `${y}-${String(m + 1).padStart(2, '0')}-01`
+  })
+  const [customEnd, setCustomEnd] = useState(() => {
+    const d = new Date()
+    const y = d.getFullYear()
+    const m = d.getMonth()
+    const last = new Date(y, m + 1, 0)
+    return `${y}-${String(m + 1).padStart(2, '0')}-${String(last.getDate()).padStart(2, '0')}`
+  })
 
-const closedPositionItems = useMemo<DashboardListItem[]>(() => {
-  return filteredPositions
-    .filter((position) => isClosedCurrentStatusLabel(position?.currentStatus || position?.status))
-    .map((position) => ({
-      id: position?.id,
-      kind: 'fptk' as const,
-      title: position?.title || position?.position || 'Unknown Position',
-      subtitle: `${position?.department || 'N/A'} • ${position?.location || 'N/A'}`,
-      meta: position?.currentStatus || position?.status || 'N/A',
-    }))
-}, [filteredPositions])
+  const periodBounds = useMemo(
+    () => getDashboardPeriodBounds(timeMode, { weekValue, monthValue, customStart, customEnd }),
+    [timeMode, weekValue, monthValue, customStart, customEnd]
+  )
 
-const holdPositionItems = useMemo<DashboardListItem[]>(() => {
-  return filteredPositions
-    .filter((position) => isHoldCurrentStatusLabel(position?.currentStatus || position?.status))
-    .map((position) => ({
-      id: position?.id,
-      kind: 'fptk' as const,
-      title: position?.title || position?.position || 'Unknown Position',
-      subtitle: `${position?.department || 'N/A'} • ${position?.location || 'N/A'}`,
-      meta: position?.currentStatus || position?.status || 'N/A',
-    }))
-}, [filteredPositions])
-const interviewsThisWeekItems = useMemo(
-  () => getInterviewsThisWeekItems(filteredPositions),
-  [filteredPositions]
-)
-const hiredThisMonthItems = useMemo(
-  () => getHiredThisMonthItems(filteredPositions),
-  [filteredPositions]
-)
+  const activePeriod = useMemo(() => {
+    if (periodBounds) return periodBounds
+    return getDashboardPeriodBounds('month', {
+      weekValue: toWeekInputValue(),
+      monthValue: toMonthInputValue(),
+      customStart: '',
+      customEnd: '',
+    }) as NonNullable<ReturnType<typeof getDashboardPeriodBounds>>
+  }, [periodBounds])
+
+  const filteredPositions = useMemo(
+    () => filterPositionsByPriority(allPositions, priorityFilter),
+    [allPositions, priorityFilter]
+  )
+
+  const openPositionItems = useMemo<DashboardListItem[]>(() => {
+    const range = activePeriod.current
+    return filteredPositions
+      .filter(
+        (position) =>
+          isOpenCurrentStatusLabel(position?.currentStatus || position?.status) &&
+          itemTimestampInRange(fptkActivityTs(position), range)
+      )
+      .map((position) => ({
+        id: position?.id,
+        kind: 'fptk' as const,
+        title: position?.title || position?.position || 'Unknown Position',
+        subtitle: `${position?.department || 'N/A'} • ${position?.location || 'N/A'}`,
+        meta: position?.currentStatus || position?.status || 'N/A',
+      }))
+  }, [filteredPositions, activePeriod])
+
+  const closedPositionItems = useMemo<DashboardListItem[]>(() => {
+    return filteredPositions
+      .filter((position) => isClosedCurrentStatusLabel(position?.currentStatus || position?.status))
+      .map((position) => ({
+        id: position?.id,
+        kind: 'fptk' as const,
+        title: position?.title || position?.position || 'Unknown Position',
+        subtitle: `${position?.department || 'N/A'} • ${position?.location || 'N/A'}`,
+        meta: position?.currentStatus || position?.status || 'N/A',
+      }))
+  }, [filteredPositions])
+
+  const holdPositionItems = useMemo<DashboardListItem[]>(() => {
+    return filteredPositions
+      .filter((position) => isHoldCurrentStatusLabel(position?.currentStatus || position?.status))
+      .map((position) => ({
+        id: position?.id,
+        kind: 'fptk' as const,
+        title: position?.title || position?.position || 'Unknown Position',
+        subtitle: `${position?.department || 'N/A'} • ${position?.location || 'N/A'}`,
+        meta: position?.currentStatus || position?.status || 'N/A',
+      }))
+  }, [filteredPositions])
+
+  const hiredInPeriodItems = useMemo(
+    () => getHiredInRangeItems(filteredPositions, activePeriod.current),
+    [filteredPositions, activePeriod]
+  )
 
   const applicationsScoped = useMemo(() => {
     if (!dashboardApplications.length) return []
@@ -405,116 +405,169 @@ const hiredThisMonthItems = useMemo(
     return dashboardApplications.filter((a: any) => a.fptkId && idSet.has(a.fptkId))
   }, [dashboardApplications, filteredPositions, fptkListHydrated])
 
-  const candidateCreatedRows = useMemo(() => {
-    const rows: { createdAt?: string | null }[] = []
-    const seen = new Set<string>()
-    for (const a of applicationsScoped) {
-      const id = a.candidate?.id || a.candidateId
-      if (!id || seen.has(id)) continue
-      seen.add(id)
-      rows.push({ createdAt: a.candidate?.createdAt })
+  const mapApplicationToDetailItem = (application: any): DashboardListItem => {
+    const candidateName =
+      `${application?.candidate?.user?.firstName || ''} ${application?.candidate?.user?.lastName || ''}`.trim() ||
+      application?.candidate?.fullName ||
+      'Unknown Candidate'
+    const positionTitle =
+      application?.fptk?.positionTitle || application?.fptk?.position || 'Unknown Position'
+    const department = application?.fptk?.department || application?.candidate?.user?.division || 'N/A'
+    return {
+      id: application?.fptkId || application?.id,
+      kind: application?.fptkId ? ('fptk' as const) : undefined,
+      title: candidateName,
+      subtitle: `${positionTitle} • ${department}`,
+      meta: asUpperStatus(application?.status).replace(/_/g, ' '),
     }
-    return rows
-  }, [applicationsScoped])
+  }
 
-  const interviewTimestampRows = useMemo(() => {
-    const rows: { at: string }[] = []
-    for (const application of applicationsScoped) {
-      const appStatus = (application?.status || '').toString().toUpperCase()
-      if (appStatus !== 'INTERVIEW_SCHEDULED' && appStatus !== 'INTERVIEW_COMPLETED') continue
-      for (const interview of application?.interviews || []) {
-        if (interview?.scheduledAt) rows.push({ at: interview.scheduledAt })
-      }
-    }
-    return rows
-  }, [applicationsScoped])
+  const totalCandidateItems = useMemo(
+    () =>
+      applicationsScoped
+        .filter((a: any) =>
+          appInGroupInRange(a, APPLICATION_STATUS_GROUPS.totalCandidate, activePeriod.current)
+        )
+        .map(mapApplicationToDetailItem),
+    [applicationsScoped, activePeriod]
+  )
 
-  const wowTotalCandidates = useMemo(
-    () => weekOverWeekFromDataset(candidateCreatedRows, (r) => r.createdAt),
-    [candidateCreatedRows]
+  const interviewItems = useMemo(
+    () =>
+      applicationsScoped
+        .filter((a: any) => appInGroupInRange(a, APPLICATION_STATUS_GROUPS.interview, activePeriod.current))
+        .map(mapApplicationToDetailItem),
+    [applicationsScoped, activePeriod]
+  )
+
+  const offeringStageItems = useMemo(
+    () =>
+      applicationsScoped
+        .filter((a: any) =>
+          appInGroupInRange(a, APPLICATION_STATUS_GROUPS.offeringStage, activePeriod.current)
+        )
+        .map(mapApplicationToDetailItem),
+    [applicationsScoped, activePeriod]
+  )
+
+  const mcuItems = useMemo(
+    () =>
+      applicationsScoped
+        .filter((a: any) => appInGroupInRange(a, APPLICATION_STATUS_GROUPS.mcu, activePeriod.current))
+        .map(mapApplicationToDetailItem),
+    [applicationsScoped, activePeriod]
+  )
+
+  const countOpenFptkInRange = useCallback(
+    (range: DateRange) =>
+      filteredPositions.filter(
+        (p) =>
+          isOpenCurrentStatusLabel(p?.currentStatus || p?.status) && itemTimestampInRange(fptkActivityTs(p), range)
+      ).length,
+    [filteredPositions]
+  )
+
+  const countAppGroupInRange = useCallback(
+    (group: Set<string>, range: DateRange) =>
+      applicationsScoped.filter((a: any) => appInGroupInRange(a, group, range)).length,
+    [applicationsScoped]
+  )
+
+  const countHiredCloseInRange = useCallback(
+    (range: DateRange) =>
+      filteredPositions.filter(
+        (p) =>
+          normalizeUiCurrentStatus(p?.currentStatus || p?.status) === 'close' &&
+          itemTimestampInRange(fptkActivityTs(p), range)
+      ).length,
+    [filteredPositions]
   )
 
   const wowOpenPositions = useMemo(
     () =>
-      weekOverWeekFromDataset(filteredPositions, (p) => p.createdAt, {
-        predicate: (p) => isOpenCurrentStatusLabel(p?.currentStatus || p?.status),
-      }),
-    [filteredPositions]
+      periodOverPeriodChange(
+        countOpenFptkInRange(activePeriod.current),
+        countOpenFptkInRange(activePeriod.previous)
+      ),
+    [countOpenFptkInRange, activePeriod]
   )
 
-  const wowClosedPositions = useMemo(
+  const wowTotalCandidateStatus = useMemo(
     () =>
-      weekOverWeekFromDataset(filteredPositions, (p) => p.createdAt, {
-        predicate: (p) => isClosedCurrentStatusLabel(p?.currentStatus || p?.status),
-      }),
-    [filteredPositions]
+      periodOverPeriodChange(
+        countAppGroupInRange(APPLICATION_STATUS_GROUPS.totalCandidate, activePeriod.current),
+        countAppGroupInRange(APPLICATION_STATUS_GROUPS.totalCandidate, activePeriod.previous)
+      ),
+    [countAppGroupInRange, activePeriod]
   )
 
-  const wowHoldPositions = useMemo(
+  const wowInterviewStatus = useMemo(
     () =>
-      weekOverWeekFromDataset(filteredPositions, (p) => p.createdAt, {
-        predicate: (p) => isHoldCurrentStatusLabel(p?.currentStatus || p?.status),
-      }),
-    [filteredPositions]
+      periodOverPeriodChange(
+        countAppGroupInRange(APPLICATION_STATUS_GROUPS.interview, activePeriod.current),
+        countAppGroupInRange(APPLICATION_STATUS_GROUPS.interview, activePeriod.previous)
+      ),
+    [countAppGroupInRange, activePeriod]
   )
 
-  const wowInterviews = useMemo(
-    () => weekOverWeekFromDataset(interviewTimestampRows, (r) => r.at),
-    [interviewTimestampRows]
+  const wowOfferingStatus = useMemo(
+    () =>
+      periodOverPeriodChange(
+        countAppGroupInRange(APPLICATION_STATUS_GROUPS.offeringStage, activePeriod.current),
+        countAppGroupInRange(APPLICATION_STATUS_GROUPS.offeringStage, activePeriod.previous)
+      ),
+    [countAppGroupInRange, activePeriod]
+  )
+
+  const wowMcuStatus = useMemo(
+    () =>
+      periodOverPeriodChange(
+        countAppGroupInRange(APPLICATION_STATUS_GROUPS.mcu, activePeriod.current),
+        countAppGroupInRange(APPLICATION_STATUS_GROUPS.mcu, activePeriod.previous)
+      ),
+    [countAppGroupInRange, activePeriod]
   )
 
   const wowHiredRolling = useMemo(
     () =>
-      weekOverWeekFromDataset(filteredPositions, (p) => p.updatedAt, {
-        predicate: (p) => isClosedCurrentStatusLabel(p?.currentStatus || p?.status),
-      }),
-    [filteredPositions]
+      periodOverPeriodChange(
+        countHiredCloseInRange(activePeriod.current),
+        countHiredCloseInRange(activePeriod.previous)
+      ),
+    [countHiredCloseInRange, activePeriod]
   )
 
-  const totalCandidatesHeadline = useMemo(() => {
-    if (priorityFilter !== 'ALL') return candidateCreatedRows.length
-    if (baseStats?.totalCandidates != null) return baseStats.totalCandidates
-    return candidateCreatedRows.length
-  }, [priorityFilter, baseStats?.totalCandidates, candidateCreatedRows.length])
+  const openPositionsHeadline = useMemo(
+    () => openPositionItems.length,
+    [openPositionItems.length]
+  )
 
-  const openPositionsHeadline = useMemo(() => {
-    if (fptkListHydrated) return openPositionItems.length
-    return baseStats?.openPositions ?? openPositionItems.length
-  }, [fptkListHydrated, openPositionItems.length, baseStats?.openPositions])
+  const totalCandidateHeadline = useMemo(
+    () => totalCandidateItems.length,
+    [totalCandidateItems.length]
+  )
 
-  const closedPositionsHeadline = useMemo(() => {
-    if (fptkListHydrated) return closedPositionItems.length
-    return baseStats?.closedPositions ?? closedPositionItems.length
-  }, [fptkListHydrated, closedPositionItems.length, baseStats?.closedPositions])
+  const interviewHeadline = useMemo(
+    () => interviewItems.length,
+    [interviewItems.length]
+  )
 
-  const holdPositionsHeadline = useMemo(() => {
-    if (fptkListHydrated) return holdPositionItems.length
-    return baseStats?.holdPositions ?? holdPositionItems.length
-  }, [fptkListHydrated, holdPositionItems.length, baseStats?.holdPositions])
+  const offeringStageHeadline = useMemo(
+    () => offeringStageItems.length,
+    [offeringStageItems.length]
+  )
 
-  const interviewsHeadline = useMemo(() => {
-    if (dashboardApplications.length > 0) {
-      const { currentStart, currentEnd } = getRollingWeekWindowBounds()
-      return countInterviewsInDateRange(applicationsScoped, currentStart, currentEnd)
-    }
-    return (
-      interviewDetailItems.length ||
-      interviewsThisWeekItems.length ||
-      baseStats?.interviewsThisWeek ||
-      0
-    )
-  }, [
-    dashboardApplications.length,
-    applicationsScoped,
-    interviewDetailItems.length,
-    interviewsThisWeekItems.length,
-    baseStats?.interviewsThisWeek,
-  ])
+  const mcuHeadline = useMemo(
+    () => mcuItems.length,
+    [mcuItems.length]
+  )
 
   const hiredThisMonthHeadline = useMemo(
-    () => hiredThisMonthItems.length || baseStats?.hiredThisMonth || 0,
-    [hiredThisMonthItems.length, baseStats?.hiredThisMonth]
+    () => hiredInPeriodItems.length,
+    [hiredInPeriodItems.length]
   )
+
+  const customRangeInvalid = timeMode === 'custom' && !periodBounds
 
   const combinedLocations = useMemo(() => {
     const locationsSet = new Set<string>()
@@ -538,41 +591,41 @@ const hiredThisMonthItems = useMemo(
     () => [
       {
         name: 'Total Candidates',
-        value: totalCandidatesHeadline.toString(),
-        icon: UsersIcon,
-        change: wowTotalCandidates.formattedChange,
-        changeType: wowTotalCandidates.sentiment,
-      },
-      {
-        name: 'Open Positions',
         value: openPositionsHeadline.toString(),
-        icon: BriefcaseIcon,
+        icon: UsersIcon,
         change: wowOpenPositions.formattedChange,
         changeType: wowOpenPositions.sentiment,
       },
       {
-        name: 'Closed Positions',
-        value: closedPositionsHeadline.toString(),
+        name: 'Open Positions',
+        value: totalCandidateHeadline.toString(),
         icon: BriefcaseIcon,
-        change: wowClosedPositions.formattedChange,
-        changeType: wowClosedPositions.sentiment,
+        change: wowTotalCandidateStatus.formattedChange,
+        changeType: wowTotalCandidateStatus.sentiment,
       },
       {
-        name: 'Hold Positions',
-        value: holdPositionsHeadline.toString(),
+        name: 'Interview',
+        value: interviewHeadline.toString(),
         icon: BriefcaseIcon,
-        change: wowHoldPositions.formattedChange,
-        changeType: wowHoldPositions.sentiment,
+        change: wowInterviewStatus.formattedChange,
+        changeType: wowInterviewStatus.sentiment,
       },
       {
-        name: 'Interviews This Week',
-        value: interviewsHeadline.toString(),
+        name: 'Offering Stage',
+        value: offeringStageHeadline.toString(),
+        icon: BriefcaseIcon,
+        change: wowOfferingStatus.formattedChange,
+        changeType: wowOfferingStatus.sentiment,
+      },
+      {
+        name: 'MCU',
+        value: mcuHeadline.toString(),
         icon: CalendarDaysIcon,
-        change: wowInterviews.formattedChange,
-        changeType: wowInterviews.sentiment,
+        change: wowMcuStatus.formattedChange,
+        changeType: wowMcuStatus.sentiment,
       },
       {
-        name: 'Hired This Month',
+        name: 'Hired',
         value: hiredThisMonthHeadline.toString(),
         icon: DocumentTextIcon,
         change: wowHiredRolling.formattedChange,
@@ -580,16 +633,16 @@ const hiredThisMonthItems = useMemo(
       },
     ],
     [
-      totalCandidatesHeadline,
-      wowTotalCandidates,
       openPositionsHeadline,
       wowOpenPositions,
-      closedPositionsHeadline,
-      wowClosedPositions,
-      holdPositionsHeadline,
-      wowHoldPositions,
-      interviewsHeadline,
-      wowInterviews,
+      totalCandidateHeadline,
+      wowTotalCandidateStatus,
+      interviewHeadline,
+      wowInterviewStatus,
+      offeringStageHeadline,
+      wowOfferingStatus,
+      mcuHeadline,
+      wowMcuStatus,
       hiredThisMonthHeadline,
       wowHiredRolling,
     ]
@@ -609,12 +662,12 @@ useEffect(() => {
   if (!baseStats) return
 
   setDashboardStats({
-    totalCandidates: totalCandidatesHeadline,
+    totalCandidates: openPositionsHeadline,
     activeApplications: baseStats.activeApplications ?? 0,
-    openPositions: openPositionsHeadline,
-    closedPositions: closedPositionsHeadline,
-    holdPositions: holdPositionsHeadline,
-    interviewsThisWeek: interviewsHeadline,
+    openPositions: totalCandidateHeadline,
+    closedPositions: interviewHeadline,
+    holdPositions: offeringStageHeadline,
+    interviewsThisWeek: mcuHeadline,
     hiredThisMonth: hiredThisMonthHeadline,
     recentActivity: baseStats.recentActivity ?? [],
     positionStatusByLocation: (baseStats as any).positionStatusByLocation || computePositionStatusByLocation(filteredPositions),
@@ -624,11 +677,11 @@ useEffect(() => {
 }, [
   baseStats,
   filteredPositions,
-  totalCandidatesHeadline,
   openPositionsHeadline,
-  closedPositionsHeadline,
-  holdPositionsHeadline,
-  interviewsHeadline,
+  totalCandidateHeadline,
+  interviewHeadline,
+  offeringStageHeadline,
+  mcuHeadline,
   hiredThisMonthHeadline,
 ])
 
@@ -1012,6 +1065,78 @@ useEffect(() => {
           </div>
         </div>
 
+        <div className="mb-6 bg-white border border-gray-200 rounded-lg shadow-sm p-4">
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:flex-wrap">
+            <div className="inline-flex rounded-md shadow-sm">
+                {(['week', 'month', 'custom'] as const).map((m, index, arr) => (
+                  <button
+                    key={m}
+                    type="button"
+                    onClick={() => setTimeMode(m)}
+                    className={`px-3 py-1.5 border text-sm font-medium capitalize ${
+                      timeMode === m
+                        ? 'bg-indigo-600 text-white border-indigo-600'
+                        : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50'
+                    } ${index === 0 ? 'rounded-l-md' : ''} ${
+                      index === arr.length - 1 ? 'rounded-r-md' : ''
+                    } ${index > 0 ? '-ml-px' : ''}`}
+                  >
+                    {m}
+                  </button>
+                ))}
+              </div>
+              {timeMode === 'week' && (
+                <label className="flex items-center gap-2 text-sm text-gray-700">
+                  <span className="whitespace-nowrap">Week</span>
+                  <input
+                    type="week"
+                    value={weekValue}
+                    onChange={(e) => setWeekValue(e.target.value)}
+                    className="rounded-md border border-gray-300 px-2 py-1.5 text-sm"
+                  />
+                </label>
+              )}
+              {timeMode === 'month' && (
+                <label className="flex items-center gap-2 text-sm text-gray-700">
+                  <span className="whitespace-nowrap">Month</span>
+                  <input
+                    type="month"
+                    value={monthValue}
+                    onChange={(e) => setMonthValue(e.target.value)}
+                    className="rounded-md border border-gray-300 px-2 py-1.5 text-sm"
+                  />
+                </label>
+              )}
+              {timeMode === 'custom' && (
+                <div className="flex flex-wrap items-center gap-2 text-sm text-gray-700">
+                  <label className="flex items-center gap-1">
+                    From
+                    <input
+                      type="date"
+                      value={customStart}
+                      onChange={(e) => setCustomStart(e.target.value)}
+                      className="rounded-md border border-gray-300 px-2 py-1.5 text-sm"
+                    />
+                  </label>
+                  <label className="flex items-center gap-1">
+                    To
+                    <input
+                      type="date"
+                      value={customEnd}
+                      onChange={(e) => setCustomEnd(e.target.value)}
+                      className="rounded-md border border-gray-300 px-2 py-1.5 text-sm"
+                    />
+                  </label>
+                </div>
+              )}
+          </div>
+          {customRangeInvalid ? (
+            <p className="mt-2 text-xs text-amber-800 bg-amber-50 border border-amber-200 rounded px-2 py-1.5">
+              Invalid or incomplete custom range. Showing current month until the range is valid.
+            </p>
+          ) : null}
+        </div>
+
         {/* Stats Grid */}
         <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3">
           {stats.map((item) => (
@@ -1019,14 +1144,14 @@ useEffect(() => {
               key={item.name}
               className="text-left relative overflow-hidden rounded-lg bg-white px-4 py-5 shadow sm:px-6 sm:py-6 hover:ring-2 hover:ring-indigo-500 focus:outline-none"
               onClick={async () => {
-                if (item.name === 'Open Positions') {
+                if (item.name === 'Total Candidates') {
                   setOpenPositionsModalOpen(true)
                   if (!openPositionsLoadedOnceRef.current) {
                     await fetchOpenPositions('')
                   }
                   return
                 }
-                if (item.name === 'Total Candidates') {
+                if (item.name === 'Open Positions') {
                   setTotalCandidatesQuery('')
                   setTotalCandidatesModal({
                     page: 1,
@@ -1050,32 +1175,19 @@ useEffect(() => {
                     meta: position?.currentStatus || position?.status || 'N/A',
                   })
 
-                  if (item.name === 'Closed Positions') {
+                  if (item.name === 'Interview') {
+                    items = interviewItems
+                  } else if (item.name === 'Offering Stage') {
+                    items = offeringStageItems
+                  } else if (item.name === 'MCU') {
+                    items = mcuItems
+                  } else                 if (item.name === 'Hired') {
                     const pos = await fetchAllFptksForDashboard()
                     setAllPositions(pos)
-                    items = filterPositionsByPriority(pos, priorityFilter)
-                      .filter((p: any) => isClosedCurrentStatusLabel(p?.currentStatus || p?.status))
-                      .map(mapPositionRow)
-                  } else if (item.name === 'Hold Positions') {
-                    const pos = await fetchAllFptksForDashboard()
-                    setAllPositions(pos)
-                    items = filterPositionsByPriority(pos, priorityFilter)
-                      .filter((p: any) => isHoldCurrentStatusLabel(p?.currentStatus || p?.status))
-                      .map(mapPositionRow)
-                  } else if (item.name === 'Interviews This Week') {
-                    const pos = await fetchAllFptksForDashboard()
-                    setAllPositions(pos)
-                    const local = getInterviewsThisWeekItems(filterPositionsByPriority(pos, priorityFilter))
-                    if (local.length > 0) {
-                      items = local
-                    } else {
-                      const fromApi = await loadApplicationInsights()
-                      items = fromApi.length ? fromApi : local
-                    }
-                  } else if (item.name === 'Hired This Month') {
-                    const pos = await fetchAllFptksForDashboard()
-                    setAllPositions(pos)
-                    items = getHiredThisMonthItems(filterPositionsByPriority(pos, priorityFilter))
+                    items = getHiredInRangeItems(
+                      filterPositionsByPriority(pos, priorityFilter),
+                      activePeriod.current
+                    )
                   }
 
                   if (!items.length) {

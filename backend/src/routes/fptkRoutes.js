@@ -109,6 +109,9 @@ router.get(
       isPublished: req.query.isPublished,
       search: req.query.search,
       currentStatus: req.query.currentStatus,
+      pt: req.query.pt,
+      area: req.query.area,
+      areaDetail: req.query.areaDetail,
     };
     
     const pagination = {
@@ -156,6 +159,9 @@ router.get(
   asyncHandler(async (req, res) => {
     const filters = {
       search: req.query.search,
+      pt: req.query.pt,
+      area: req.query.area,
+      areaDetail: req.query.areaDetail,
     };
     const data = await fptkService.getFptkCurrentStatusCounts(filters, req.user);
     res.json({

@@ -6,6 +6,11 @@ import { FPTK } from '@/types'
 import { MasterOfficeLocationAPI, MasterDivisionAPI, CandidatesAPI, AdminUsersAPI } from '@/lib/api'
 import { useAuth } from '@/contexts/AuthContext'
 import { compressFile, formatFileSize } from '@/utils/fileCompression'
+import {
+  fptkRequiredFieldHighlightStyle,
+  getMissingFptkRequiredKeys,
+  type FptkRequiredKey,
+} from '@/utils/fptkFormRequired'
 
 interface EditJobPostingModalProps {
   isOpen: boolean
@@ -65,6 +70,7 @@ export default function EditJobPostingModal({
   const [fptkFile, setFptkFile] = useState<File | null>(null)
   const [isCompressingFptk, setIsCompressingFptk] = useState(false)
   const [fptkFileError, setFptkFileError] = useState<string>('')
+  const [showRequiredFieldHighlights, setShowRequiredFieldHighlights] = useState(false)
   const [fptkReceiveDate, setFptkReceiveDate] = useState<string>('')
   const [hiringManagerOptions, setHiringManagerOptions] = useState<Array<{firstName: string, lastName: string}>>([])
   const [teamMembers, setTeamMembers] = useState<Array<{id: string, firstName: string, lastName: string, email: string}>>([])
@@ -98,6 +104,7 @@ export default function EditJobPostingModal({
       HIRED: 'Hired',
       REJECTED: 'Rejected (Failed Interview / Assessment)',
       WITHDRAWN: 'Withdrawn',
+      KEEP_IN_VIEW: 'Keep In View',
     }
     if (lookup[normalized]) return lookup[normalized]
     return normalized
@@ -317,6 +324,15 @@ export default function EditJobPostingModal({
     return Array.from(set)
   }, [formData.division, divisions])
 
+  const missingRequiredKeys = useMemo(
+    () =>
+      showRequiredFieldHighlights
+        ? getMissingFptkRequiredKeys(formData as unknown as Record<string, unknown>)
+        : [],
+    [showRequiredFieldHighlights, formData]
+  )
+  const fInv = (key: FptkRequiredKey) => missingRequiredKeys.includes(key)
+
   // Update area details when area changes
   useEffect(() => {
     if (formData.area && officeLocations.length > 0) {
@@ -352,6 +368,7 @@ export default function EditJobPostingModal({
 
   useEffect(() => {
     if (jobPosting && isOpen) {
+      setShowRequiredFieldHighlights(false)
       // Reset file state when modal opens with a different position
       // This prevents file from one position appearing in another position
       setFptkFile(null)
@@ -1245,12 +1262,19 @@ export default function EditJobPostingModal({
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
-    
+
     // Prevent submission if editing is disabled
     if (isEditingDisabled) {
       alert('This position cannot be edited when status is "On Boarding"')
       return
     }
+
+    const missing = getMissingFptkRequiredKeys(formData as unknown as Record<string, unknown>)
+    if (missing.length > 0) {
+      setShowRequiredFieldHighlights(true)
+      return
+    }
+    setShowRequiredFieldHighlights(false)
     
     // Save applied candidates data back to localStorage
     const candidatesData = localStorage.getItem('candidates')
@@ -1427,20 +1451,22 @@ export default function EditJobPostingModal({
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
                 {/* PT */}
                 <div>
-                  <label style={{ fontSize: '14px', fontWeight: '500', color: '#374151', marginBottom: '6px', display: 'block' }}>
+                  <label style={{ fontSize: '14px', fontWeight: '500', color: fInv('pt') ? '#b91c1c' : '#374151', marginBottom: '6px', display: 'block' }}>
                     PT
                   </label>
                   <select
                     name="pt"
                     value={formData.pt}
                     onChange={handleInputChange}
+                    aria-invalid={fInv('pt')}
                     style={{
                       width: '100%',
                       padding: '8px 12px',
                       border: '1px solid #d1d5db',
                       borderRadius: '6px',
                       fontSize: '14px',
-                      backgroundColor: 'white'
+                      backgroundColor: 'white',
+                      ...fptkRequiredFieldHighlightStyle(fInv('pt'))
                     }}
                   >
                     <option value="">Select PT</option>
@@ -1457,20 +1483,22 @@ export default function EditJobPostingModal({
 
                 {/* Division */}
                 <div>
-                  <label style={{ fontSize: '14px', fontWeight: '500', color: '#374151', marginBottom: '6px', display: 'block' }}>
+                  <label style={{ fontSize: '14px', fontWeight: '500', color: fInv('division') ? '#b91c1c' : '#374151', marginBottom: '6px', display: 'block' }}>
                     Division
                   </label>
                   <select
                     name="division"
                     value={formData.division}
                     onChange={handleInputChange}
+                    aria-invalid={fInv('division')}
                     style={{
                       width: '100%',
                       padding: '8px 12px',
                       border: '1px solid #d1d5db',
                       borderRadius: '6px',
                       fontSize: '14px',
-                      backgroundColor: 'white'
+                      backgroundColor: 'white',
+                      ...fptkRequiredFieldHighlightStyle(fInv('division'))
                     }}
                   >
                     <option value="">Select Division</option>
@@ -1487,7 +1515,7 @@ export default function EditJobPostingModal({
 
                 {/* Position */}
                 <div>
-                  <label style={{ fontSize: '14px', fontWeight: '500', color: '#374151', marginBottom: '6px', display: 'block' }}>
+                  <label style={{ fontSize: '14px', fontWeight: '500', color: fInv('position') ? '#b91c1c' : '#374151', marginBottom: '6px', display: 'block' }}>
                     Position
                   </label>
                   <input
@@ -1495,31 +1523,35 @@ export default function EditJobPostingModal({
                     name="position"
                     value={formData.position}
                     onChange={handleInputChange}
+                    aria-invalid={fInv('position')}
                     style={{
                       width: '100%',
                       padding: '8px 12px',
                       border: '1px solid #d1d5db',
                       borderRadius: '6px',
-                      fontSize: '14px'
+                      fontSize: '14px',
+                      ...fptkRequiredFieldHighlightStyle(fInv('position'))
                     }}
                   />
                 </div>
 
                 {/* Hiring Manager */}
                 <div>
-                  <label style={{ fontSize: '14px', fontWeight: '500', color: '#374151', marginBottom: '6px', display: 'block' }}>
+                  <label style={{ fontSize: '14px', fontWeight: '500', color: fInv('hiringManager') ? '#b91c1c' : '#374151', marginBottom: '6px', display: 'block' }}>
                     Hiring Manager
                   </label>
                   <select
                     name="hiringManager"
                     value={formData.hiringManager}
                     onChange={handleInputChange}
+                    aria-invalid={fInv('hiringManager')}
                     style={{
                       width: '100%',
                       padding: '8px 12px',
                       border: '1px solid #d1d5db',
                       borderRadius: '6px',
-                      fontSize: '14px'
+                      fontSize: '14px',
+                      ...fptkRequiredFieldHighlightStyle(fInv('hiringManager'))
                     }}
                   >
                     <option value="">Select Hiring Manager</option>
@@ -1536,20 +1568,22 @@ export default function EditJobPostingModal({
 
                 {/* Employment Type */}
                 <div>
-                  <label style={{ fontSize: '14px', fontWeight: '500', color: '#374151', marginBottom: '6px', display: 'block' }}>
+                  <label style={{ fontSize: '14px', fontWeight: '500', color: fInv('employmentType') ? '#b91c1c' : '#374151', marginBottom: '6px', display: 'block' }}>
                     Employment Type
                   </label>
                   <select
                     name="employmentType"
                     value={formData.employmentType}
                     onChange={handleInputChange}
+                    aria-invalid={fInv('employmentType')}
                     style={{
                       width: '100%',
                       padding: '8px 12px',
                       border: '1px solid #d1d5db',
                       borderRadius: '6px',
                       fontSize: '14px',
-                      backgroundColor: 'white'
+                      backgroundColor: 'white',
+                      ...fptkRequiredFieldHighlightStyle(fInv('employmentType'))
                     }}
                   >
                     <option value="">Select Type</option>
@@ -1561,7 +1595,7 @@ export default function EditJobPostingModal({
 
                 {/* Area */}
                 <div>
-                  <label style={{ fontSize: '14px', fontWeight: '500', color: '#374151', marginBottom: '6px', display: 'block' }}>
+                  <label style={{ fontSize: '14px', fontWeight: '500', color: fInv('area') ? '#b91c1c' : '#374151', marginBottom: '6px', display: 'block' }}>
                     Area
                   </label>
                   <select
@@ -1569,13 +1603,15 @@ export default function EditJobPostingModal({
                     value={formData.area}
                     onChange={handleInputChange}
                     disabled={!formData.pt}
+                    aria-invalid={fInv('area')}
                     style={{
                       width: '100%',
                       padding: '8px 12px',
                       border: '1px solid #d1d5db',
                       borderRadius: '6px',
                       fontSize: '14px',
-                      backgroundColor: formData.pt ? 'white' : '#f3f4f6'
+                      backgroundColor: formData.pt ? 'white' : '#f3f4f6',
+                      ...fptkRequiredFieldHighlightStyle(fInv('area'))
                     }}
                   >
                     <option value="">{formData.pt ? 'Select Area' : 'Select PT first'}</option>
@@ -1592,7 +1628,7 @@ export default function EditJobPostingModal({
 
                 {/* Area Detail */}
                 <div>
-                  <label style={{ fontSize: '14px', fontWeight: '500', color: '#374151', marginBottom: '6px', display: 'block' }}>
+                  <label style={{ fontSize: '14px', fontWeight: '500', color: fInv('areaDetail') ? '#b91c1c' : '#374151', marginBottom: '6px', display: 'block' }}>
                     Area Detail
                   </label>
                   <select
@@ -1600,13 +1636,15 @@ export default function EditJobPostingModal({
                     value={formData.areaDetail}
                     onChange={handleInputChange}
                     disabled={!formData.area}
+                    aria-invalid={fInv('areaDetail')}
                     style={{
                       width: '100%',
                       padding: '8px 12px',
                       border: '1px solid #d1d5db',
                       borderRadius: '6px',
                       fontSize: '14px',
-                      backgroundColor: formData.area ? 'white' : '#f3f4f6'
+                      backgroundColor: formData.area ? 'white' : '#f3f4f6',
+                      ...fptkRequiredFieldHighlightStyle(fInv('areaDetail'))
                     }}
                   >
                     <option value="">{formData.area ? 'Select Area Detail' : 'Select Area first'}</option>
@@ -1756,20 +1794,22 @@ export default function EditJobPostingModal({
 
                 {/* Section */}
                 <div>
-                  <label style={{ fontSize: '14px', fontWeight: '500', color: '#374151', marginBottom: '6px', display: 'block' }}>
+                  <label style={{ fontSize: '14px', fontWeight: '500', color: fInv('section') ? '#b91c1c' : '#374151', marginBottom: '6px', display: 'block' }}>
                     Section
                   </label>
                   <select
                     name="section"
                     value={formData.section}
                     onChange={handleInputChange}
+                    aria-invalid={fInv('section')}
                     style={{
                       width: '100%',
                       padding: '8px 12px',
                       border: '1px solid #d1d5db',
                       borderRadius: '6px',
                       fontSize: '14px',
-                      backgroundColor: 'white'
+                      backgroundColor: 'white',
+                      ...fptkRequiredFieldHighlightStyle(fInv('section'))
                     }}
                   >
                     <option value="">Select Section</option>
@@ -1854,20 +1894,22 @@ export default function EditJobPostingModal({
 
                 {/* Criteria */}
                 <div>
-                  <label style={{ fontSize: '14px', fontWeight: '500', color: '#374151', marginBottom: '6px', display: 'block' }}>
+                  <label style={{ fontSize: '14px', fontWeight: '500', color: fInv('criteria') ? '#b91c1c' : '#374151', marginBottom: '6px', display: 'block' }}>
                     Criteria
                   </label>
                   <select
                     name="criteria"
                     value={formData.criteria}
                     onChange={handleInputChange}
+                    aria-invalid={fInv('criteria')}
                     style={{
                       width: '100%',
                       padding: '8px 12px',
                       border: '1px solid #d1d5db',
                       borderRadius: '6px',
                       fontSize: '14px',
-                      backgroundColor: 'white'
+                      backgroundColor: 'white',
+                      ...fptkRequiredFieldHighlightStyle(fInv('criteria'))
                     }}
                   >
                     <option value="">Select Criteria</option>
@@ -1878,20 +1920,22 @@ export default function EditJobPostingModal({
 
                 {/* Additional or Replacement */}
                 <div>
-                  <label style={{ fontSize: '14px', fontWeight: '500', color: '#374151', marginBottom: '6px', display: 'block' }}>
+                  <label style={{ fontSize: '14px', fontWeight: '500', color: fInv('additionalOrReplacement') ? '#b91c1c' : '#374151', marginBottom: '6px', display: 'block' }}>
                     Additional or Replacement
                   </label>
                   <select
                     name="additionalOrReplacement"
                     value={formData.additionalOrReplacement}
                     onChange={handleInputChange}
+                    aria-invalid={fInv('additionalOrReplacement')}
                     style={{
                       width: '100%',
                       padding: '8px 12px',
                       border: '1px solid #d1d5db',
                       borderRadius: '6px',
                       fontSize: '14px',
-                      backgroundColor: 'white'
+                      backgroundColor: 'white',
+                      ...fptkRequiredFieldHighlightStyle(fInv('additionalOrReplacement'))
                     }}
                   >
                     <option value="">Select Type</option>
@@ -1943,7 +1987,7 @@ export default function EditJobPostingModal({
 
                 {/* Request Date */}
                 <div>
-                  <label style={{ fontSize: '14px', fontWeight: '500', color: '#374151', marginBottom: '6px', display: 'block' }}>
+                  <label style={{ fontSize: '14px', fontWeight: '500', color: fInv('requestDate') ? '#b91c1c' : '#374151', marginBottom: '6px', display: 'block' }}>
                     Request Date
                   </label>
                   <input
@@ -1951,12 +1995,14 @@ export default function EditJobPostingModal({
                     name="requestDate"
                     value={formData.requestDate}
                     onChange={handleInputChange}
+                    aria-invalid={fInv('requestDate')}
                     style={{
                       width: '100%',
                       padding: '8px 12px',
                       border: '1px solid #d1d5db',
                       borderRadius: '6px',
-                      fontSize: '14px'
+                      fontSize: '14px',
+                      ...fptkRequiredFieldHighlightStyle(fInv('requestDate'))
                     }}
                   />
                 </div>
@@ -1964,7 +2010,7 @@ export default function EditJobPostingModal({
 
               {/* Job Specification */}
               <div style={{ marginTop: '16px' }}>
-                <label style={{ fontSize: '14px', fontWeight: '500', color: '#374151', marginBottom: '6px', display: 'block' }}>
+                <label style={{ fontSize: '14px', fontWeight: '500', color: fInv('jobSpecification') ? '#b91c1c' : '#374151', marginBottom: '6px', display: 'block' }}>
                   Job Specification
                 </label>
                 <textarea
@@ -1972,13 +2018,15 @@ export default function EditJobPostingModal({
                   value={formData.jobSpecification}
                   onChange={handleInputChange}
                   rows={3}
+                  aria-invalid={fInv('jobSpecification')}
                   style={{
                     width: '100%',
                     padding: '8px 12px',
                     border: '1px solid #d1d5db',
                     borderRadius: '6px',
                     fontSize: '14px',
-                    resize: 'vertical'
+                    resize: 'vertical',
+                    ...fptkRequiredFieldHighlightStyle(fInv('jobSpecification'))
                   }}
                 />
               </div>
@@ -2231,6 +2279,7 @@ export default function EditJobPostingModal({
                             <option value="Offer Rejected">Offer Rejected</option>
                             <option value="Rejected (Failed Interview / Assessment)">Rejected (Failed Interview / Assessment)</option>
                             <option value="Withdrawn">Withdrawn</option>
+                            <option value="Keep In View">Keep In View</option>
                           </select>
                           {(candidate.status || '').toString().toLowerCase().startsWith('rejected') && candidate.rejectedDate ? (
                             <div style={{ marginTop: '6px', fontSize: '11px', color: '#b91c1c' }}>

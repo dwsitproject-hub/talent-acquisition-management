@@ -253,15 +253,30 @@ export const MasterOfficeLocationAPI = {
 // FPTK APIs
 export const FPTKAPI = {
   async getAll(
-    filters?: { status?: string; department?: string; search?: string; currentStatus?: string },
+    filters?: {
+      status?: string
+      department?: string
+      search?: string
+      currentStatus?: string
+      pt?: string
+      area?: string
+      areaDetail?: string
+    },
     pagination?: { page?: number; limit?: number }
   ) {
     const res = await api.get('/fptk', { params: { ...filters, ...pagination } })
     return res.data
   },
-  async getCountsByCurrentStatus(search?: string) {
+  async getCountsByCurrentStatus(
+    params?: { search?: string; pt?: string; area?: string; areaDetail?: string }
+  ) {
+    const q: Record<string, string> = {}
+    if (params?.search) q.search = params.search
+    if (params?.pt) q.pt = params.pt
+    if (params?.area) q.area = params.area
+    if (params?.areaDetail) q.areaDetail = params.areaDetail
     const res = await api.get('/fptk/counts-by-current-status', {
-      params: search ? { search } : {},
+      params: Object.keys(q).length ? q : {},
     })
     return res.data.data as Record<string, number>
   },
@@ -436,10 +451,14 @@ export const CandidatesAPI = {
 
 // Applications APIs
 export const ApplicationsAPI = {
-  async getAll(filters?: { status?: string; fptkId?: string; department?: string; search?: string }, pagination?: { page?: number; limit?: number }) {
+  async getAll(
+    filters?: { status?: string; fptkId?: string; candidateId?: string; department?: string; search?: string },
+    pagination?: { page?: number; limit?: number }
+  ) {
     const params: any = { ...pagination }
     if (filters?.status) params.status = filters.status
     if (filters?.fptkId) params.fptkId = filters.fptkId
+    if (filters?.candidateId) params.candidateId = filters.candidateId
     if (filters?.department) params.department = filters.department
     if (filters?.search) params.search = filters.search
     const res = await api.get('/applications', { params })
