@@ -1,7 +1,6 @@
 const express = require('express');
 const router = express.Router();
 const { authenticate, authorize, checkOwnership } = require('../middleware/auth');
-const { requireMenuCreate, requireMenuEdit } = require('../middleware/menuAccessAuth');
 const { asyncHandler } = require('../middleware/errorHandler');
 const candidateService = require('../services/candidateService');
 const { validationRules, validate } = require('../middleware/validator');
@@ -120,7 +119,7 @@ router.post('/me/reference', authenticate, authorize('CANDIDATE'), asyncHandler(
 router.post(
   '/',
   authenticate,
-  requireMenuCreate('/candidates', ['TA_TEAM', 'HRBP', 'SUPER_ADMIN', 'CHRO']),
+  authorize('TA_TEAM', 'HRBP', 'SUPER_ADMIN', 'CHRO'),
   asyncHandler(async (req, res) => {
     console.log('CREATE CANDIDATE - Received data:', JSON.stringify(req.body, null, 2));
     try {
@@ -156,7 +155,7 @@ router.post(
 router.get(
   '/bulk-template',
   authenticate,
-  requireMenuCreate('/candidates', ['TA_TEAM', 'HRBP', 'SUPER_ADMIN', 'CHRO']),
+  authorize('TA_TEAM', 'HRBP', 'SUPER_ADMIN', 'CHRO'),
   asyncHandler(async (req, res) => {
     const format = (req.query.format || 'csv').toString();
     return sendTemplate(res, {
@@ -175,7 +174,7 @@ router.get(
 router.post(
   '/bulk-upload',
   authenticate,
-  requireMenuCreate('/candidates', ['TA_TEAM', 'HRBP', 'SUPER_ADMIN', 'CHRO']),
+  authorize('TA_TEAM', 'HRBP', 'SUPER_ADMIN', 'CHRO'),
   uploadLimiter,
   asyncHandler(async (req, res) => {
     if (!req.files || !req.files.file) {
@@ -212,7 +211,6 @@ router.get(
       search: req.query.search,
       skills: req.query.skills ? req.query.skills.split(',') : undefined,
       minScore: req.query.minScore,
-      sortBy: req.query.sortBy,
     };
     
     const pagination = {
@@ -263,7 +261,7 @@ router.put(
 router.post(
   '/:id/documents',
   authenticate,
-  requireMenuEdit('/candidates', ['TA_TEAM', 'HRBP', 'SUPER_ADMIN', 'CHRO']),
+  authorize('TA_TEAM', 'HRBP', 'SUPER_ADMIN', 'CHRO'),
   uploadLimiter,
   validationRules.uuidParam('id'),
   validate,
@@ -301,7 +299,7 @@ router.post(
 router.post(
   '/:id/form-link',
   authenticate,
-  requireMenuEdit('/candidates', ['TA_TEAM', 'HRBP', 'SUPER_ADMIN', 'CHRO']),
+  authorize('TA_TEAM', 'HRBP', 'SUPER_ADMIN', 'CHRO'),
   validationRules.uuidParam('id'),
   validate,
   asyncHandler(async (req, res) => {

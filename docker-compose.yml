@@ -14,8 +14,7 @@ services:
       - postgres_data:/var/lib/postgresql/data
       - ./database/init:/docker-entrypoint-initdb.d
     ports:
-      # Host 5434: avoids conflict when another PostgreSQL already uses 5432/5433 on the machine
-      - "5434:5432"
+      - "5432:5432"
     networks:
       - tas_network
     healthcheck:

@@ -1,7 +1,6 @@
 const express = require('express');
 const router = express.Router();
 const { authenticate, authorize } = require('../middleware/auth');
-const { requireMenuCreate } = require('../middleware/menuAccessAuth');
 const { asyncHandler } = require('../middleware/errorHandler');
 const masterDivisionService = require('../services/masterDivisionService');
 const masterOfficeLocationService = require('../services/masterOfficeLocationService');
@@ -43,7 +42,7 @@ router.get(
 router.post(
   '/divisions',
   authenticate,
-  requireMenuCreate('/masters/division', ['TA_TEAM', 'SUPER_ADMIN']),
+  authorize('TA_TEAM', 'SUPER_ADMIN'),
   asyncHandler(async (req, res) => {
     const division = await masterDivisionService.createDivision(req.body);
 
@@ -63,13 +62,13 @@ router.post(
 router.get(
   '/divisions/bulk-template',
   authenticate,
-  requireMenuCreate('/masters/division', ['TA_TEAM', 'SUPER_ADMIN']),
+  authorize('TA_TEAM', 'SUPER_ADMIN'),
   asyncHandler(async (req, res) => {
     const format = (req.query.format || 'csv').toString();
     return sendTemplate(res, {
       filenameBase: 'master-divisions-upload-template',
       format,
-      headers: ['Division Name', 'Section Name', 'Hiring Manager Name', 'Head of Division Name'],
+      headers: ['Division Name', 'Section Name', 'Head of Division Name'],
     });
   })
 );
@@ -82,7 +81,7 @@ router.get(
 router.post(
   '/divisions/bulk-upload',
   authenticate,
-  requireMenuCreate('/masters/division', ['TA_TEAM', 'SUPER_ADMIN']),
+  authorize('TA_TEAM', 'SUPER_ADMIN'),
   asyncHandler(async (req, res) => {
     if (!req.files || !req.files.file) {
       return res.status(400).json({
@@ -201,7 +200,7 @@ router.get(
 router.post(
   '/office-locations',
   authenticate,
-  requireMenuCreate('/masters/office-location', ['TA_TEAM', 'SUPER_ADMIN']),
+  authorize('TA_TEAM', 'SUPER_ADMIN'),
   asyncHandler(async (req, res) => {
     const officeLocation = await masterOfficeLocationService.createOfficeLocation(req.body);
 
@@ -221,7 +220,7 @@ router.post(
 router.get(
   '/office-locations/bulk-template',
   authenticate,
-  requireMenuCreate('/masters/office-location', ['TA_TEAM', 'SUPER_ADMIN']),
+  authorize('TA_TEAM', 'SUPER_ADMIN'),
   asyncHandler(async (req, res) => {
     const format = (req.query.format || 'csv').toString();
     return sendTemplate(res, {
@@ -240,7 +239,7 @@ router.get(
 router.post(
   '/office-locations/bulk-upload',
   authenticate,
-  requireMenuCreate('/masters/office-location', ['TA_TEAM', 'SUPER_ADMIN']),
+  authorize('TA_TEAM', 'SUPER_ADMIN'),
   asyncHandler(async (req, res) => {
     if (!req.files || !req.files.file) {
       return res.status(400).json({

@@ -35,9 +35,8 @@ RUN addgroup -g 1001 -S nodejs && \
 # Copy production dependencies
 COPY --from=dependencies --chown=nodejs:nodejs /app/node_modules ./node_modules
 
-# Copy application code (includes docker-entrypoint.sh)
+# Copy application code
 COPY --chown=nodejs:nodejs . .
-RUN chmod +x /app/docker-entrypoint.sh
 
 # Generate Prisma client in the final image to ensure schema is present
 RUN npx prisma generate
@@ -53,7 +52,7 @@ USER nodejs
 EXPOSE 4000
 
 # Use dumb-init to handle signals properly
-ENTRYPOINT ["dumb-init", "--", "/app/docker-entrypoint.sh"]
+ENTRYPOINT ["dumb-init", "--"]
 
 # Health check
 HEALTHCHECK --interval=30s --timeout=3s --start-period=40s \

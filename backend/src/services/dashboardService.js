@@ -1,6 +1,5 @@
 const prisma = require('../config/database');
 const logger = require('../utils/logger');
-const { buildHrbpFptkFilterFromUser } = require('../utils/hrbpScope');
 
 function startOfWeekMonday(date) {
   const d = new Date(date);
@@ -52,6 +51,10 @@ async function getDashboardStats(user = null) {
       const userRole = user.role;
       const userFirstName = user.firstName;
       const userDivision = user.division;
+      const userPt = user.pt;
+      const userArea = user.area;
+      const userAreaDetail = user.areaDetail;
+
       if ((userRole === 'HIRING_MANAGER' || userRole === 'HIRING_MANAGER') && userFirstName) {
         fptkWhere.hiringManager = userFirstName;
         applicationWhere.fptk = { hiringManager: userFirstName };
@@ -63,16 +66,29 @@ async function getDashboardStats(user = null) {
         ];
         candidateWhere.user = { division: userDivision };
       } else if (userRole === 'HRBP') {
-        const hrbp = buildHrbpFptkFilterFromUser(user);
-        if (hrbp) {
-          Object.assign(fptkWhere, hrbp);
-          applicationWhere.fptk = hrbp;
+        // HRBP: All three fields must be present and match
+        if (userPt && userArea && userAreaDetail) {
+          fptkWhere.pt = userPt;
+          fptkWhere.area = userArea;
+          fptkWhere.areaDetail = userAreaDetail;
+          
+          applicationWhere.fptk = {
+            pt: userPt,
+            area: userArea,
+            areaDetail: userAreaDetail,
+          };
+          
           candidateWhere.applications = {
             some: {
-              fptk: hrbp,
+              fptk: {
+                pt: userPt,
+                area: userArea,
+                areaDetail: userAreaDetail,
+              },
             },
           };
         } else {
+          // If any field is missing, return no results
           fptkWhere.id = '00000000-0000-0000-0000-000000000000';
           applicationWhere.id = '00000000-0000-0000-0000-000000000000';
           candidateWhere.id = '00000000-0000-0000-0000-000000000000';

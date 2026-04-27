@@ -167,13 +167,11 @@ async function migrateMasterDivisions(data) {
         },
         update: {
           headOfDivisionName: division.headOfDivisionName,
-          hiringManagerName: division.hiringManagerName || '',
         },
         create: {
           divisionName: division.divisionName,
           sectionName: division.sectionName,
           headOfDivisionName: division.headOfDivisionName,
-          hiringManagerName: division.hiringManagerName || '',
         },
       });
       created++;

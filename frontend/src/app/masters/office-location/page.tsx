@@ -1,25 +1,11 @@
 'use client'
 
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useAuth } from '@/contexts/AuthContext'
 import { useRouter } from 'next/navigation'
 import Layout from '@/components/Layout/Layout'
 import { PlusIcon, PencilIcon, TrashIcon, EyeIcon } from '@heroicons/react/24/outline'
-import { MasterOfficeLocationAPI, MenuAccessAPI } from '@/lib/api'
-
-function mapEnumToRole(role: string): string {
-  const roleMap: Record<string, string> = {
-    SUPER_ADMIN: 'SUPER_ADMIN',
-    CHRO: 'Management',
-    DEPARTMENT_HEAD: 'Head of Division',
-    HRBP: 'HRBP',
-    TA_TEAM: 'TA_TEAM',
-    HIRING_MANAGER: 'HIRING_MANAGER',
-    INTERVIEWER: 'INTERVIEWER',
-    CANDIDATE: 'CANDIDATE',
-  }
-  return roleMap[role] || role
-}
+import { MasterOfficeLocationAPI } from '@/lib/api'
 import BulkUploadModal from '@/components/BulkUploadModal'
 
 interface OfficeLocation {
@@ -32,50 +18,22 @@ interface OfficeLocation {
 }
 
 export default function MasterOfficeLocationPage() {
-  const { isAuthenticated, isLoading, user } = useAuth()
+  const { isAuthenticated, isLoading } = useAuth()
   const router = useRouter()
   const [officeLocations, setOfficeLocations] = useState<OfficeLocation[]>([])
   const [loading, setLoading] = useState(true)
   const [searchTerm, setSearchTerm] = useState('')
-  const [page, setPage] = useState(1)
-  const [pageSize, setPageSize] = useState<10 | 50 | 100>(50)
   const [isAddModalOpen, setIsAddModalOpen] = useState(false)
   const [isEditModalOpen, setIsEditModalOpen] = useState(false)
   const [isViewModalOpen, setIsViewModalOpen] = useState(false)
   const [selectedOfficeLocation, setSelectedOfficeLocation] = useState<OfficeLocation | null>(null)
   const [isBulkUploadOpen, setIsBulkUploadOpen] = useState(false)
-  const [menuAccess, setMenuAccess] = useState<Record<string, any>>({})
-  const [menuAccessLoading, setMenuAccessLoading] = useState(true)
 
   useEffect(() => {
     if (!isLoading && !isAuthenticated) {
       router.push('/login')
     }
   }, [isAuthenticated, isLoading, router])
-
-  useEffect(() => {
-    let isMounted = true
-    const loadMenuAccess = async () => {
-      if (!isAuthenticated || isLoading || !isMounted) return
-      try {
-        const access = await MenuAccessAPI.get()
-        if (isMounted) setMenuAccess(access || {})
-      } catch {
-        if (isMounted) setMenuAccess({})
-      } finally {
-        if (isMounted) setMenuAccessLoading(false)
-      }
-    }
-    if (isAuthenticated && !isLoading) {
-      loadMenuAccess()
-    } else {
-      setMenuAccess({})
-      setMenuAccessLoading(false)
-    }
-    return () => {
-      isMounted = false
-    }
-  }, [isAuthenticated, isLoading])
 
   const loadOfficeLocations = async (search?: string) => {
     try {
@@ -142,17 +100,7 @@ export default function MasterOfficeLocationPage() {
     }
   }
 
-  useEffect(() => {
-    setPage(1)
-  }, [searchTerm, pageSize])
-
   const filteredOfficeLocations = officeLocations
-  const totalPages = Math.max(1, Math.ceil(filteredOfficeLocations.length / pageSize))
-  const pagedOfficeLocations = useMemo(() => {
-    const safePage = Math.min(page, totalPages)
-    const start = (safePage - 1) * pageSize
-    return filteredOfficeLocations.slice(start, start + pageSize)
-  }, [filteredOfficeLocations, page, pageSize, totalPages])
 
   if (isLoading) {
     return (
@@ -165,38 +113,6 @@ export default function MasterOfficeLocationPage() {
   if (!isAuthenticated) {
     return null
   }
-
-  const backendRole = (user as any)?.role?.name || (user as any)?.role || 'TA_TEAM'
-  const roleName = mapEnumToRole(backendRole)
-  const cfg = menuAccess['/masters/office-location'] || {}
-  const visibleRoles: string[] = cfg.visibleRoles && cfg.visibleRoles.length ? cfg.visibleRoles : [
-    'SUPER_ADMIN',
-    'Management',
-    'Head of Division',
-    'HRBP',
-    'TA_TEAM',
-  ]
-
-  if (menuAccessLoading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-indigo-600"></div>
-      </div>
-    )
-  }
-
-  if (!visibleRoles.includes(roleName)) {
-    router.push('/')
-    return null
-  }
-
-  const perms = cfg.permissions || {
-    view: visibleRoles,
-    create: ['SUPER_ADMIN', 'TA_TEAM'],
-    edit: ['SUPER_ADMIN', 'TA_TEAM'],
-  }
-  const canCreate = (perms.create || []).includes(roleName) || (perms.create || []).includes('*')
-  const canEdit = (perms.edit || []).includes(roleName) || (perms.edit || []).includes('*')
 
   return (
     <Layout>
@@ -219,38 +135,16 @@ export default function MasterOfficeLocationPage() {
               className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
             />
           </div>
-          <div className="flex items-center gap-2">
-            <label className="text-sm text-gray-600 whitespace-nowrap">Per page</label>
-            <select
-              value={pageSize}
-              onChange={(e) => setPageSize(Number(e.target.value) as 10 | 50 | 100)}
-              className="px-2 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
-            >
-              <option value={10}>10</option>
-              <option value={50}>50</option>
-              <option value={100}>100</option>
-            </select>
-          </div>
           <div className="flex items-center gap-2 sm:ml-auto">
             <button
-              type="button"
-              disabled={!canCreate}
-              onClick={() => canCreate && setIsBulkUploadOpen(true)}
-              className={`inline-flex items-center px-4 py-2 border text-sm font-medium rounded-md ${
-                canCreate ? 'border-gray-300 text-gray-900 hover:bg-gray-50' : 'border-gray-200 text-gray-400 cursor-not-allowed'
-              }`}
+              onClick={() => setIsBulkUploadOpen(true)}
+              className="inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-900 hover:bg-gray-50"
             >
               Bulk Upload
             </button>
             <button
-              type="button"
-              disabled={!canCreate}
-              onClick={() => canCreate && setIsAddModalOpen(true)}
-              className={`inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white ${
-                canCreate
-                  ? 'bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500'
-                  : 'bg-gray-300 cursor-not-allowed'
-              }`}
+              onClick={() => setIsAddModalOpen(true)}
+              className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
             >
               <PlusIcon className="h-5 w-5 mr-2" />
               Add Office Location
@@ -280,7 +174,7 @@ export default function MasterOfficeLocationPage() {
                   </tr>
                 </thead>
                 <tbody className="bg-white divide-y divide-gray-200">
-                  {pagedOfficeLocations.map((officeLocation) => (
+                  {filteredOfficeLocations.map((officeLocation) => (
                     <tr key={officeLocation.id}>
                       <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
                         {officeLocation.pt}
@@ -303,24 +197,17 @@ export default function MasterOfficeLocationPage() {
                             <EyeIcon className="h-5 w-5" />
                           </button>
                           <button
-                            type="button"
-                            disabled={!canEdit}
                             onClick={() => {
-                              if (!canEdit) return
                               setSelectedOfficeLocation(officeLocation)
                               setIsEditModalOpen(true)
                             }}
-                            className={
-                              canEdit ? 'text-yellow-600 hover:text-yellow-900' : 'text-gray-300 cursor-not-allowed'
-                            }
+                            className="text-yellow-600 hover:text-yellow-900"
                           >
                             <PencilIcon className="h-5 w-5" />
                           </button>
                           <button
-                            type="button"
-                            disabled={!canEdit}
-                            onClick={() => canEdit && handleDeleteOfficeLocation(officeLocation.id)}
-                            className={canEdit ? 'text-red-600 hover:text-red-900' : 'text-gray-300 cursor-not-allowed'}
+                            onClick={() => handleDeleteOfficeLocation(officeLocation.id)}
+                            className="text-red-600 hover:text-red-900"
                           >
                             <TrashIcon className="h-5 w-5" />
                           </button>
@@ -331,34 +218,6 @@ export default function MasterOfficeLocationPage() {
                 </tbody>
               </table>
             </div>
-          </div>
-        </div>
-
-        <div className="mt-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 text-sm text-gray-600">
-          <span>
-            Showing {filteredOfficeLocations.length === 0 ? 0 : (page - 1) * pageSize + 1}–
-            {Math.min(page * pageSize, filteredOfficeLocations.length)} of {filteredOfficeLocations.length}
-          </span>
-          <div className="flex items-center gap-2">
-            <button
-              type="button"
-              disabled={page <= 1}
-              onClick={() => setPage((p) => Math.max(1, p - 1))}
-              className="rounded-md border border-gray-300 bg-white px-3 py-1.5 text-sm hover:bg-gray-50 disabled:opacity-50"
-            >
-              Previous
-            </button>
-            <span className="tabular-nums">
-              Page {Math.min(page, totalPages)} / {totalPages}
-            </span>
-            <button
-              type="button"
-              disabled={page >= totalPages}
-              onClick={() => setPage((p) => p + 1)}
-              className="rounded-md border border-gray-300 bg-white px-3 py-1.5 text-sm hover:bg-gray-50 disabled:opacity-50"
-            >
-              Next
-            </button>
           </div>
         </div>
 

@@ -12,7 +12,6 @@ async function getAllDivisions(filters = {}) {
       { divisionName: { contains: filters.search, mode: 'insensitive' } },
       { sectionName: { contains: filters.search, mode: 'insensitive' } },
       { headOfDivisionName: { contains: filters.search, mode: 'insensitive' } },
-      { hiringManagerName: { contains: filters.search, mode: 'insensitive' } },
     ];
   }
 

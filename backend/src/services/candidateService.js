@@ -1,5 +1,4 @@
 const prisma = require('../config/database');
-const { buildHrbpFptkFilterFromUser } = require('../utils/hrbpScope');
 const bcrypt = require('bcryptjs');
 const { encrypt, decrypt } = require('../utils/encryption');
 const logger = require('../utils/logger');
@@ -853,7 +852,6 @@ async function addReference(candidateId, referenceData) {
 async function searchCandidates(filters, pagination, user = null) {
   const { page = 1, limit = 20 } = pagination;
   const skip = (page - 1) * limit;
-  const sortByName = (filters.sortBy || '').toString().toLowerCase() === 'name';
 
   const where = {};
 
@@ -862,6 +860,10 @@ async function searchCandidates(filters, pagination, user = null) {
     const userRole = user.role;
     const userFirstName = user.firstName;
     const userDivision = user.division;
+    const userPt = user.pt;
+    const userArea = user.area;
+    const userAreaDetail = user.areaDetail;
+
     if ((userRole === 'HIRING_MANAGER' || userRole === 'HIRING_MANAGER') && userFirstName) {
       // HIRING_MANAGER: only see candidates where Position.Hiring Manager = Team.First Name
       // Filter candidates that have applications with matching hiring manager
@@ -883,14 +885,20 @@ async function searchCandidates(filters, pagination, user = null) {
         }
       ];
     } else if (userRole === 'HRBP') {
-      const hrbp = buildHrbpFptkFilterFromUser(user);
-      if (hrbp) {
+      // HRBP: only see candidates where Position.PT = Team.PT AND Position.Area = Team.Area AND Position.Area Detail = Team.Area Detail
+      // All three fields must be present and match
+      if (userPt && userArea && userAreaDetail) {
         where.applications = {
           some: {
-            fptk: hrbp,
-          },
+            fptk: {
+              pt: userPt,
+              area: userArea,
+              areaDetail: userAreaDetail,
+            }
+          }
         };
       } else {
+        // If any field is missing, return no results (HRBP must have all three fields)
         where.id = '00000000-0000-0000-0000-000000000000'; // Non-existent ID to return empty results
       }
     }
@@ -937,10 +945,6 @@ async function searchCandidates(filters, pagination, user = null) {
     }
   }
 
-  const orderBy = sortByName
-    ? [{ user: { firstName: 'asc' } }, { user: { lastName: 'asc' } }]
-    : { createdAt: 'desc' };
-
   const [candidates, total] = await Promise.all([
     prisma.candidate.findMany({
       where,
@@ -966,7 +970,7 @@ async function searchCandidates(filters, pagination, user = null) {
           },
         },
       },
-      orderBy,
+      orderBy: { createdAt: 'desc' },
     }),
     prisma.candidate.count({ where }),
   ]);

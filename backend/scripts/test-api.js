@@ -194,8 +194,7 @@ async function testMasterDivision() {
     const result = await apiRequest('POST', '/api/masters/divisions', {
       divisionName: 'Test Division',
       sectionName: 'Test Section',
-      headOfDivisionName: 'Test Head',
-      hiringManagerName: 'Test HM',
+      headOfDivisionName: 'Test Head'
     });
 
     if (result.success && result.data.data?.id) {
@@ -218,8 +217,7 @@ async function testMasterDivision() {
       const result = await apiRequest('PUT', `/api/masters/divisions/${divisionId}`, {
         divisionName: 'Updated Test Division',
         sectionName: 'Updated Test Section',
-        headOfDivisionName: 'Updated Test Head',
-        hiringManagerName: 'Updated Test HM',
+        headOfDivisionName: 'Updated Test Head'
       });
 
       if (result.success) {
@@ -242,16 +240,14 @@ async function testMasterDivision() {
     await apiRequest('POST', '/api/masters/divisions', {
       divisionName: 'Duplicate Test',
       sectionName: 'Duplicate Section',
-      headOfDivisionName: 'Test Head',
-      hiringManagerName: 'Test HM',
+      headOfDivisionName: 'Test Head'
     });
 
     // Try to create duplicate
     const result = await apiRequest('POST', '/api/masters/divisions', {
       divisionName: 'Duplicate Test',
       sectionName: 'Duplicate Section',
-      headOfDivisionName: 'Test Head',
-      hiringManagerName: 'Test HM',
+      headOfDivisionName: 'Test Head'
     });
 
     if (!result.success && (result.status === 400 || result.status === 409)) {
