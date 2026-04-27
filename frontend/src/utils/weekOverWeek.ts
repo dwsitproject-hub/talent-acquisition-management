@@ -3,7 +3,7 @@
  */
 
 export type WeekOverWeekPercentResult = {
-  /** Short label, e.g. "+12% vs prior" or "—" */
+  /** Short label, e.g. "+12%" or "7" */
   formattedChange: string
   /** Drives up/down/flat coloring on the home dashboard */
   sentiment: 'positive' | 'negative' | 'neutral'
@@ -45,16 +45,16 @@ export function computeWeekOverWeekPercent(
     return { formattedChange: '—', sentiment: 'neutral' }
   }
   if (p === 0 && c === 0) {
-    return { formattedChange: '0% vs prior', sentiment: 'neutral' }
+    return { formattedChange: '0%', sentiment: 'neutral' }
   }
   if (p === 0) {
-    return { formattedChange: c > 0 ? `+${c} vs 0 prior` : '0% vs prior', sentiment: c > 0 ? 'positive' : 'neutral' }
+    return { formattedChange: `${Math.round(c)}`, sentiment: c > 0 ? 'positive' : 'neutral' }
   }
   const rawPct = ((c - p) / p) * 100
   const rounded = Math.round(rawPct * 10) / 10
   const sign = rounded > 0 ? '+' : ''
   const body = Math.abs(rounded) < 0.05 && rounded !== 0 ? `${sign}${rawPct.toFixed(1)}` : `${sign}${rounded}`
-  const formattedChange = `${body}% vs prior`
+  const formattedChange = `${body}%`
   if (rounded > 0) {
     return { formattedChange, sentiment: 'positive' }
   }
