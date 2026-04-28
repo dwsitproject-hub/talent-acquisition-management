@@ -137,6 +137,7 @@ async function getCandidateApplications(candidateId, pagination) {
         fptk: {
           select: {
             fptkNumber: true,
+            position: true,
             positionTitle: true,
             department: true,
             location: true,
@@ -282,6 +283,7 @@ async function getAllApplications(filters, pagination, user = null) {
         fptk: {
           select: {
             fptkNumber: true,
+            position: true,
             positionTitle: true,
             department: true,
           },

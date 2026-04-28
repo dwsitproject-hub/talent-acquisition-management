@@ -8,6 +8,39 @@ import { formatFileSize } from '@/utils/fileCompression'
 import { ApplicationsAPI } from '@/lib/api'
 import { getApplicationStatusPillClass, mapApplicationStatusToUi } from '@/utils/applicationStatusUi'
 
+/** Collapse whitespace and unify dash variants so profile "Position applied for" matches FPTK titles */
+function normalizeTitleForMatch(s: string): string {
+  return (s || '')
+    .trim()
+    .toLowerCase()
+    .replace(/[\u2013\u2014\u2212]/g, '-')
+    .replace(/\s+/g, ' ')
+}
+
+function fptkJobTitle(f: Record<string, unknown>): string {
+  const title = (f.positionTitle ?? f.position ?? '') as string
+  return String(title || '').trim()
+}
+
+/** True if this profile line is covered by any loaded application (same role, wording may differ slightly). */
+function profileTitleMatchedByApplications(profileTitle: string, applications: any[]): boolean {
+  const p = normalizeTitleForMatch(profileTitle)
+  if (!p) return true
+  return applications.some((app) => {
+    const f = (app as any).fptk || {}
+    const raw = fptkJobTitle(f)
+    const a = normalizeTitleForMatch(raw)
+    if (!a) return false
+    if (a === p) return true
+    if (a.includes(p) || p.includes(a)) return true
+    const wordsP = p.split(' ').filter((w) => w.length >= 3)
+    const wordsA = a.split(' ').filter((w) => w.length >= 3)
+    if (wordsP.length === 0 || wordsA.length === 0) return false
+    const [shorter, longer] = wordsP.length <= wordsA.length ? [wordsP, wordsA] : [wordsA, wordsP]
+    return shorter.every((sw) => longer.some((lw) => lw === sw || lw.includes(sw) || sw.includes(lw)))
+  })
+}
+
 interface ViewCandidateModalProps {
   isOpen: boolean
   onClose: () => void
@@ -533,24 +566,23 @@ export default function ViewCandidateModal({ isOpen, onClose, candidate }: ViewC
                       Loading application pipeline…
                     </div>
                   ) : (() => {
-                    const titleNorm = (s: string) => (s || '').trim().toLowerCase()
                     const appliedTitlesFromCandidate: string[] = Array.isArray((candidate as any).positionAppliedFor)
                       ? (candidate as any).positionAppliedFor
                       : (candidate as any).positionAppliedFor
                         ? [String((candidate as any).positionAppliedFor)]
                         : []
-                    const fromApps = new Set(
-                      positionApplications.map((a) => titleNorm((a as any).fptk?.positionTitle || (a as any).fptk?.position || ''))
-                    )
                     const orphanOnlyOnProfile = appliedTitlesFromCandidate.filter(
-                      (t) => t && t.trim() && !fromApps.has(titleNorm(t))
+                      (t) =>
+                        t &&
+                        t.trim() &&
+                        !profileTitleMatchedByApplications(t, positionApplications)
                     )
 
                     const rows: ReactNode[] = []
 
                     positionApplications.forEach((app) => {
                       const f = (app as any).fptk || {}
-                      const title = (f.positionTitle || f.position || 'Position').toString() || '—'
+                      const title = fptkJobTitle(f) || '—'
                       const department = f.department || f.division || '—'
                       const uiStatus = mapApplicationStatusToUi((app as any).status)
                       const appliedAt = (app as any).appliedAt
