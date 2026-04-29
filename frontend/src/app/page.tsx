@@ -605,17 +605,17 @@ export default function Dashboard() {
     () => [
       {
         name: 'Total Candidates',
-        value: openPositionsHeadline.toString(),
+        value: totalCandidateHeadline.toString(),
         icon: UsersIcon,
-        change: wowOpenPositions.formattedChange,
-        changeType: wowOpenPositions.sentiment,
+        change: wowTotalCandidateStatus.formattedChange,
+        changeType: wowTotalCandidateStatus.sentiment,
       },
       {
         name: 'Open Positions',
-        value: totalCandidateHeadline.toString(),
+        value: openPositionsHeadline.toString(),
         icon: BriefcaseIcon,
-        change: wowTotalCandidateStatus.formattedChange,
-        changeType: wowTotalCandidateStatus.sentiment,
+        change: wowOpenPositions.formattedChange,
+        changeType: wowOpenPositions.sentiment,
       },
       {
         name: 'Interview',
@@ -676,9 +676,9 @@ useEffect(() => {
   if (!baseStats) return
 
   setDashboardStats({
-    totalCandidates: openPositionsHeadline,
+    totalCandidates: totalCandidateHeadline,
     activeApplications: baseStats.activeApplications ?? 0,
-    openPositions: totalCandidateHeadline,
+    openPositions: openPositionsHeadline,
     closedPositions: interviewHeadline,
     holdPositions: offeringStageHeadline,
     interviewsThisWeek: mcuHeadline,
@@ -1162,13 +1162,6 @@ useEffect(() => {
               className="text-left relative overflow-hidden rounded-lg bg-white px-4 py-5 shadow sm:px-6 sm:py-6 hover:ring-2 hover:ring-indigo-500 focus:outline-none"
               onClick={async () => {
                 if (item.name === 'Total Candidates') {
-                  setOpenPositionsModalOpen(true)
-                  if (!openPositionsLoadedOnceRef.current) {
-                    await fetchOpenPositions('')
-                  }
-                  return
-                }
-                if (item.name === 'Open Positions') {
                   setTotalCandidatesQuery('')
                   setTotalCandidatesModal({
                     page: 1,
@@ -1178,6 +1171,13 @@ useEffect(() => {
                     loading: true,
                   })
                   await loadTotalCandidatesModalPage(1)
+                  return
+                }
+                if (item.name === 'Open Positions') {
+                  setOpenPositionsModalOpen(true)
+                  if (!openPositionsLoadedOnceRef.current) {
+                    await fetchOpenPositions('')
+                  }
                   return
                 }
                 setDetailModal({ title: item.name, items: [] })

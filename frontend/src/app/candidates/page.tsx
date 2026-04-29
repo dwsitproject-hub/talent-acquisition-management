@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { useModalEscape } from '@/hooks/useModalEscape'
 import { useAuth } from '@/contexts/AuthContext'
 import { useRouter } from 'next/navigation'
@@ -345,6 +345,8 @@ export default function CandidatesPage() {
   const [generatedLink, setGeneratedLink] = useState<string | null>(null)
   const [showLinkModal, setShowLinkModal] = useState(false)
   const [isBulkUploadOpen, setIsBulkUploadOpen] = useState(false)
+  const [page, setPage] = useState(1)
+  const [pageSize, setPageSize] = useState<10 | 50 | 100>(50)
   const [menuAccess, setMenuAccess] = useState<Record<string, any>>({})
   const [menuAccessLoading, setMenuAccessLoading] = useState(true)
 
@@ -457,6 +459,47 @@ export default function CandidatesPage() {
     }
   }, [isAuthenticated, isLoading])
 
+  const filteredCandidates = useMemo(
+    () =>
+      candidates
+        .filter(candidate => {
+          const matchesSearch = matchesTokenizedSearch(searchTerm, [
+            candidate.personalInfo.firstName,
+            candidate.personalInfo.lastName,
+            `${candidate.personalInfo.firstName} ${candidate.personalInfo.lastName}`,
+            candidate.contactInfo.email,
+          ])
+
+          const matchesStatus = statusFilter === 'all' || candidate.status === statusFilter
+
+          return matchesSearch && matchesStatus
+        })
+        .sort((a, b) => {
+          const nameA = `${a.personalInfo.firstName || ''} ${a.personalInfo.lastName || ''}`.trim().toLowerCase()
+          const nameB = `${b.personalInfo.firstName || ''} ${b.personalInfo.lastName || ''}`.trim().toLowerCase()
+          return nameA.localeCompare(nameB)
+        }),
+    [candidates, searchTerm, statusFilter]
+  )
+
+  const listMeta = useMemo(() => {
+    const total = filteredCandidates.length
+    const totalPages = Math.max(1, Math.ceil(total / pageSize))
+    const safePage = Math.min(page, totalPages)
+    const start = (safePage - 1) * pageSize
+    const end = start + pageSize
+    return {
+      total,
+      totalPages,
+      safePage,
+      pagedRows: filteredCandidates.slice(start, end),
+    }
+  }, [filteredCandidates, page, pageSize])
+
+  useEffect(() => {
+    setPage(1)
+  }, [searchTerm, statusFilter, pageSize])
+
   if (isLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
@@ -490,19 +533,6 @@ export default function CandidatesPage() {
   const canCreate = (perms.create || []).includes(roleName) || (perms.create || []).includes('*')
   const canEdit = (perms.edit || []).includes(roleName) || (perms.edit || []).includes('*')
   const canGenerateLink = ['SUPER_ADMIN', 'TA_TEAM', 'HRBP'].includes(roleName)
-
-  const filteredCandidates = candidates.filter(candidate => {
-    const matchesSearch = matchesTokenizedSearch(searchTerm, [
-      candidate.personalInfo.firstName,
-      candidate.personalInfo.lastName,
-      `${candidate.personalInfo.firstName} ${candidate.personalInfo.lastName}`,
-      candidate.contactInfo.email,
-    ])
-    
-    const matchesStatus = statusFilter === 'all' || candidate.status === statusFilter
-    
-    return matchesSearch && matchesStatus
-  })
 
   interface UploadFilesPayload {
     cvFile: File | null
@@ -1009,6 +1039,18 @@ export default function CandidatesPage() {
               <option value="withdrawn">Withdrawn</option>
             </select>
           </div>
+          <div className="flex items-center gap-2 sm:ml-auto">
+            <label className="text-sm text-gray-600 whitespace-nowrap">Rows per page</label>
+            <select
+              className="block rounded-md border-0 py-1.5 pl-3 pr-8 text-gray-900 ring-1 ring-inset ring-gray-300 focus:ring-2 focus:ring-indigo-600 sm:text-sm"
+              value={pageSize}
+              onChange={(e) => setPageSize(Number(e.target.value) as 10 | 50 | 100)}
+            >
+              <option value={10}>10</option>
+              <option value={50}>50</option>
+              <option value={100}>100</option>
+            </select>
+          </div>
         </div>
 
         {/* Candidates Table */}
@@ -1046,7 +1088,7 @@ export default function CandidatesPage() {
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-200 bg-white">
-                    {filteredCandidates.map((candidate) => {
+                    {listMeta.pagedRows.map((candidate) => {
                       console.log('Candidate data:', candidate)
                       console.log('Position Applied For:', (candidate as any).positionAppliedFor)
                       console.log('Professional Info:', candidate.professionalInfo)
@@ -1179,11 +1221,40 @@ export default function CandidatesPage() {
           </div>
         </div>
 
-        {filteredCandidates.length === 0 && (
+        {listMeta.total === 0 && (
           <div className="text-center py-12">
             <div className="text-gray-500">No candidates found matching your criteria.</div>
           </div>
         )}
+
+        <div className="mt-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 text-sm text-gray-600">
+          <span>
+            {listMeta.total === 0
+              ? 'Showing 0 of 0'
+              : `Showing ${(listMeta.safePage - 1) * pageSize + 1}-${Math.min(listMeta.safePage * pageSize, listMeta.total)} of ${listMeta.total}`}
+          </span>
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              disabled={listMeta.safePage <= 1}
+              onClick={() => setPage((p) => Math.max(1, p - 1))}
+              className="rounded-md border border-gray-300 bg-white px-3 py-1.5 text-sm hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              Previous
+            </button>
+            <span className="tabular-nums">
+              Page {listMeta.safePage} / {listMeta.totalPages}
+            </span>
+            <button
+              type="button"
+              disabled={listMeta.safePage >= listMeta.totalPages}
+              onClick={() => setPage((p) => p + 1)}
+              className="rounded-md border border-gray-300 bg-white px-3 py-1.5 text-sm hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              Next
+            </button>
+          </div>
+        </div>
 
         {/* Add Candidate Modal */}
         <EnhancedAddCandidateModal
