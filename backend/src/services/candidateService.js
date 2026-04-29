@@ -4,6 +4,24 @@ const { encrypt, decrypt } = require('../utils/encryption');
 const logger = require('../utils/logger');
 const { buildTokenizedSearch } = require('../utils/search');
 
+function buildHiringManagerScopeFromUser(user = null) {
+  if (!user) return null;
+
+  const firstName = String(user.firstName || '').trim();
+  const lastName = String(user.lastName || '').trim();
+  const email = String(user.email || '').trim();
+  const fullName = [firstName, lastName].filter(Boolean).join(' ').trim();
+
+  const values = Array.from(new Set([firstName, fullName, email].filter(Boolean)));
+  if (values.length === 0) return null;
+
+  return {
+    OR: values.map((value) => ({
+      hiringManager: { equals: value, mode: 'insensitive' },
+    })),
+  };
+}
+
 function parseFormDataDiri(candidate) {
   if (candidate && candidate.formDataDiri) {
     if (typeof candidate.formDataDiri === 'string') {
@@ -859,20 +877,24 @@ async function searchCandidates(filters, pagination, user = null) {
   // Role-based filtering
   if (user) {
     const userRole = user.role;
-    const userFirstName = user.firstName;
     const userDivision = user.division;
     const userPt = user.pt;
     const userArea = user.area;
     const userAreaDetail = user.areaDetail;
 
-    if ((userRole === 'HIRING_MANAGER' || userRole === 'HIRING_MANAGER') && userFirstName) {
+    if (userRole === 'HIRING_MANAGER') {
       // HIRING_MANAGER: only see candidates where Position.Hiring Manager = Team.First Name
       // Filter candidates that have applications with matching hiring manager
-      where.applications = {
-        some: {
-          fptk: { hiringManager: userFirstName }
-        }
-      };
+      const hmScope = buildHiringManagerScopeFromUser(user);
+      if (hmScope) {
+        where.applications = {
+          some: {
+            fptk: hmScope,
+          },
+        };
+      } else {
+        where.id = '00000000-0000-0000-0000-000000000000';
+      }
     } else if ((userRole === 'Head of Division' || userRole === 'DEPARTMENT_HEAD') && userDivision) {
       // Head of Division: only see candidates where Position.Division = Team.Division OR Candidates.Division = Team.Division
       where.OR = [

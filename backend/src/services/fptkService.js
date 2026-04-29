@@ -202,6 +202,28 @@ function normalizeName(value) {
     .replace(/\s+/g, ' ');
 }
 
+function buildHiringManagerWhereFromUser(user = null) {
+  if (!user) return null;
+
+  const firstName = String(user.firstName || '').trim();
+  const lastName = String(user.lastName || '').trim();
+  const email = String(user.email || '').trim();
+  const fullName = [firstName, lastName].filter(Boolean).join(' ').trim();
+
+  const candidates = [firstName, fullName, email]
+    .map((value) => String(value || '').trim())
+    .filter(Boolean);
+
+  if (candidates.length === 0) return null;
+
+  const uniqueCandidates = Array.from(new Set(candidates));
+  return {
+    OR: uniqueCandidates.map((value) => ({
+      hiringManager: { equals: value, mode: 'insensitive' },
+    })),
+  };
+}
+
 function httpError(statusCode, message) {
   const err = new Error(message);
   err.statusCode = statusCode;
@@ -969,10 +991,15 @@ function buildInternalFptkListWhere(filters = {}, user = null) {
 
   if (user) {
     const userRole = user.role;
-    const userFirstName = user.firstName;
     const userDivision = user.division;
-    if ((userRole === 'HIRING_MANAGER' || userRole === 'HIRING_MANAGER') && userFirstName) {
-      where.hiringManager = userFirstName;
+    if (userRole === 'HIRING_MANAGER') {
+      const hmWhere = buildHiringManagerWhereFromUser(user);
+      if (hmWhere) {
+        Object.assign(where, hmWhere);
+      } else {
+        // Hiring manager without an identifier should see nothing.
+        where.id = '00000000-0000-0000-0000-000000000000';
+      }
     } else if ((userRole === 'Head of Division' || userRole === 'DEPARTMENT_HEAD') && userDivision) {
       where.division = userDivision;
     } else if (userRole === 'HRBP') {
@@ -1101,11 +1128,16 @@ async function getSummaryByPosition(user = null) {
 
   if (user) {
     const userRole = user.role;
-    const userFirstName = user.firstName;
     const userDivision = user.division;
-    if ((userRole === 'HIRING_MANAGER' || userRole === 'HIRING_MANAGER') && userFirstName) {
-      fptkWhere.hiringManager = userFirstName;
-      applicationWhere.fptk = { hiringManager: userFirstName };
+    if (userRole === 'HIRING_MANAGER') {
+      const hmWhere = buildHiringManagerWhereFromUser(user);
+      if (hmWhere) {
+        Object.assign(fptkWhere, hmWhere);
+        applicationWhere.fptk = hmWhere;
+      } else {
+        fptkWhere.id = '00000000-0000-0000-0000-000000000000';
+        applicationWhere.id = '00000000-0000-0000-0000-000000000000';
+      }
     } else if ((userRole === 'Head of Division' || userRole === 'DEPARTMENT_HEAD') && userDivision) {
       fptkWhere.division = userDivision;
       applicationWhere.fptk = { division: userDivision };

@@ -12,7 +12,7 @@ const dashboardService = require('../services/dashboardService');
 router.get(
   '/stats',
   authenticate,
-  authorize('TA_TEAM', 'HRBP', 'SUPER_ADMIN', 'CHRO', 'DEPARTMENT_HEAD'),
+  authorize('TA_TEAM', 'HRBP', 'SUPER_ADMIN', 'CHRO', 'DEPARTMENT_HEAD', 'HIRING_MANAGER'),
   asyncHandler(async (req, res) => {
     const stats = await dashboardService.getDashboardStats(req.user);
     // prevent caching to ensure fresh numbers
@@ -34,7 +34,7 @@ router.get(
 router.get(
   '/metrics',
   authenticate,
-  authorize('TA_TEAM', 'HRBP', 'SUPER_ADMIN', 'CHRO', 'DEPARTMENT_HEAD'),
+  authorize('TA_TEAM', 'HRBP', 'SUPER_ADMIN', 'CHRO', 'DEPARTMENT_HEAD', 'HIRING_MANAGER'),
   asyncHandler(async (req, res) => {
     const stats = await dashboardService.getDashboardStats(req.user);
     res.set('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
