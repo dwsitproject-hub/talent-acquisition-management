@@ -166,7 +166,7 @@ function normalizeAppliedCandidates(appliedCandidatesInput) {
   const pushCandidate = (payload = {}) => {
     const key = makeKey(payload);
     if (!key) return;
-    map.set(key, {
+    const entry = {
       candidateId: payload.candidateId || payload.id || null,
       email: payload.email ? payload.email.toString().trim().toLowerCase() : null,
       fullName: payload.fullName || payload.name || null,
@@ -176,7 +176,13 @@ function normalizeAppliedCandidates(appliedCandidatesInput) {
       interviews: payload.interviews || [], // Preserve interview data
       rejectedDate: payload.rejectedDate || payload.rejectedAt || null,
       withdrawDate: payload.withdrawDate || payload.withdrawnDate || payload.withdrawnAt || null,
-    });
+    };
+    if (Object.prototype.hasOwnProperty.call(payload, 'joinDate')) {
+      entry.joinDate = payload.joinDate || null;
+    } else if (Object.prototype.hasOwnProperty.call(payload, 'join_date')) {
+      entry.joinDate = payload.join_date || null;
+    }
+    map.set(key, entry);
   };
 
   if (Array.isArray(appliedCandidatesInput)) {
@@ -608,6 +614,11 @@ async function syncFptkApplicationsTx(tx, fptkId, appliedCandidates, options = {
     }
 
     let applicationId;
+    const joinDateData = {};
+    if (Object.prototype.hasOwnProperty.call(item, 'joinDate')) {
+      joinDateData.joinDate = item.joinDate ? new Date(item.joinDate) : null;
+    }
+
     if (existing) {
       await tx.application.update({
         where: { id: existing.id },
@@ -618,6 +629,7 @@ async function syncFptkApplicationsTx(tx, fptkId, appliedCandidates, options = {
           source,
           rejectedAt: typeof rejectedAtValue !== 'undefined' ? rejectedAtValue : undefined,
           withdrawnAt: typeof withdrawnAtValue !== 'undefined' ? withdrawnAtValue : undefined,
+          ...joinDateData,
         },
       });
       applicationId = existing.id;
@@ -634,6 +646,7 @@ async function syncFptkApplicationsTx(tx, fptkId, appliedCandidates, options = {
             appliedByUserId: options.userId || null,
             rejectedAt: typeof rejectedAtValue !== 'undefined' ? rejectedAtValue : undefined,
             withdrawnAt: typeof withdrawnAtValue !== 'undefined' ? withdrawnAtValue : undefined,
+            ...joinDateData,
           },
         });
         applicationId = newApplication.id;
@@ -735,9 +748,16 @@ async function ensureFptkCloseIfAnyOnBoardingTx(tx, fptkId) {
     where: { fptkId, status: 'ONBOARDING' },
   });
   if (onboardingCount > 0) {
+    const current = await tx.fPTK.findUnique({
+      where: { id: fptkId },
+      select: { currentStatus: true, closedAt: true },
+    });
     await tx.fPTK.update({
       where: { id: fptkId },
-      data: { currentStatus: 'Close' },
+      data: {
+        currentStatus: 'Close',
+        closedAt: current?.closedAt || new Date(),
+      },
     });
   }
 }
@@ -873,6 +893,10 @@ async function createFPTK(data, creatorId) {
     // Use currentStatus from data, don't fall back to statusFktk
     // If not provided, default to 'Raise FPTK'
     currentStatus: data.currentStatus || 'Raise FPTK',
+    closedAt:
+      ((data.currentStatus || '').toString().trim().toLowerCase() === 'close')
+        ? new Date()
+        : null,
     requestDate: (data.requestDate && data.requestDate.toString().trim() !== '') 
       ? (() => {
           try {
@@ -1171,7 +1195,9 @@ async function getSummaryByPosition(user = null) {
       areaDetail: true,
       requestDate: true,
       fptkReceiveDate: true,
+      closedAt: true,
       createdAt: true,
+      updatedAt: true,
     },
     orderBy: { createdAt: 'desc' },
   });
@@ -1325,7 +1351,16 @@ async function updateFPTK(fptkId, data, updaterId) {
     updateData.totalRequest = parseInt(data.totalRequest);
     updateData.numberOfPositions = parseInt(data.totalRequest);
   }
-  if (data.currentStatus !== undefined) updateData.currentStatus = data.currentStatus;
+  if (data.currentStatus !== undefined) {
+    updateData.currentStatus = data.currentStatus;
+    const nextStatus = String(data.currentStatus || '').trim().toLowerCase();
+    const prevStatus = String(current.currentStatus || '').trim().toLowerCase();
+    if (nextStatus === 'close' && prevStatus !== 'close') {
+      updateData.closedAt = new Date();
+    } else if (nextStatus !== 'close' && prevStatus === 'close') {
+      updateData.closedAt = null;
+    }
+  }
   if (data.requestDate !== undefined) updateData.requestDate = new Date(data.requestDate);
   if (data.status !== undefined) updateData.status = data.status;
   if (data.remark !== undefined) updateData.remark = data.remark;

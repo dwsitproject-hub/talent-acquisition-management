@@ -799,6 +799,11 @@ export default function ViewJobPostingModal({ isOpen, onClose, jobPosting, onSta
                               Withdraw Date: {formatDate(candidate.withdrawDate)}
                             </div>
                           ) : null}
+                          {candidate.joinDate ? (
+                            <div style={{ marginTop: '6px', fontSize: '11px', color: '#1e40af' }}>
+                              Join Date: {formatDate(candidate.joinDate)}
+                            </div>
+                          ) : null}
                         </div>
                       </div>
 

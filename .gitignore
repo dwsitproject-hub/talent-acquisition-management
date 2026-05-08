@@ -15,3 +15,4 @@ backend/.env*
 *.sql
 database/
 nginx/ssl/
+backend/scripts/testNotificationSeed.js

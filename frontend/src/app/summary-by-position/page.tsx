@@ -138,14 +138,18 @@ export default function SummaryByPositionPage() {
           }
         })
 
-        // SLA bucket based on FPTK Receive Date (fallback to requestDate if receiveDate not available)
-        // Use same logic as dashboard: fptkReceiveDate || requestDate
+        // SLA bucket based on FPTK Receive Date (fallback to requestDate if receiveDate not available).
+        // If position is already closed, freeze SLA at closedAt.
         const referenceDate = job.fptkReceiveDate || job.requestDate || job.createdAt
+        const isClosed = isFptkClosedByCurrentStatus(job.currentStatus)
+        const closeAnchorRaw = isClosed ? (job.closedAt || null) : null
+        const closeAnchorDate = closeAnchorRaw ? new Date(closeAnchorRaw) : null
+        const slaEndDate = closeAnchorDate && !isNaN(closeAnchorDate.getTime()) ? closeAnchorDate : new Date()
         let slaBucket = '-'
         if (referenceDate) {
           const dateObj = new Date(referenceDate)
           if (!isNaN(dateObj.getTime())) {
-            slaBucket = getSlaBucketIndonesiaWorkingDays(dateObj, new Date())
+            slaBucket = getSlaBucketIndonesiaWorkingDays(dateObj, slaEndDate)
           }
         }
 

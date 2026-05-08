@@ -404,6 +404,7 @@ model FPTK {
   totalRequest      Int?        // Total Request
   currentStatus     String?     // Current Status
   requestDate       DateTime?   // Request Date
+  closedAt          DateTime?   // Timestamp when position entered Close status
   
   // FPTK File Information
   fptkFilePath      String?     // Path to uploaded FPTK file
@@ -504,6 +505,7 @@ model Application {
   interviewedAt     DateTime?
   offeredAt         DateTime?
   hiredAt           DateTime?
+  joinDate          DateTime?          // Expected join date (captured at MCU stage)
   rejectedAt        DateTime?
   withdrawnAt       DateTime?
   
@@ -524,12 +526,30 @@ model Application {
   interviews        Interview[]
   documents         Document[]
   offers            Offer[]
+  onboardingJoinReminderDispatches OnboardingJoinReminderDispatch[]
 
   @@index([candidateId])
   @@index([fptkId])
   @@index([status])
   @@index([appliedAt])
+  @@index([joinDate])
   @@map("applications")
+}
+
+/// Tracks onboarding join-date reminders (14d / 7d) to prevent duplicate sends when the job runs repeatedly.
+model OnboardingJoinReminderDispatch {
+  id             String      @id @default(uuid())
+  applicationId  String
+  application    Application @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+  offsetDays     Int         // 14 or 7 — days before joinDate when this reminder is due
+  anchorJoinDate DateTime    @db.Date // Calendar join date this reminder refers to (UTC date)
+  emailSentAt    DateTime?   // Set when TA email succeeds; null if email pending retry
+  createdAt      DateTime    @default(now())
+
+  @@unique([applicationId, offsetDays, anchorJoinDate])
+  @@index([applicationId])
+  @@index([anchorJoinDate])
+  @@map("onboarding_join_reminder_dispatches")
 }
 
 model ApplicationStatusHistory {

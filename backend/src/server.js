@@ -23,11 +23,16 @@ if (fs.existsSync(envPath)) {
 }
 
 let app, logger, prisma, redis;
+let startOnboardingJoinReminderScheduler = () => {};
+let stopOnboardingJoinReminderScheduler = () => {};
 try {
   app = require('./app');
   logger = require('./utils/logger');
   prisma = require('./config/database');
   redis = require('./config/redis');
+  const onboardingJoinReminderJob = require('./jobs/onboardingJoinReminderJob');
+  startOnboardingJoinReminderScheduler = onboardingJoinReminderJob.startOnboardingJoinReminderScheduler;
+  stopOnboardingJoinReminderScheduler = onboardingJoinReminderJob.stopOnboardingJoinReminderScheduler;
 } catch (error) {
   console.error('Error loading modules:', error);
   console.error('Error stack:', error.stack);
@@ -87,6 +92,11 @@ async function startServer() {
     logger.info(`Server running on port ${PORT} in ${process.env.NODE_ENV} mode`);
     logger.info(`API available at: http://0.0.0.0:${PORT}/api`);
     logger.info(`Server listening on all network interfaces (0.0.0.0:${PORT})`);
+    try {
+      startOnboardingJoinReminderScheduler();
+    } catch (err) {
+      logger.error('Failed to start onboarding join reminder scheduler', err);
+    }
   });
 
   // Graceful shutdown
@@ -95,7 +105,13 @@ async function startServer() {
     
     server.close(async () => {
       logger.info('HTTP server closed');
-      
+
+      try {
+        stopOnboardingJoinReminderScheduler();
+      } catch (e) {
+        logger.warn('Onboarding reminder scheduler stop:', e.message);
+      }
+
       try {
         await prisma.$disconnect();
         logger.info('Database disconnected');

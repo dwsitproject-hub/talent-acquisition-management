@@ -222,6 +222,9 @@ export const mapApiFptk = (fptk: any): FPTK => {
           appliedDate: application.appliedAt,
         rejectedDate: application.rejectedAt,
         withdrawDate: application.withdrawnAt,
+          joinDate: application.joinDate
+            ? new Date(application.joinDate).toISOString().split('T')[0]
+            : null,
           source: application.source,
           skills,
           experience,
@@ -383,6 +386,14 @@ const mapAppliedCandidatesForPayload = (candidates?: any[]) => {
           : candidate.withdrawnAt
             ? new Date(candidate.withdrawnAt).toISOString()
             : null,
+        joinDate:
+          candidate.joinDate == null || candidate.joinDate === ''
+            ? null
+            : new Date(
+                /^\d{4}-\d{2}-\d{2}$/.test(String(candidate.joinDate).trim())
+                  ? `${String(candidate.joinDate).trim().slice(0, 10)}T12:00:00.000Z`
+                  : String(candidate.joinDate)
+              ).toISOString(),
       }
     })
     .filter(Boolean)
@@ -401,7 +412,7 @@ export default function FPTKPage() {
   const [areaFilter, setAreaFilter] = useState<string[]>([])
   const [areaDetailFilter, setAreaDetailFilter] = useState<string[]>([])
   const [officeLocations, setOfficeLocations] = useState<any[]>([])
-  const [sortBy, setSortBy] = useState<'location' | 'areaDetail' | ''>('')
+  const [sortBy, setSortBy] = useState<'location' | 'areaDetail' | 'requestDate' | ''>('')
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc')
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false)
   const [isViewModalOpen, setIsViewModalOpen] = useState(false)
@@ -1087,6 +1098,10 @@ export default function FPTKPage() {
       } else if (sortBy === 'areaDetail') {
         aValue = ((a as any).areaDetail || '').toLowerCase()
         bValue = ((b as any).areaDetail || '').toLowerCase()
+      } else if (sortBy === 'requestDate') {
+        const aTs = a.requestDate ? new Date(a.requestDate).getTime() : 0
+        const bTs = b.requestDate ? new Date(b.requestDate).getTime() : 0
+        return sortOrder === 'asc' ? aTs - bTs : bTs - aTs
       }
       
       if (aValue < bValue) return sortOrder === 'asc' ? -1 : 1
@@ -1251,7 +1266,7 @@ export default function FPTKPage() {
               <select
                 value={sortBy}
                 onChange={(e) => {
-                  const newSortBy = e.target.value as 'location' | 'areaDetail' | ''
+                  const newSortBy = e.target.value as 'location' | 'areaDetail' | 'requestDate' | ''
                   if (newSortBy === sortBy) {
                     setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc')
                   } else {
@@ -1264,6 +1279,7 @@ export default function FPTKPage() {
                 <option value="">None</option>
                 <option value="location">Location</option>
                 <option value="areaDetail">Area Detail</option>
+                <option value="requestDate">Request Date</option>
               </select>
               {sortBy && (
                 <button

@@ -256,6 +256,8 @@ export interface AppliedCandidate {
   appliedDate?: string
   rejectedDate?: string | null
   withdrawDate?: string | null
+  /** Expected join date (set while candidate is at MCU on this position) */
+  joinDate?: string | null
   source?: string
   skills?: string[]
   experience?: number

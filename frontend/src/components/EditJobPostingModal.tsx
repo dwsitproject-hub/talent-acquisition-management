@@ -201,6 +201,12 @@ export default function EditJobPostingModal({
       appliedDate: candidate.appliedDate || candidate.appliedAt || new Date().toISOString(),
       rejectedDate: candidate.rejectedDate || candidate.rejectedAt || baseInfo.rejectedDate || baseInfo.rejectedAt || null,
       withdrawDate: candidate.withdrawDate || candidate.withdrawnAt || candidate.withdrawnDate || baseInfo.withdrawDate || baseInfo.withdrawnAt || null,
+      joinDate:
+        candidate.joinDate != null && candidate.joinDate !== ''
+          ? String(candidate.joinDate).trim().slice(0, 10)
+          : baseInfo.joinDate != null && baseInfo.joinDate !== ''
+            ? String(baseInfo.joinDate).trim().slice(0, 10)
+            : null,
       skills,
       experience,
       yearsOfExperience: experience,
@@ -1034,6 +1040,24 @@ export default function EditJobPostingModal({
     
     if (onCandidateStatusUpdate && jobPosting) {
       onCandidateStatusUpdate(jobPosting.id, candidateId, newStatus)
+    }
+  }
+
+  const handleCandidateJoinDateChange = (candidateId: string, dateValue: string) => {
+    setAppliedCandidates(prev =>
+      prev.map(candidate => {
+        const matches =
+          candidate.id === candidateId || candidate.candidateId === candidateId
+        if (!matches) return candidate
+        const joinDate = dateValue ? dateValue.slice(0, 10) : null
+        return { ...candidate, joinDate }
+      })
+    )
+    if (jobPosting) {
+      appendOpenPositionLog({
+        type: 'CANDIDATE_JOIN_DATE_UPDATE',
+        details: { candidateId, joinDate: dateValue || null },
+      })
     }
   }
 
@@ -2205,6 +2229,42 @@ export default function EditJobPostingModal({
                           {candidate.status === 'Withdrawn' && candidate.withdrawDate ? (
                             <div style={{ marginTop: '6px', fontSize: '11px', color: '#92400e' }}>
                               Withdraw Date: {formatDate(candidate.withdrawDate)}
+                            </div>
+                          ) : null}
+                          {candidate.status === 'MCU' ? (
+                            <div style={{ marginTop: '10px' }}>
+                              <label
+                                style={{
+                                  fontSize: '12px',
+                                  fontWeight: '500',
+                                  color: '#374151',
+                                  marginBottom: '4px',
+                                  display: 'block',
+                                }}
+                              >
+                                Join Date
+                              </label>
+                              <input
+                                type="date"
+                                value={
+                                  candidate.joinDate
+                                    ? String(candidate.joinDate).slice(0, 10)
+                                    : ''
+                                }
+                                onChange={e =>
+                                  handleCandidateJoinDateChange(
+                                    candidate.id || candidate.candidateId,
+                                    e.target.value
+                                  )
+                                }
+                                style={{
+                                  padding: '6px 8px',
+                                  border: '1px solid #d1d5db',
+                                  borderRadius: '4px',
+                                  fontSize: '12px',
+                                  backgroundColor: 'white',
+                                }}
+                              />
                             </div>
                           ) : null}
                         </div>
