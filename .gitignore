@@ -13,6 +13,7 @@ backend/logs/
 backend/coverage/
 backend/.env*
 *.sql
+!backend/prisma/migrations/**/migration.sql
 database/
 nginx/ssl/
 backend/scripts/testNotificationSeed.js
