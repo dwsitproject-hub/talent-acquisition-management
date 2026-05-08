@@ -20,5 +20,6 @@ uploads
 .docker
 Dockerfile*
 docker-compose*
-prisma/migrations/*/migration.sql
 
+# Do NOT ignore migration.sql files — they must be in the image for
+# `prisma migrate deploy` to run in production (P3015 if missing).
