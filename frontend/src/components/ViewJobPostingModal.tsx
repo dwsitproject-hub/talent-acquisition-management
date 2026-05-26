@@ -432,7 +432,6 @@ export default function ViewJobPostingModal({ isOpen, onClose, jobPosting, onSta
                   const fixedMilestones = [
                     'Pending FKTK',
                     'Open',
-                    'Hold',
                     'Re-Open',
                     'Internal Movement',
                     'Cancel'

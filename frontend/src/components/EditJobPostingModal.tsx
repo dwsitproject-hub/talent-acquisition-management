@@ -1949,7 +1949,6 @@ export default function EditJobPostingModal({
                   <option value="Open">Open</option>
                   <option value="Pending FKTK">Pending FKTK</option>
                   <option value="Re-Open">Re-Open</option>
-                  <option value="Hold">Hold</option>
                   <option value="Cancel">Cancel</option>
                   <option value="Internal Movement">Internal Movement</option>
                   <option value="Close">Close</option>
