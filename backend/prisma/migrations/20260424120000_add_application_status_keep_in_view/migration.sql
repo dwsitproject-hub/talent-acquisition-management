@@ -1,0 +1,2 @@
+-- Empty migration placeholder (directory was created without SQL file).
+-- KEEP_IN_VIEW status was added to the ApplicationStatus enum in a concurrent migration.

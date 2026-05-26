@@ -6,6 +6,7 @@ import { XMarkIcon } from '@heroicons/react/24/outline'
 import { FPTK, Candidate } from '@/types'
 import ViewCandidateModal from './ViewCandidateModal'
 import { CandidatesAPI } from '@/lib/api'
+import { fetchApplicationsForFptk } from '@/utils/mapFptkApplication'
 import { mapApiCandidate } from '@/app/candidates/page'
 import { mapApplicationStatusToUi } from '@/utils/applicationStatusUi'
 
@@ -65,124 +66,12 @@ export default function ViewJobPostingModal({ isOpen, onClose, jobPosting, onSta
         }))
       }
 
-      // If no applications found, try to find candidates by positionAppliedFor (legacy fallback)
-      if (candidates.length === 0 && jobPosting.title) {
+      // If embedded FPTK data has no applications, load by fptk id (never by position title)
+      if (candidates.length === 0 && jobPosting.id) {
         try {
-          console.log('🔍 No applications found, searching candidates by positionAppliedFor for:', jobPosting.title)
-          
-          // Load candidates with pagination (API max limit is 100)
-          let allCandidates: any[] = []
-          let page = 1
-          const limit = 100
-          let hasMore = true
-          
-          while (hasMore) {
-            const response = await CandidatesAPI.getAll({}, { page, limit })
-            const candidatesData = response.data || []
-            allCandidates = [...allCandidates, ...candidatesData]
-            
-            // Check if there are more pages
-            const totalPages = response.pagination?.totalPages || 1
-            hasMore = page < totalPages
-            page++
-            
-            // Safety limit to prevent infinite loops
-            if (page > 50) {
-              console.warn('⚠️ Reached maximum page limit (50). Some candidates may not be loaded.')
-              break
-            }
-          }
-          
-          console.log('📋 Total candidates loaded:', allCandidates.length)
-          
-          // Find candidates who have this position in their positionAppliedFor
-          const matchingCandidates = allCandidates.filter((candidate: any) => {
-            // Parse positionAppliedFor from different possible locations
-            let positionAppliedFor: string[] = []
-            
-            // Check direct field
-            if (candidate.positionAppliedFor !== undefined && candidate.positionAppliedFor !== null) {
-              positionAppliedFor = Array.isArray(candidate.positionAppliedFor) 
-                ? candidate.positionAppliedFor 
-                : [String(candidate.positionAppliedFor)]
-            }
-            
-            // Check languages field (where it's actually stored in backend)
-            if (positionAppliedFor.length === 0 && candidate.languages) {
-              const languagesData = typeof candidate.languages === 'string'
-                ? JSON.parse(candidate.languages || '{}')
-                : (candidate.languages || {})
-              
-              if (languagesData.positionAppliedFor) {
-                positionAppliedFor = Array.isArray(languagesData.positionAppliedFor)
-                  ? languagesData.positionAppliedFor
-                  : [String(languagesData.positionAppliedFor)]
-              }
-            }
-            
-            // Normalize position title for comparison
-            const positionTitle = (jobPosting.title || '').trim().toLowerCase()
-            const matches = positionAppliedFor.some((pos: string) => {
-              const normalizedPos = (pos || '').trim().toLowerCase()
-              const isMatch = normalizedPos === positionTitle
-              if (isMatch) {
-                console.log('✅ Match found:', pos, '===', jobPosting.title)
-              }
-              return isMatch
-            })
-            
-            if (matches) {
-              console.log('🎯 Candidate matched:', candidate.id, candidate.user?.firstName, candidate.user?.lastName, 'Positions:', positionAppliedFor)
-            }
-            
-            return matches
-          })
-          
-          console.log('📊 Matching candidates found:', matchingCandidates.length)
-
-          // Map to applied candidates format
-          candidates = matchingCandidates.map((candidate: any) => {
-            const user = candidate.user || {}
-            const formDataDiri = typeof candidate.formDataDiri === 'string' 
-              ? JSON.parse(candidate.formDataDiri || '{}') 
-              : (candidate.formDataDiri || {})
-            const languagesData = typeof candidate.languages === 'string'
-              ? JSON.parse(candidate.languages || '{}')
-              : (candidate.languages || {})
-
-            const fullName = [user.firstName, user.lastName].filter(Boolean).join(' ') ||
-              formDataDiri?.fullName || candidate.fullName || candidate.name ||
-              `Candidate ${candidate.id?.slice(0, 6) || ''}`
-
-            const email = user.email || candidate.email || formDataDiri?.email || ''
-            const skills = Array.isArray(candidate.skills)
-              ? candidate.skills
-              : Array.isArray(languagesData?.skills)
-                ? languagesData.skills
-                : []
-
-            return {
-              id: candidate.id,
-              candidateId: candidate.id,
-              fullName,
-              name: fullName,
-              email,
-              phone: user.phoneNumber || '',
-              status: 'Applied',
-              backendStatus: 'SUBMITTED',
-              appliedDate: candidate.createdAt || new Date().toISOString(),
-              rejectedDate: null,
-              withdrawDate: null,
-              source: 'Manual',
-              skills,
-              experience: languagesData?.yearsOfExperience || 0,
-              yearsOfExperience: languagesData?.yearsOfExperience || 0,
-              division: user.division || candidate.division || null,
-              interviews: [],
-            }
-          })
+          candidates = await fetchApplicationsForFptk(jobPosting.id)
         } catch (error) {
-          console.error('Error loading candidates by positionAppliedFor:', error)
+          console.error('ViewJobPostingModal: load applications by fptkId', error)
         }
       }
 

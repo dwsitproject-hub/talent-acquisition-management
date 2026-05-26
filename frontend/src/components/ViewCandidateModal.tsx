@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, type ReactNode } from 'react'
+import { useState, useEffect, useCallback, type ReactNode } from 'react'
 import { useModalEscape } from '@/hooks/useModalEscape'
 import { XMarkIcon, DocumentArrowDownIcon, EyeIcon, PrinterIcon } from '@heroicons/react/24/outline'
 import { Candidate } from '@/types'
@@ -8,6 +8,8 @@ import { generateFormDataDiriPDF } from '@/utils/pdfGenerator'
 import { formatFileSize } from '@/utils/fileCompression'
 import { ApplicationsAPI } from '@/lib/api'
 import { getApplicationStatusPillClass, mapApplicationStatusToUi } from '@/utils/applicationStatusUi'
+import PositionEditOverlay from '@/components/PositionEditOverlay'
+import { usePositionEditOverlay } from '@/hooks/usePositionEditOverlay'
 
 /** Collapse whitespace and unify dash variants so profile "Position applied for" matches FPTK titles */
 function normalizeTitleForMatch(s: string): string {
@@ -54,40 +56,50 @@ export default function ViewCandidateModal({ isOpen, onClose, candidate }: ViewC
   const [canAssignNewPosition, setCanAssignNewPosition] = useState(false)
   const [positionApplications, setPositionApplications] = useState<any[]>([])
   const [loadingPositionApplications, setLoadingPositionApplications] = useState(false)
+  const [applicationsRefreshKey, setApplicationsRefreshKey] = useState(0)
+
+  const positionEdit = usePositionEditOverlay(() => {
+    if (candidate?.id) {
+      setApplicationsRefreshKey((k) => k + 1)
+    }
+  })
+
+  const loadPositionApplications = useCallback(async (candidateId: string) => {
+    setLoadingPositionApplications(true)
+    try {
+      const merged: any[] = []
+      let page = 1
+      const limit = 100
+      let totalPages = 1
+      do {
+        const res = await ApplicationsAPI.getAll({ candidateId }, { page, limit })
+        const batch: any[] = (res as any).data || []
+        merged.push(...batch)
+        totalPages = (res as any).pagination?.totalPages ?? 1
+        page += 1
+      } while (page <= totalPages)
+      setPositionApplications(merged)
+    } catch (e) {
+      console.error('ViewCandidateModal: load applications', e)
+      setPositionApplications([])
+    } finally {
+      setLoadingPositionApplications(false)
+    }
+  }, [])
 
   useEffect(() => {
     if (!isOpen || !candidate?.id) {
       setPositionApplications([])
       return
     }
-    let cancelled = false
-    setLoadingPositionApplications(true)
-    ;(async () => {
-      try {
-        const merged: any[] = []
-        let page = 1
-        const limit = 100
-        let totalPages = 1
-        do {
-          const res = await ApplicationsAPI.getAll({ candidateId: candidate.id }, { page, limit })
-          if (cancelled) return
-          const batch: any[] = (res as any).data || []
-          merged.push(...batch)
-          totalPages = (res as any).pagination?.totalPages ?? 1
-          page += 1
-        } while (page <= totalPages && !cancelled)
-        if (!cancelled) setPositionApplications(merged)
-      } catch (e) {
-        console.error('ViewCandidateModal: load applications', e)
-        if (!cancelled) setPositionApplications([])
-      } finally {
-        if (!cancelled) setLoadingPositionApplications(false)
-      }
-    })()
-    return () => {
-      cancelled = true
+    void loadPositionApplications(candidate.id)
+  }, [isOpen, candidate?.id, applicationsRefreshKey, loadPositionApplications])
+
+  useEffect(() => {
+    if (!isOpen) {
+      positionEdit.close()
     }
-  }, [isOpen, candidate?.id])
+  }, [isOpen, positionEdit.close])
 
   // Debug: Log candidate files when modal opens
   useEffect(() => {
@@ -128,7 +140,15 @@ export default function ViewCandidateModal({ isOpen, onClose, candidate }: ViewC
     }
   }, [candidate])
 
-  useModalEscape(isOpen && !!candidate, onClose)
+  useModalEscape(isOpen && !!candidate && !positionEdit.isOpen, onClose)
+
+  const candidateDisplayName =
+    [candidate?.personalInfo?.firstName, candidate?.personalInfo?.lastName].filter(Boolean).join(' ') ||
+    'candidate'
+
+  const openPositionEdit = (fptkId: string) => {
+    void positionEdit.open(fptkId, candidateDisplayName)
+  }
 
   if (!isOpen || !candidate) {
     return null
@@ -157,6 +177,10 @@ export default function ViewCandidateModal({ isOpen, onClose, candidate }: ViewC
     }
   }
 
+  const navigateToPosition = (fptkId: string) => {
+    openPositionEdit(fptkId)
+  }
+
   const getStatusColor = (status: string) => {
     const statusColors: Record<string, string> = {
       new: 'bg-blue-100 text-blue-800',
@@ -172,6 +196,7 @@ export default function ViewCandidateModal({ isOpen, onClose, candidate }: ViewC
   }
 
   return (
+    <>
     <div 
       style={{
         position: 'fixed',
@@ -183,7 +208,10 @@ export default function ViewCandidateModal({ isOpen, onClose, candidate }: ViewC
         zIndex: 9999,
         display: 'flex',
         alignItems: 'center',
-        justifyContent: 'center'
+        justifyContent: 'center',
+        opacity: positionEdit.isOpen ? 0.45 : 1,
+        transition: 'opacity 0.2s ease',
+        pointerEvents: positionEdit.isOpen ? 'none' : 'auto',
       }}
       onClick={onClose}
     >
@@ -583,6 +611,7 @@ export default function ViewCandidateModal({ isOpen, onClose, candidate }: ViewC
                     positionApplications.forEach((app) => {
                       const f = (app as any).fptk || {}
                       const title = fptkJobTitle(f) || '—'
+                      const fptkId = String((app as any).fptkId || f.id || '').trim()
                       const department = f.department || f.division || '—'
                       const uiStatus = mapApplicationStatusToUi((app as any).status)
                       const appliedAt = (app as any).appliedAt
@@ -600,7 +629,29 @@ export default function ViewCandidateModal({ isOpen, onClose, candidate }: ViewC
                         >
                           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
                             <div>
-                              <h5 style={{ fontSize: '14px', fontWeight: '600', color: '#111827', margin: '0 0 6px 0' }}>{title}</h5>
+                              {fptkId ? (
+                                <button
+                                  type="button"
+                                  onClick={() => navigateToPosition(fptkId)}
+                                  style={{
+                                    fontSize: '14px',
+                                    fontWeight: '600',
+                                    color: '#4f46e5',
+                                    margin: '0 0 6px 0',
+                                    padding: 0,
+                                    border: 'none',
+                                    background: 'none',
+                                    cursor: 'pointer',
+                                    textAlign: 'left',
+                                    textDecoration: 'underline',
+                                  }}
+                                  title="Open position"
+                                >
+                                  {title}
+                                </button>
+                              ) : (
+                                <h5 style={{ fontSize: '14px', fontWeight: '600', color: '#111827', margin: '0 0 6px 0' }}>{title}</h5>
+                              )}
                               <p style={{ fontSize: '12px', color: '#6b7280', margin: '0 0 4px 0' }}>Division: {department}</p>
                               <p style={{ fontSize: '12px', color: '#6b7280', margin: 0 }}>Applied: {appliedAt ? formatDate(appliedAt) : '—'}</p>
                             </div>
@@ -1389,5 +1440,15 @@ export default function ViewCandidateModal({ isOpen, onClose, candidate }: ViewC
         </div>
       </div>
     </div>
+
+    <PositionEditOverlay
+      isOpen={positionEdit.isOpen}
+      jobPosting={positionEdit.jobPosting}
+      loading={positionEdit.loading}
+      onClose={positionEdit.close}
+      onSave={positionEdit.handleSave}
+      headerBackLabel={`Back to ${positionEdit.backLabel || candidateDisplayName}`}
+    />
+    </>
   )
 }

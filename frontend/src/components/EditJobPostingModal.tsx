@@ -5,6 +5,7 @@ import { useModalEscape } from '@/hooks/useModalEscape'
 import { XMarkIcon } from '@heroicons/react/24/outline'
 import { FPTK } from '@/types'
 import { MasterOfficeLocationAPI, MasterDivisionAPI, CandidatesAPI, AdminUsersAPI } from '@/lib/api'
+import { fetchApplicationsForFptk } from '@/utils/mapFptkApplication'
 import { useAuth } from '@/contexts/AuthContext'
 import { compressFile, formatFileSize } from '@/utils/fileCompression'
 import {
@@ -23,8 +24,11 @@ interface EditJobPostingModalProps {
   onClose: () => void
   jobPosting: FPTK | null
   onSave: (updatedData: any) => void
-  onStatusUpdate?: (jobPostingId: string, newStatus: string) => void
   onCandidateStatusUpdate?: (jobPostingId: string, candidateId: string, newStatus: string) => void
+  /** When stacked over another modal (e.g. candidate detail), use a higher z-index */
+  overlayZIndex?: number
+  /** Optional back affordance (e.g. return to candidate profile) */
+  headerBackLabel?: string
 }
 
 export default function EditJobPostingModal({ 
@@ -32,8 +36,9 @@ export default function EditJobPostingModal({
   onClose, 
   jobPosting, 
   onSave, 
-  onStatusUpdate,
-  onCandidateStatusUpdate 
+  onCandidateStatusUpdate,
+  overlayZIndex = 1000,
+  headerBackLabel,
 }: EditJobPostingModalProps) {
   const { user } = useAuth()
   const userRole = (user as any)?.role?.name || (user as any)?.role || ''
@@ -69,6 +74,8 @@ export default function EditJobPostingModal({
   const [expandedInterviewSections, setExpandedInterviewSections] = useState<Set<string>>(new Set())
   const [suggestedCandidates, setSuggestedCandidates] = useState<any[]>([])
   const [allCandidates, setAllCandidates] = useState<any[]>([])
+  const [showCandidatePicker, setShowCandidatePicker] = useState(false)
+  const [candidatePickerSearch, setCandidatePickerSearch] = useState('')
   const [officeLocations, setOfficeLocations] = useState<any[]>([])
   const [areaDetails, setAreaDetails] = useState<any[]>([])
   const [divisions, setDivisions] = useState<any[]>([])
@@ -516,47 +523,28 @@ export default function EditJobPostingModal({
         remark: (jobPosting as any).remark || ''
       })
       
-      const jobAppliedRaw = Array.isArray((jobPosting as any).appliedCandidates)
-        ? (jobPosting as any).appliedCandidates
-        : []
-
-      if (jobAppliedRaw.length > 0) {
-        const initialApplied = jobAppliedRaw.map((candidate: any) =>
-          mergeAppliedCandidateData(candidate)
-        )
-        setAppliedCandidates(initialApplied)
-      } else {
-        setAppliedCandidates([])
-      }
-
-      // Load candidates from API with pagination (same logic as ViewJobPostingModal)
       const loadCandidates = async () => {
         try {
-          // Load candidates with pagination (API max limit is 100)
           let allCandidates: any[] = []
           let page = 1
           const limit = 100
           let hasMore = true
-          
+
           while (hasMore) {
             const response = await CandidatesAPI.getAll({}, { page, limit })
             const candidatesData = response.data || []
             allCandidates = [...allCandidates, ...candidatesData]
-            
-            // Check if there are more pages
+
             const totalPages = response.pagination?.totalPages || 1
             hasMore = page < totalPages
             page++
-            
-            // Safety limit to prevent infinite loops
+
             if (page > 50) {
               console.warn('⚠️ Reached maximum page limit (50). Some candidates may not be loaded.')
               break
             }
           }
-          
-          console.log('📋 Total candidates loaded in EditJobPostingModal:', allCandidates.length)
-          
+
           const mappedCandidates = allCandidates.map(mapApiCandidate).filter((c: any) => c !== null)
           setAllCandidates(mappedCandidates)
           return mappedCandidates
@@ -566,8 +554,21 @@ export default function EditJobPostingModal({
           return []
         }
       }
-      
-      loadCandidates().then((candidates) => {
+
+      void (async () => {
+        let jobAppliedRaw: any[] = Array.isArray((jobPosting as any).appliedCandidates)
+          ? (jobPosting as any).appliedCandidates
+          : []
+
+        if (jobAppliedRaw.length === 0 && jobPosting.id) {
+          try {
+            jobAppliedRaw = await fetchApplicationsForFptk(jobPosting.id)
+          } catch (error) {
+            console.error('EditJobPostingModal: load applications by fptkId', error)
+          }
+        }
+
+        const candidates = await loadCandidates()
         const candidateMap = new Map<string, any>(
           candidates.map((candidate: any) => [candidate.id, candidate])
         )
@@ -577,101 +578,9 @@ export default function EditJobPostingModal({
           return mergeAppliedCandidateData(candidate, info)
         })
 
+        setAppliedCandidates(enrichedFromJob)
+
         const appliedIds = new Set(enrichedFromJob.map((candidate: any) => candidate.id))
-
-        // Load real applied candidates for this specific open position (fallback for legacy data)
-        // Use the same comprehensive matching logic as ViewJobPostingModal
-        const legacyApplied = candidates
-          .filter((candidate: any) => {
-            // Parse positionAppliedFor from different possible locations (same as ViewJobPostingModal)
-            let positionAppliedFor: string[] = []
-            
-            // Check direct field
-            if (candidate.positionAppliedFor !== undefined && candidate.positionAppliedFor !== null) {
-              positionAppliedFor = Array.isArray(candidate.positionAppliedFor) 
-                ? candidate.positionAppliedFor 
-                : [String(candidate.positionAppliedFor)]
-            }
-            
-            // Check languages field (where it's actually stored in backend)
-            if (positionAppliedFor.length === 0 && candidate.languages) {
-              const languagesData = typeof candidate.languages === 'string'
-                ? JSON.parse(candidate.languages || '{}')
-                : (candidate.languages || {})
-              
-              if (languagesData.positionAppliedFor) {
-                positionAppliedFor = Array.isArray(languagesData.positionAppliedFor)
-                  ? languagesData.positionAppliedFor
-                  : [String(languagesData.positionAppliedFor)]
-              }
-            }
-            
-            // Normalize position title for comparison
-            const positionTitle = (jobPosting.title || '').trim().toLowerCase()
-            const hasAppliedToThis = positionAppliedFor.some((pos: string) => {
-              const normalizedPos = (pos || '').trim().toLowerCase()
-              return normalizedPos === positionTitle
-            })
-            
-            // Also check currentPosition as fallback
-            const currentPositionMatch =
-              candidate.professionalInfo && 
-              (candidate.professionalInfo.currentPosition || '').trim().toLowerCase() === positionTitle
-            
-            return hasAppliedToThis || currentPositionMatch
-          })
-          .filter((candidate: any) => !appliedIds.has(candidate.id))
-          .map((candidate: any) => {
-            // Use the same mapping logic as ViewJobPostingModal for consistency
-            const user = candidate.user || {}
-            const formDataDiri = typeof candidate.formDataDiri === 'string' 
-              ? JSON.parse(candidate.formDataDiri || '{}') 
-              : (candidate.formDataDiri || {})
-            const languagesData = typeof candidate.languages === 'string'
-              ? JSON.parse(candidate.languages || '{}')
-              : (candidate.languages || {})
-
-            const fullName = [user.firstName, user.lastName].filter(Boolean).join(' ') ||
-              formDataDiri?.fullName || candidate.fullName || candidate.name ||
-              `Candidate ${candidate.id?.slice(0, 6) || ''}`
-
-            const email = user.email || candidate.email || formDataDiri?.email || ''
-            const skills = Array.isArray(candidate.skills)
-              ? candidate.skills
-              : Array.isArray(languagesData?.skills)
-                ? languagesData.skills
-                : candidate.professionalInfo?.skills || []
-
-            return mergeAppliedCandidateData(
-              {
-                id: candidate.id,
-                candidateId: candidate.id,
-                fullName,
-                name: fullName,
-                email,
-                phone: user.phoneNumber || '',
-                status: 'Applied',
-                backendStatus: 'SUBMITTED',
-                appliedDate: candidate.createdAt || new Date().toISOString(),
-                rejectedDate: null,
-                withdrawDate: null,
-                source: 'Manual',
-                skills,
-                experience: languagesData?.yearsOfExperience || candidate.yearsOfExperience || candidate.professionalInfo?.experience || 0,
-                yearsOfExperience: languagesData?.yearsOfExperience || candidate.yearsOfExperience || candidate.professionalInfo?.experience || 0,
-                division: user.division || candidate.division || null,
-                jobPostingId: jobPosting.id,
-                interviews: candidate.interviews || [],
-              },
-              candidate
-            )
-          })
-
-        legacyApplied.forEach((candidate: any) => appliedIds.add(candidate.id))
-
-        console.log('📊 Applied candidates found in EditJobPostingModal:', enrichedFromJob.length, 'from jobPosting,', legacyApplied.length, 'from positionAppliedFor')
-        setAppliedCandidates([...enrichedFromJob, ...legacyApplied])
-
         const jobDivision = jobPosting.department || formData.division || ''
 
         // Helper function to map API candidate to frontend structure
@@ -754,7 +663,7 @@ export default function EditJobPostingModal({
         }).slice(0, 10) // Limit to 10 suggestions
         
         setSuggestedCandidates(suggested)
-      })
+      })()
     }
   }, [jobPosting, isOpen])
 
@@ -984,9 +893,6 @@ export default function EditJobPostingModal({
       
       return updated
     })
-    if (onStatusUpdate && jobPosting) {
-      onStatusUpdate(jobPosting.id, newStatus)
-    }
   }
 
   const handleCandidateStatusChange = (candidateId: string, newStatus: string) => {
@@ -1076,6 +982,32 @@ export default function EditJobPostingModal({
 
     setAppliedCandidates(prev => [...prev, newAppliedCandidate])
     setSuggestedCandidates(prev => prev.filter(c => c.id !== candidate.id))
+    if (jobPosting) {
+      appendOpenPositionLog({
+        type: 'APPLIED_CANDIDATE_ADDED',
+        details: {
+          candidateId: candidate.id,
+          candidateName: candidate.fullName || candidate.name,
+        },
+      })
+    }
+  }
+
+  const handleAddManualCandidate = (candidate: any) => {
+    const newAppliedCandidate = mergeAppliedCandidateData(
+      {
+        ...candidate,
+        id: candidate.id,
+        candidateId: candidate.id,
+        status: 'Applied',
+        appliedDate: new Date().toISOString(),
+        jobPostingId: jobPosting?.id,
+      },
+      candidate
+    )
+    setAppliedCandidates(prev => [...prev, newAppliedCandidate])
+    setSuggestedCandidates(prev => prev.filter(c => c.id !== candidate.id))
+    setCandidatePickerSearch('')
     if (jobPosting) {
       appendOpenPositionLog({
         type: 'APPLIED_CANDIDATE_ADDED',
@@ -1320,7 +1252,7 @@ export default function EditJobPostingModal({
       display: 'flex',
       alignItems: 'center',
       justifyContent: 'center',
-      zIndex: 1000
+      zIndex: overlayZIndex
     }}>
       <div style={{
         backgroundColor: 'white',
@@ -1337,16 +1269,39 @@ export default function EditJobPostingModal({
           borderBottom: '1px solid #e5e7eb',
           display: 'flex',
           justifyContent: 'space-between',
-          alignItems: 'center'
+          alignItems: 'center',
+          gap: '12px',
+          flexWrap: 'wrap',
         }}>
-          <h2 style={{
-            fontSize: '18px',
-            fontWeight: '600',
-            color: '#111827',
-            margin: 0
-          }}>
-            Edit Position - {jobPosting.title}
-          </h2>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', minWidth: 0, flex: 1 }}>
+            {headerBackLabel ? (
+              <button
+                type="button"
+                onClick={onClose}
+                style={{
+                  alignSelf: 'flex-start',
+                  background: 'none',
+                  border: 'none',
+                  padding: 0,
+                  color: '#4f46e5',
+                  fontSize: '13px',
+                  fontWeight: '500',
+                  cursor: 'pointer',
+                  textDecoration: 'none',
+                }}
+              >
+                ← {headerBackLabel}
+              </button>
+            ) : null}
+            <h2 style={{
+              fontSize: '18px',
+              fontWeight: '600',
+              color: '#111827',
+              margin: 0
+            }}>
+              Edit Position - {jobPosting.title}
+            </h2>
+          </div>
           <button
             onClick={onClose}
             style={{
@@ -2803,6 +2758,123 @@ export default function EditJobPostingModal({
                     </p>
                   </div>
                 )}
+              </div>
+
+              {/* Add Any Candidate */}
+              <div style={{ marginBottom: '20px' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+                  <h4 style={{ fontSize: '14px', fontWeight: '500', color: '#374151', margin: 0 }}>
+                    Add Candidate Manually
+                  </h4>
+                  <button
+                    type="button"
+                    onClick={() => { setShowCandidatePicker(v => !v); setCandidatePickerSearch('') }}
+                    style={{
+                      padding: '6px 14px',
+                      border: '1px solid #6366f1',
+                      borderRadius: '6px',
+                      fontSize: '13px',
+                      fontWeight: '500',
+                      color: '#6366f1',
+                      backgroundColor: 'white',
+                      cursor: 'pointer',
+                    }}
+                  >
+                    {showCandidatePicker ? 'Close' : '+ Add Candidate'}
+                  </button>
+                </div>
+                {showCandidatePicker && (() => {
+                  const alreadyAppliedIds = new Set(appliedCandidates.map((c: any) => c.id || c.candidateId))
+                  const searchLower = candidatePickerSearch.toLowerCase()
+                  const pickerCandidates = allCandidates.filter((c: any) => {
+                    if (alreadyAppliedIds.has(c.id)) return false
+                    if (!searchLower) return true
+                    const name = (c.fullName || c.name || [c.personalInfo?.firstName, c.personalInfo?.lastName].filter(Boolean).join(' ') || '').toLowerCase()
+                    const email = (c.email || c.contactInfo?.email || '').toLowerCase()
+                    return name.includes(searchLower) || email.includes(searchLower)
+                  })
+                  return (
+                    <div style={{
+                      border: '1px solid #e5e7eb',
+                      borderRadius: '8px',
+                      overflow: 'hidden',
+                      backgroundColor: '#fff',
+                    }}>
+                      <div style={{ padding: '10px 12px', borderBottom: '1px solid #e5e7eb' }}>
+                        <input
+                          type="text"
+                          placeholder="Search by name or email…"
+                          value={candidatePickerSearch}
+                          onChange={e => setCandidatePickerSearch(e.target.value)}
+                          style={{
+                            width: '100%',
+                            padding: '7px 10px',
+                            border: '1px solid #d1d5db',
+                            borderRadius: '6px',
+                            fontSize: '13px',
+                            outline: 'none',
+                            boxSizing: 'border-box',
+                          }}
+                        />
+                      </div>
+                      <div style={{ maxHeight: '280px', overflowY: 'auto' }}>
+                        {pickerCandidates.length === 0 ? (
+                          <p style={{ padding: '16px', textAlign: 'center', fontSize: '13px', color: '#6b7280', margin: 0 }}>
+                            {allCandidates.length === 0 ? 'Loading candidates…' : 'No candidates found.'}
+                          </p>
+                        ) : (
+                          pickerCandidates.map((candidate: any) => {
+                            const name = candidate.fullName || candidate.name || [candidate.personalInfo?.firstName, candidate.personalInfo?.lastName].filter(Boolean).join(' ') || 'Unknown'
+                            const email = candidate.email || candidate.contactInfo?.email || ''
+                            const exp = candidate.experience ?? candidate.yearsOfExperience ?? candidate.professionalInfo?.experience ?? 0
+                            const skills: string[] = candidate.skills || candidate.professionalInfo?.skills || []
+                            return (
+                              <div key={candidate.id} style={{
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'space-between',
+                                padding: '10px 14px',
+                                borderBottom: '1px solid #f3f4f6',
+                              }}>
+                                <div style={{ flex: 1, minWidth: 0 }}>
+                                  <p style={{ fontSize: '13px', fontWeight: '600', color: '#111827', margin: '0 0 2px 0', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                                    {name}
+                                  </p>
+                                  <p style={{ fontSize: '12px', color: '#6b7280', margin: '0 0 2px 0' }}>{email}</p>
+                                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: '3px', marginTop: '4px' }}>
+                                    <span style={{ fontSize: '11px', color: '#6b7280' }}>{exp} yr exp</span>
+                                    {skills.slice(0, 4).map((s: string, i: number) => (
+                                      <span key={i} style={{ padding: '1px 5px', backgroundColor: '#e0e7ff', color: '#3730a3', borderRadius: '3px', fontSize: '10px' }}>{s}</span>
+                                    ))}
+                                    {skills.length > 4 && <span style={{ fontSize: '10px', color: '#9ca3af' }}>+{skills.length - 4} more</span>}
+                                  </div>
+                                </div>
+                                <button
+                                  type="button"
+                                  onClick={() => handleAddManualCandidate(candidate)}
+                                  style={{
+                                    marginLeft: '12px',
+                                    flexShrink: 0,
+                                    padding: '5px 12px',
+                                    border: 'none',
+                                    borderRadius: '4px',
+                                    fontSize: '12px',
+                                    fontWeight: '500',
+                                    color: 'white',
+                                    backgroundColor: '#6366f1',
+                                    cursor: 'pointer',
+                                  }}
+                                >
+                                  Add
+                                </button>
+                              </div>
+                            )
+                          })
+                        )}
+                      </div>
+                    </div>
+                  )
+                })()}
               </div>
             </div>
 

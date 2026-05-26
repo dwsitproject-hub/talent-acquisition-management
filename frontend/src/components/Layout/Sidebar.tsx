@@ -2,7 +2,7 @@
 
 import { Fragment, useEffect, useState } from 'react'
 import { Dialog, Transition } from '@headlessui/react'
-import { XMarkIcon } from '@heroicons/react/24/outline'
+import { XMarkIcon, ChevronLeftIcon, ChevronRightIcon } from '@heroicons/react/24/outline'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { cn } from '@/lib/utils'
@@ -54,54 +54,100 @@ const settingsNavigation = [
 interface SidebarProps {
   sidebarOpen: boolean
   setSidebarOpen: (open: boolean) => void
+  sidebarCollapsed?: boolean
+  setSidebarCollapsed?: (collapsed: boolean) => void
 }
 
 function getDefaultNavRoles(href: string): string[] {
   const d: Record<string, string[]> = {
     '/team': ['SUPER_ADMIN', 'TA_TEAM'],
     '/candidates': [
-      'SUPER_ADMIN',
-      'Management',
-      'Head of Division',
-      'HRBP',
-      'TA_TEAM',
-      'HIRING_MANAGER',
-      'INTERVIEWER',
+      'SUPER_ADMIN', 'Management', 'Head of Division', 'HRBP', 'TA_TEAM',
+      'HIRING_MANAGER', 'INTERVIEWER',
     ],
     '/candidates/kiv': [
-      'SUPER_ADMIN',
-      'Management',
-      'Head of Division',
-      'HRBP',
-      'TA_TEAM',
-      'HIRING_MANAGER',
-      'INTERVIEWER',
+      'SUPER_ADMIN', 'Management', 'Head of Division', 'HRBP', 'TA_TEAM',
+      'HIRING_MANAGER', 'INTERVIEWER',
     ],
   }
-  return (
-    d[href] || [
-      'SUPER_ADMIN',
-      'Management',
-      'Head of Division',
-      'HRBP',
-      'TA_TEAM',
-      'HIRING_MANAGER',
-      'INTERVIEWER',
-    ]
-  )
+  return d[href] || [
+    'SUPER_ADMIN', 'Management', 'Head of Division', 'HRBP', 'TA_TEAM',
+    'HIRING_MANAGER', 'INTERVIEWER',
+  ]
 }
 
 function PrimaryNavList({
   navigation,
   pathname,
   onLinkClick,
+  collapsed = false,
 }: {
   navigation: TopNavItem[]
   pathname: string
   onLinkClick?: () => void
+  collapsed?: boolean
 }) {
   const subActive = (href: string) =>
     href === '/candidates' ? pathname === '/candidates' : pathname === href
+
+  if (collapsed) {
+    return (
+      <>
+        {navigation.map((item) =>
+          item.kind === 'link' ? (
+            <li key={item.name}>
+              <Link
+                href={item.href}
+                onClick={onLinkClick}
+                title={item.name}
+                className={cn(
+                  pathname === item.href
+                    ? 'bg-gray-50 text-indigo-600'
+                    : 'text-gray-700 hover:text-indigo-600 hover:bg-gray-50',
+                  'flex justify-center rounded-md p-2'
+                )}
+              >
+                <item.icon
+                  className={cn(
+                    pathname === item.href ? 'text-indigo-600' : 'text-gray-400 group-hover:text-indigo-600',
+                    'h-6 w-6 shrink-0'
+                  )}
+                  aria-hidden="true"
+                />
+                <span className="sr-only">{item.name}</span>
+              </Link>
+            </li>
+          ) : (
+            item.children.map((ch) => (
+              <li key={ch.href}>
+                <Link
+                  data-tour={ch.href === '/candidates/kiv' ? 'nav-kiv' : undefined}
+                  href={ch.href}
+                  onClick={onLinkClick}
+                  title={ch.name}
+                  className={cn(
+                    subActive(ch.href)
+                      ? 'bg-gray-50 text-indigo-600'
+                      : 'text-gray-700 hover:text-indigo-600 hover:bg-gray-50',
+                    'flex justify-center rounded-md p-2'
+                  )}
+                >
+                  <ch.icon
+                    className={cn(
+                      subActive(ch.href) ? 'text-indigo-600' : 'text-gray-400',
+                      'h-5 w-5 shrink-0'
+                    )}
+                    aria-hidden="true"
+                  />
+                  <span className="sr-only">{ch.name}</span>
+                </Link>
+              </li>
+            ))
+          )
+        )}
+      </>
+    )
+  }
 
   return (
     <>
@@ -120,9 +166,7 @@ function PrimaryNavList({
             >
               <item.icon
                 className={cn(
-                  pathname === item.href
-                    ? 'text-indigo-600'
-                    : 'text-gray-400 group-hover:text-indigo-600',
+                  pathname === item.href ? 'text-indigo-600' : 'text-gray-400 group-hover:text-indigo-600',
                   'h-6 w-6 shrink-0'
                 )}
                 aria-hidden="true"
@@ -151,9 +195,7 @@ function PrimaryNavList({
                   >
                     <ch.icon
                       className={cn(
-                        subActive(ch.href)
-                          ? 'text-indigo-600'
-                          : 'text-gray-400 group-hover:text-indigo-600',
+                        subActive(ch.href) ? 'text-indigo-600' : 'text-gray-400 group-hover:text-indigo-600',
                         'h-5 w-5 shrink-0'
                       )}
                       aria-hidden="true"
@@ -170,7 +212,6 @@ function PrimaryNavList({
   )
 }
 
-// Map backend enum values to frontend role names
 function mapEnumToRole(role: string): string {
   if (!role) return role
   const roleMap: Record<string, string> = {
@@ -186,14 +227,17 @@ function mapEnumToRole(role: string): string {
   return roleMap[role] || role
 }
 
-export default function Sidebar({ sidebarOpen, setSidebarOpen }: SidebarProps) {
+export default function Sidebar({
+  sidebarOpen,
+  setSidebarOpen,
+  sidebarCollapsed = false,
+  setSidebarCollapsed,
+}: SidebarProps) {
   const pathname = usePathname()
   const { user, isAuthenticated } = useAuth()
   const backendRole = (user as any)?.role?.name || (user as any)?.role || 'TA_TEAM'
-  // Map backend enum to frontend role name for Menu Access Management
   const roleName = mapEnumToRole(backendRole)
-  
-  // Fetch menu access from API
+
   const [menuAccess, setMenuAccess] = useState<Record<string, any>>({})
   const [loading, setLoading] = useState(true)
 
@@ -213,14 +257,13 @@ export default function Sidebar({ sidebarOpen, setSidebarOpen }: SidebarProps) {
     if (user && isAuthenticated) {
       loadMenuAccess()
     } else {
-      // Clear menu access when user logs out
       setMenuAccess({})
       setLoading(false)
     }
   }, [user, isAuthenticated])
 
   const isVisible = (href: string, defaultRoles: string[]) => {
-    if (loading) return false // Don't show menus while loading
+    if (loading) return false
     const cfg = menuAccess[href]?.visibleRoles as string[] | undefined
     const roles = cfg && cfg.length ? cfg : defaultRoles
     return roles.includes(roleName)
@@ -237,16 +280,17 @@ export default function Sidebar({ sidebarOpen, setSidebarOpen }: SidebarProps) {
     })
     .filter((x): x is TopNavItem => x !== null)
 
-  // Filter master navigation by role using Menu Access Management
   const filteredMasterNavigation = masterNavigation.filter(item => {
-    // Defaults: Master Division and Master Office Location only SUPER_ADMIN and TA_TEAM
     const defaults: Record<string, string[]> = {
-      '/masters/division': ['SUPER_ADMIN','TA_TEAM'],
-      '/masters/office-location': ['SUPER_ADMIN','TA_TEAM'],
+      '/masters/division': ['SUPER_ADMIN', 'TA_TEAM'],
+      '/masters/office-location': ['SUPER_ADMIN', 'TA_TEAM'],
     }
-    const defaultRoles = defaults[item.href] || ['SUPER_ADMIN','TA_TEAM']
+    const defaultRoles = defaults[item.href] || ['SUPER_ADMIN', 'TA_TEAM']
     return isVisible(item.href, defaultRoles)
   })
+
+  const navPx = sidebarCollapsed ? 'px-2' : 'px-6'
+  const listMx = sidebarCollapsed ? '' : '-mx-2'
 
   return (
     <>
@@ -307,83 +351,76 @@ export default function Sidebar({ sidebarOpen, setSidebarOpen }: SidebarProps) {
                           {loading ? (
                             <li className="space-y-2 px-2" aria-hidden="true">
                               {Array.from({ length: 6 }).map((_, i) => (
-                                <div
-                                  key={i}
-                                  className="h-10 animate-pulse rounded-md bg-gray-100"
-                                />
+                                <div key={i} className="h-10 animate-pulse rounded-md bg-gray-100" />
                               ))}
                             </li>
                           ) : (
-                          <PrimaryNavList
-                            navigation={navigation}
-                            pathname={pathname}
-                            onLinkClick={() => setSidebarOpen(false)}
-                          />
+                            <PrimaryNavList
+                              navigation={navigation}
+                              pathname={pathname}
+                              onLinkClick={() => setSidebarOpen(false)}
+                            />
                           )}
                         </ul>
                       </li>
                       {!loading && filteredMasterNavigation.length > 0 && (
-                      <li>
-                        <div className="text-xs font-semibold leading-6 text-gray-400 uppercase tracking-wider">
-                          Master Data
-                        </div>
-                        <ul role="list" className="-mx-2 mt-2 space-y-1">
-                          {filteredMasterNavigation.map((item) => (
-                            <li key={item.name}>
-                              <Link
-                                href={item.href}
-                                className={cn(
-                                  pathname === item.href
-                                    ? 'bg-gray-50 text-indigo-600'
-                                    : 'text-gray-700 hover:text-indigo-600 hover:bg-gray-50',
-                                  'group flex gap-x-3 rounded-md p-2 text-sm leading-6 font-semibold'
-                                )}
-                              >
-                                <item.icon
+                        <li>
+                          <div className="text-xs font-semibold leading-6 text-gray-400 uppercase tracking-wider">
+                            Master Data
+                          </div>
+                          <ul role="list" className="-mx-2 mt-2 space-y-1">
+                            {filteredMasterNavigation.map((item) => (
+                              <li key={item.name}>
+                                <Link
+                                  href={item.href}
                                   className={cn(
                                     pathname === item.href
-                                      ? 'text-indigo-600'
-                                      : 'text-gray-400 group-hover:text-indigo-600',
-                                    'h-6 w-6 shrink-0'
+                                      ? 'bg-gray-50 text-indigo-600'
+                                      : 'text-gray-700 hover:text-indigo-600 hover:bg-gray-50',
+                                    'group flex gap-x-3 rounded-md p-2 text-sm leading-6 font-semibold'
                                   )}
-                                  aria-hidden="true"
-                                />
-                                {item.name}
-                              </Link>
-                            </li>
-                          ))}
-                        </ul>
-                      </li>
+                                >
+                                  <item.icon
+                                    className={cn(
+                                      pathname === item.href ? 'text-indigo-600' : 'text-gray-400 group-hover:text-indigo-600',
+                                      'h-6 w-6 shrink-0'
+                                    )}
+                                    aria-hidden="true"
+                                  />
+                                  {item.name}
+                                </Link>
+                              </li>
+                            ))}
+                          </ul>
+                        </li>
                       )}
                       {!loading && (
-                      <li>
-                        <ul role="list" className="-mx-2 space-y-1">
-                          {settingsNavigation.map((item) => (
-                            <li key={item.name}>
-                              <Link
-                                href={item.href}
-                                className={cn(
-                                  pathname === item.href
-                                    ? 'bg-gray-50 text-indigo-600'
-                                    : 'text-gray-700 hover:text-indigo-600 hover:bg-gray-50',
-                                  'group flex gap-x-3 rounded-md p-2 text-sm leading-6 font-semibold'
-                                )}
-                              >
-                                <item.icon
+                        <li>
+                          <ul role="list" className="-mx-2 space-y-1">
+                            {settingsNavigation.map((item) => (
+                              <li key={item.name}>
+                                <Link
+                                  href={item.href}
                                   className={cn(
                                     pathname === item.href
-                                      ? 'text-indigo-600'
-                                      : 'text-gray-400 group-hover:text-indigo-600',
-                                    'h-6 w-6 shrink-0'
+                                      ? 'bg-gray-50 text-indigo-600'
+                                      : 'text-gray-700 hover:text-indigo-600 hover:bg-gray-50',
+                                    'group flex gap-x-3 rounded-md p-2 text-sm leading-6 font-semibold'
                                   )}
-                                  aria-hidden="true"
-                                />
-                                {item.name}
-                              </Link>
-                            </li>
-                          ))}
-                        </ul>
-                      </li>
+                                >
+                                  <item.icon
+                                    className={cn(
+                                      pathname === item.href ? 'text-indigo-600' : 'text-gray-400 group-hover:text-indigo-600',
+                                      'h-6 w-6 shrink-0'
+                                    )}
+                                    aria-hidden="true"
+                                  />
+                                  {item.name}
+                                </Link>
+                              </li>
+                            ))}
+                          </ul>
+                        </li>
                       )}
                     </ul>
                   </nav>
@@ -395,94 +432,142 @@ export default function Sidebar({ sidebarOpen, setSidebarOpen }: SidebarProps) {
       </Transition.Root>
 
       {/* Static sidebar for desktop */}
-      <div className="hidden lg:fixed lg:inset-y-0 lg:z-50 lg:flex lg:w-72 lg:flex-col">
-        <div className="flex grow flex-col gap-y-5 overflow-y-auto border-r border-gray-200 bg-white px-6 pb-4">
-          <div className="flex h-16 shrink-0 items-center">
-            <h1 className="text-xl font-bold text-gray-900">KPN TAS</h1>
+      <div
+        className={cn(
+          'hidden lg:fixed lg:inset-y-0 lg:z-50 lg:flex lg:flex-col transition-all duration-300 overflow-hidden',
+          sidebarCollapsed ? 'lg:w-16' : 'lg:w-72'
+        )}
+      >
+        <div className="flex grow flex-col gap-y-5 overflow-y-auto border-r border-gray-200 bg-white pb-4">
+          {/* Logo */}
+          <div
+            className={cn(
+              'flex h-16 shrink-0 items-center border-b border-gray-100',
+              sidebarCollapsed ? 'justify-center px-2' : 'px-6'
+            )}
+          >
+            {sidebarCollapsed ? (
+              <span className="text-lg font-bold text-indigo-600">K</span>
+            ) : (
+              <h1 className="text-xl font-bold text-gray-900">KPN TAS</h1>
+            )}
           </div>
-          <nav className="flex flex-1 flex-col" aria-busy={loading}>
+
+          {/* Nav */}
+          <nav className={cn('flex flex-1 flex-col', navPx)} aria-busy={loading}>
             <ul role="list" className="flex flex-1 flex-col gap-y-7">
               <li>
-                <ul role="list" className="-mx-2 space-y-1">
+                <ul role="list" className={cn('space-y-1', listMx)}>
                   {loading ? (
                     <li className="space-y-2 px-2" aria-hidden="true">
                       {Array.from({ length: 6 }).map((_, i) => (
-                        <div
-                          key={i}
-                          className="h-10 animate-pulse rounded-md bg-gray-100"
-                        />
+                        <div key={i} className="h-10 animate-pulse rounded-md bg-gray-100" />
                       ))}
                     </li>
                   ) : (
-                    <PrimaryNavList navigation={navigation} pathname={pathname} />
+                    <PrimaryNavList
+                      navigation={navigation}
+                      pathname={pathname}
+                      collapsed={sidebarCollapsed}
+                    />
                   )}
                 </ul>
               </li>
+
               {!loading && filteredMasterNavigation.length > 0 && (
-              <li>
-                <div className="text-xs font-semibold leading-6 text-gray-400 uppercase tracking-wider">
-                  Master Data
-                </div>
-                <ul role="list" className="-mx-2 mt-2 space-y-1">
-                  {filteredMasterNavigation.map((item) => (
-                    <li key={item.name}>
-                      <Link
-                        href={item.href}
-                        className={cn(
-                          pathname === item.href
-                            ? 'bg-gray-50 text-indigo-600'
-                            : 'text-gray-700 hover:text-indigo-600 hover:bg-gray-50',
-                          'group flex gap-x-3 rounded-md p-2 text-sm leading-6 font-semibold'
-                        )}
-                      >
-                        <item.icon
+                <li>
+                  {!sidebarCollapsed && (
+                    <div className="text-xs font-semibold leading-6 text-gray-400 uppercase tracking-wider">
+                      Master Data
+                    </div>
+                  )}
+                  <ul role="list" className={cn('mt-2 space-y-1', listMx)}>
+                    {filteredMasterNavigation.map((item) => (
+                      <li key={item.name}>
+                        <Link
+                          href={item.href}
+                          title={sidebarCollapsed ? item.name : undefined}
                           className={cn(
                             pathname === item.href
-                              ? 'text-indigo-600'
-                              : 'text-gray-400 group-hover:text-indigo-600',
-                            'h-6 w-6 shrink-0'
+                              ? 'bg-gray-50 text-indigo-600'
+                              : 'text-gray-700 hover:text-indigo-600 hover:bg-gray-50',
+                            sidebarCollapsed
+                              ? 'flex justify-center rounded-md p-2'
+                              : 'group flex gap-x-3 rounded-md p-2 text-sm leading-6 font-semibold'
                           )}
-                          aria-hidden="true"
-                        />
-                        {item.name}
-                      </Link>
-                    </li>
-                  ))}
-                </ul>
-              </li>
+                        >
+                          <item.icon
+                            className={cn(
+                              pathname === item.href ? 'text-indigo-600' : 'text-gray-400 group-hover:text-indigo-600',
+                              'h-6 w-6 shrink-0'
+                            )}
+                            aria-hidden="true"
+                          />
+                          {!sidebarCollapsed && item.name}
+                          {sidebarCollapsed && <span className="sr-only">{item.name}</span>}
+                        </Link>
+                      </li>
+                    ))}
+                  </ul>
+                </li>
               )}
+
               {!loading && (
-              <li>
-                <ul role="list" className="-mx-2 space-y-1">
-                  {settingsNavigation.map((item) => (
-                    <li key={item.name}>
-                      <Link
-                        href={item.href}
-                        className={cn(
-                          pathname === item.href
-                            ? 'bg-gray-50 text-indigo-600'
-                            : 'text-gray-700 hover:text-indigo-600 hover:bg-gray-50',
-                          'group flex gap-x-3 rounded-md p-2 text-sm leading-6 font-semibold'
-                        )}
-                      >
-                        <item.icon
+                <li>
+                  <ul role="list" className={cn('space-y-1', listMx)}>
+                    {settingsNavigation.map((item) => (
+                      <li key={item.name}>
+                        <Link
+                          href={item.href}
+                          title={sidebarCollapsed ? item.name : undefined}
                           className={cn(
                             pathname === item.href
-                              ? 'text-indigo-600'
-                              : 'text-gray-400 group-hover:text-indigo-600',
-                            'h-6 w-6 shrink-0'
+                              ? 'bg-gray-50 text-indigo-600'
+                              : 'text-gray-700 hover:text-indigo-600 hover:bg-gray-50',
+                            sidebarCollapsed
+                              ? 'flex justify-center rounded-md p-2'
+                              : 'group flex gap-x-3 rounded-md p-2 text-sm leading-6 font-semibold'
                           )}
-                          aria-hidden="true"
-                        />
-                        {item.name}
-                      </Link>
-                    </li>
-                  ))}
-                </ul>
-              </li>
+                        >
+                          <item.icon
+                            className={cn(
+                              pathname === item.href ? 'text-indigo-600' : 'text-gray-400 group-hover:text-indigo-600',
+                              'h-6 w-6 shrink-0'
+                            )}
+                            aria-hidden="true"
+                          />
+                          {!sidebarCollapsed && item.name}
+                          {sidebarCollapsed && <span className="sr-only">{item.name}</span>}
+                        </Link>
+                      </li>
+                    ))}
+                  </ul>
+                </li>
               )}
             </ul>
           </nav>
+
+          {/* Collapse / Expand toggle */}
+          <div className={cn('border-t border-gray-100 pt-2 pb-1', navPx)}>
+            <button
+              type="button"
+              onClick={() => setSidebarCollapsed?.(!sidebarCollapsed)}
+              title={sidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+              className={cn(
+                'flex items-center gap-2 rounded-md p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-50 w-full transition-colors',
+                sidebarCollapsed ? 'justify-center' : ''
+              )}
+            >
+              {sidebarCollapsed ? (
+                <ChevronRightIcon className="h-5 w-5 shrink-0" />
+              ) : (
+                <>
+                  <ChevronLeftIcon className="h-5 w-5 shrink-0" />
+                  <span className="text-xs font-medium">Collapse</span>
+                </>
+              )}
+            </button>
+          </div>
         </div>
       </div>
     </>

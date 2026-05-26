@@ -304,10 +304,12 @@ async function getAllApplications(filters, pagination, user = null) {
         },
         fptk: {
           select: {
+            id: true,
             fptkNumber: true,
             position: true,
             positionTitle: true,
             department: true,
+            division: true,
           },
         },
         interviews: {
