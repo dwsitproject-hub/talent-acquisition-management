@@ -447,6 +447,8 @@ model FPTK {
   @@index([department])
   @@index([division])
   @@index([priority])
+  @@index([currentStatus])
+  @@index([createdAt])
   @@map("fptk")
 }
 
@@ -531,6 +533,7 @@ model Application {
   @@index([candidateId])
   @@index([fptkId])
   @@index([status])
+  @@index([fptkId, status])
   @@index([appliedAt])
   @@index([joinDate])
   @@map("applications")

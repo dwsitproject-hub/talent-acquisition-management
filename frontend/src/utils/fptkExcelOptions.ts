@@ -31,7 +31,6 @@ export const FPTK_CURRENT_STATUS_OPTIONS = [
   'Open',
   'Pending FKTK',
   'Re-Open',
-  'Hold',
   'Cancel',
   'Internal Movement',
   'Close',

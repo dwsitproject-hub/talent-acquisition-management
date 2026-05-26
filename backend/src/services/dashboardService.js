@@ -51,9 +51,6 @@ function isClosedCurrentStatus(value) {
   return s === 'close' || s === 'internal movement';
 }
 
-function isHoldCurrentStatus(value) {
-  return normalizeCurrentStatus(value) === 'hold';
-}
 
 /**
  * Get dashboard statistics
@@ -162,9 +159,8 @@ async function getDashboardStats(user = null) {
     ]);
 
     // Calculate position counts based on currentStatus
-    // Open Position: NOT in ["Cancel", "Hold", "Signing", "On Boarding"]
+    // Open Position: NOT in ["Cancel", "Signing", "On Boarding"]
     // Closed Position: in ["Cancel", "Signing", "On Boarding"]
-    // Hold Position: "Hold"
     const allFPTKsForCounts = await prisma.fPTK.findMany({
       where: fptkWhere,
       select: {
@@ -188,11 +184,7 @@ async function getDashboardStats(user = null) {
       isClosedCurrentStatus(fptk.currentStatus)
     ).length;
 
-    const holdPositionsCount = allFPTKsForCounts.filter((fptk) =>
-      isHoldCurrentStatus(fptk.currentStatus)
-    ).length;
-
-    logger.info(`Dashboard: Position counts - Open: ${openPositionsCount}, Closed: ${closedPositionsCount}, Hold: ${holdPositionsCount}`);
+    logger.info(`Dashboard: Position counts - Open: ${openPositionsCount}, Closed: ${closedPositionsCount}`);
     logger.info(`Dashboard: allFPTKsForCounts.length: ${allFPTKsForCounts.length}, fptkWhere keys: ${Object.keys(fptkWhere).join(', ')}`);
 
     // Interviews this week (Mon–Sun): applications in Interview Scheduled / Interviewed with interview in range
@@ -279,7 +271,7 @@ async function getDashboardStats(user = null) {
       return statusMap[fptk.status] || fptk.status || 'Raise FPTK';
     };
 
-    // Location chart: green = actively open recruiting; red = everything else (incl. Hold, Close, Cancel)
+    // Location chart: green = actively open recruiting; red = everything else (Close, Cancel, etc.)
     const isClosed = (fptk) => !isOpenCurrentStatus(fptk.currentStatus || getStatus(fptk));
 
     // Calculate Position Status by Location
@@ -428,7 +420,6 @@ async function getDashboardStats(user = null) {
       activeFPTKs,
       openPositions: openPositionsCount,
       closedPositions: closedPositionsCount,
-      holdPositions: holdPositionsCount,
       totalApplications,
       activeApplications,
       pendingInterviews,
@@ -441,7 +432,7 @@ async function getDashboardStats(user = null) {
     };
 
     logger.info(`Dashboard: Result object keys: ${Object.keys(result).join(', ')}`);
-    logger.info(`Dashboard: Result closedPositions: ${result.closedPositions}, holdPositions: ${result.holdPositions}`);
+    logger.info(`Dashboard: Result closedPositions: ${result.closedPositions}`);
 
     // Log sample data for debugging
     if (positionStatusByLocation.length > 0) {

@@ -251,7 +251,6 @@ const ALLOWED_CURRENT_STATUS = new Set([
   'open',
   'pending fktk',
   're-open',
-  'hold',
   'cancel',
   'internal movement',
   'close',
@@ -480,8 +479,9 @@ async function resolveCandidateIdTx(tx, { candidateId, email, fullName }) {
   return candidate.id;
 }
 
-async function ensureCandidatePositionAppliedForTx(tx, candidateId, positionTitle) {
-  if (!candidateId || !positionTitle) return;
+async function ensureCandidatePositionAppliedForTx(tx, candidateId, fptkId, positionTitle) {
+  if (!candidateId) return;
+  if (!fptkId && !positionTitle) return;
   const candidate = await tx.candidate.findUnique({
     where: { id: candidateId },
     select: { id: true, languages: true },
@@ -514,9 +514,23 @@ async function ensureCandidatePositionAppliedForTx(tx, candidateId, positionTitl
       // Clean up legacy values that are actually statuses
       .filter((v) => v.toLowerCase() !== 'applied' && v.toLowerCase() !== 'under review' && v.toLowerCase() !== 'shortlisted')
   );
-  normalizedExisting.add(String(positionTitle).trim());
+  if (positionTitle) {
+    normalizedExisting.add(String(positionTitle).trim());
+    languages.positionAppliedFor = Array.from(normalizedExisting);
+  }
 
-  languages.positionAppliedFor = Array.from(normalizedExisting);
+  if (fptkId) {
+    const existingFptkIds = Array.isArray(languages.positionAppliedFptkIds)
+      ? languages.positionAppliedFptkIds
+      : languages.positionAppliedFptkIds
+        ? [String(languages.positionAppliedFptkIds)]
+        : [];
+    const fptkIdSet = new Set(
+      existingFptkIds.map((v) => String(v || '').trim()).filter(Boolean)
+    );
+    fptkIdSet.add(String(fptkId).trim());
+    languages.positionAppliedFptkIds = Array.from(fptkIdSet);
+  }
 
   await tx.candidate.update({
     where: { id: candidateId },
@@ -657,8 +671,8 @@ async function syncFptkApplicationsTx(tx, fptkId, appliedCandidates, options = {
     }
 
     // Ensure candidate "Position Applied For" is updated (languages.positionAppliedFor)
-    if (positionTitle) {
-      await ensureCandidatePositionAppliedForTx(tx, candidateId, positionTitle);
+    if (fptkId) {
+      await ensureCandidatePositionAppliedForTx(tx, candidateId, fptkId, positionTitle);
     }
 
     // Handle interview data if provided
@@ -1205,67 +1219,67 @@ async function getFptkPositionOptions(filters, pagination, user = null) {
 }
 
 async function getSummaryByPosition(user = null) {
-  // Role-based filtering (same intent as getAllFPTKs / dashboard)
-  const fptkWhere = {};
-  const applicationWhere = {};
+  // Reuse the shared WHERE builder — produces identical scoping to getAllFPTKs.
+  const fptkWhere = buildInternalFptkListWhere({}, user);
 
-  if (user) {
-    const userRole = user.role;
-    const userDivision = user.division;
-    if (userRole === 'HIRING_MANAGER') {
-      const hmWhere = buildHiringManagerWhereFromUser(user);
-      if (hmWhere) {
-        Object.assign(fptkWhere, hmWhere);
-        applicationWhere.fptk = hmWhere;
-      } else {
-        fptkWhere.id = '00000000-0000-0000-0000-000000000000';
-        applicationWhere.id = '00000000-0000-0000-0000-000000000000';
-      }
-    } else if ((userRole === 'Head of Division' || userRole === 'DEPARTMENT_HEAD') && userDivision) {
-      fptkWhere.division = userDivision;
-      applicationWhere.fptk = { division: userDivision };
-    } else if (userRole === 'HRBP') {
-      const hrbp = buildHrbpFptkFilterFromUser(user);
-      if (hrbp) {
-        Object.assign(fptkWhere, hrbp);
-        applicationWhere.fptk = hrbp;
-      } else {
-        fptkWhere.id = '00000000-0000-0000-0000-000000000000';
-        applicationWhere.id = '00000000-0000-0000-0000-000000000000';
-      }
-    }
+  const fptkSelect = {
+    id: true,
+    priority: true,
+    department: true,
+    division: true,
+    section: true,
+    positionTitle: true,
+    position: true,
+    currentStatus: true,
+    statusFktk: true,
+    remark: true,
+    location: true,
+    area: true,
+    areaDetail: true,
+    requestDate: true,
+    fptkReceiveDate: true,
+    closedAt: true,
+    createdAt: true,
+    updatedAt: true,
+  };
+
+  let fptks, grouped;
+
+  const isScopedRole = Object.keys(fptkWhere).length > 0;
+
+  if (!isScopedRole) {
+    // Unrestricted roles (SUPER_ADMIN, TA_TEAM, etc.): both queries are
+    // independent — run them in parallel to halve round-trip latency.
+    [fptks, grouped] = await Promise.all([
+      prisma.fPTK.findMany({
+        where: {},
+        select: fptkSelect,
+        orderBy: { createdAt: 'desc' },
+      }),
+      prisma.application.groupBy({
+        by: ['fptkId', 'status'],
+        _count: { _all: true },
+      }),
+    ]);
+  } else {
+    // Scoped roles (HIRING_MANAGER, Head of Division, HRBP): fetch the
+    // allowed FPTK IDs first, then use fptkId IN (...) for the groupBy so
+    // the application query uses the composite index instead of a JOIN.
+    fptks = await prisma.fPTK.findMany({
+      where: fptkWhere,
+      select: fptkSelect,
+      orderBy: { createdAt: 'desc' },
+    });
+
+    const fptkIds = fptks.map((f) => f.id);
+    grouped = fptkIds.length > 0
+      ? await prisma.application.groupBy({
+          by: ['fptkId', 'status'],
+          where: { fptkId: { in: fptkIds } },
+          _count: { _all: true },
+        })
+      : [];
   }
-
-  const fptks = await prisma.fPTK.findMany({
-    where: fptkWhere,
-    select: {
-      id: true,
-      priority: true,
-      department: true,
-      division: true,
-      section: true,
-      positionTitle: true,
-      position: true,
-      currentStatus: true,
-      statusFktk: true,
-      remark: true,
-      location: true,
-      area: true,
-      areaDetail: true,
-      requestDate: true,
-      fptkReceiveDate: true,
-      closedAt: true,
-      createdAt: true,
-      updatedAt: true,
-    },
-    orderBy: { createdAt: 'desc' },
-  });
-
-  const grouped = await prisma.application.groupBy({
-    by: ['fptkId', 'status'],
-    where: Object.keys(applicationWhere).length > 0 ? applicationWhere : undefined,
-    _count: { _all: true },
-  });
 
   const countsByFptkId = {};
   const allStatuses = new Set();

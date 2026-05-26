@@ -22,7 +22,7 @@ import { saveCandidateLink } from '@/utils/candidateLink'
 import { matchesTokenizedSearch } from '@/utils/search'
 import { CandidatesAPI, MenuAccessAPI } from '@/lib/api'
 import BulkUploadModal from '@/components/BulkUploadModal'
-import { getCandidateDivisions, getCandidateYearsOfExperience, parseLanguagesData } from '@/utils/candidateProfileShape'
+import { getCandidateDivisions, getCandidateYearsOfExperience, getCandidateSkills, parseLanguagesData } from '@/utils/candidateProfileShape'
 
 const mapEnumToRole = (role: string): string => {
   if (!role) return role
@@ -342,6 +342,8 @@ export default function CandidatesPage() {
   const autoViewHandledRef = useRef(false)
   const [searchTerm, setSearchTerm] = useState('')
   const [statusFilter, setStatusFilter] = useState<CandidateStatus | 'all'>('all')
+  const [experienceFilter, setExperienceFilter] = useState<string>('all')
+  const [skillsFilter, setSkillsFilter] = useState<string>('all')
   const [isAddModalOpen, setIsAddModalOpen] = useState(false)
   const [isViewModalOpen, setIsViewModalOpen] = useState(false)
   const [isEditModalOpen, setIsEditModalOpen] = useState(false)
@@ -466,6 +468,17 @@ export default function CandidatesPage() {
     }
   }, [isAuthenticated, isLoading])
 
+  const allSkillOptions = useMemo(() => {
+    const skillSet = new Set<string>()
+    candidates.forEach(c => {
+      getCandidateSkills(c).forEach(s => {
+        const trimmed = s.trim()
+        if (trimmed) skillSet.add(trimmed)
+      })
+    })
+    return Array.from(skillSet).sort((a, b) => a.localeCompare(b))
+  }, [candidates])
+
   const filteredCandidates = useMemo(
     () =>
       candidates
@@ -479,14 +492,28 @@ export default function CandidatesPage() {
 
           const matchesStatus = statusFilter === 'all' || candidate.status === statusFilter
 
-          return matchesSearch && matchesStatus
+          const years = candidate.professionalInfo.experience ?? 0
+          const matchesExperience =
+            experienceFilter === 'all' ||
+            (experienceFilter === '0-2' && years >= 0 && years <= 2) ||
+            (experienceFilter === '3-5' && years >= 3 && years <= 5) ||
+            (experienceFilter === '6-10' && years >= 6 && years <= 10) ||
+            (experienceFilter === '10+' && years > 10)
+
+          const matchesSkill =
+            skillsFilter === 'all' ||
+            getCandidateSkills(candidate).some(
+              s => s.trim().toLowerCase() === skillsFilter.toLowerCase()
+            )
+
+          return matchesSearch && matchesStatus && matchesExperience && matchesSkill
         })
         .sort((a, b) => {
           const nameA = `${a.personalInfo.firstName || ''} ${a.personalInfo.lastName || ''}`.trim().toLowerCase()
           const nameB = `${b.personalInfo.firstName || ''} ${b.personalInfo.lastName || ''}`.trim().toLowerCase()
           return nameA.localeCompare(nameB)
         }),
-    [candidates, searchTerm, statusFilter]
+    [candidates, searchTerm, statusFilter, experienceFilter, skillsFilter]
   )
 
   const listMeta = useMemo(() => {
@@ -1024,37 +1051,77 @@ export default function CandidatesPage() {
         </div>
 
         {/* Filters */}
-        <div className="mt-6 flex flex-col sm:flex-row gap-4" data-tour="candidates-filters">
-          <div className="flex-1">
-            <div className="relative">
-              <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3">
-                <MagnifyingGlassIcon className="h-5 w-5 text-gray-400" aria-hidden="true" />
+        <div className="mt-6 flex flex-col gap-3" data-tour="candidates-filters">
+          <div className="flex flex-col sm:flex-row gap-4">
+            <div className="flex-1">
+              <div className="relative">
+                <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3">
+                  <MagnifyingGlassIcon className="h-5 w-5 text-gray-400" aria-hidden="true" />
+                </div>
+                <input
+                  type="text"
+                  className="block w-full rounded-md border-0 py-1.5 pl-10 pr-3 text-gray-900 ring-1 ring-inset ring-gray-300 placeholder:text-gray-400 focus:ring-2 focus:ring-inset focus:ring-indigo-600 sm:text-sm sm:leading-6"
+                  placeholder="Search candidates..."
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                />
               </div>
-              <input
-                type="text"
-                className="block w-full rounded-md border-0 py-1.5 pl-10 pr-3 text-gray-900 ring-1 ring-inset ring-gray-300 placeholder:text-gray-400 focus:ring-2 focus:ring-inset focus:ring-indigo-600 sm:text-sm sm:leading-6"
-                placeholder="Search candidates..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-              />
+            </div>
+            <div className="sm:w-48">
+              <select
+                className="block w-full rounded-md border-0 py-1.5 pl-3 pr-10 text-gray-900 ring-1 ring-inset ring-gray-300 focus:ring-2 focus:ring-indigo-600 sm:text-sm sm:leading-6"
+                value={statusFilter}
+                onChange={(e) => { setStatusFilter(e.target.value as CandidateStatus | 'all'); setPage(1) }}
+              >
+                <option value="all">All Status</option>
+                <option value="new">New</option>
+                <option value="screening">Screening</option>
+                <option value="interview_scheduled">Interview Scheduled</option>
+                <option value="interviewed">Interviewed</option>
+                <option value="shortlisted">Shortlisted</option>
+                <option value="rejected">Rejected</option>
+                <option value="hired">Hired</option>
+                <option value="withdrawn">Withdrawn</option>
+              </select>
             </div>
           </div>
-          <div className="sm:w-48">
-            <select
-              className="block w-full rounded-md border-0 py-1.5 pl-3 pr-10 text-gray-900 ring-1 ring-inset ring-gray-300 focus:ring-2 focus:ring-indigo-600 sm:text-sm sm:leading-6"
-              value={statusFilter}
-              onChange={(e) => setStatusFilter(e.target.value as CandidateStatus | 'all')}
-            >
-              <option value="all">All Status</option>
-              <option value="new">New</option>
-              <option value="screening">Screening</option>
-              <option value="interview_scheduled">Interview Scheduled</option>
-              <option value="interviewed">Interviewed</option>
-              <option value="shortlisted">Shortlisted</option>
-              <option value="rejected">Rejected</option>
-              <option value="hired">Hired</option>
-              <option value="withdrawn">Withdrawn</option>
-            </select>
+          <div className="flex flex-col sm:flex-row gap-4">
+            {/* Experience filter */}
+            <div className="sm:w-52">
+              <select
+                className="block w-full rounded-md border-0 py-1.5 pl-3 pr-10 text-gray-900 ring-1 ring-inset ring-gray-300 focus:ring-2 focus:ring-indigo-600 sm:text-sm sm:leading-6"
+                value={experienceFilter}
+                onChange={(e) => { setExperienceFilter(e.target.value); setPage(1) }}
+              >
+                <option value="all">All Experience</option>
+                <option value="0-2">0 – 2 years</option>
+                <option value="3-5">3 – 5 years</option>
+                <option value="6-10">6 – 10 years</option>
+                <option value="10+">10+ years</option>
+              </select>
+            </div>
+            {/* Skills filter */}
+            <div className="sm:w-56">
+              <select
+                className="block w-full rounded-md border-0 py-1.5 pl-3 pr-10 text-gray-900 ring-1 ring-inset ring-gray-300 focus:ring-2 focus:ring-indigo-600 sm:text-sm sm:leading-6"
+                value={skillsFilter}
+                onChange={(e) => { setSkillsFilter(e.target.value); setPage(1) }}
+              >
+                <option value="all">All Skills</option>
+                {allSkillOptions.map(skill => (
+                  <option key={skill} value={skill}>{skill}</option>
+                ))}
+              </select>
+            </div>
+            {(experienceFilter !== 'all' || skillsFilter !== 'all') && (
+              <button
+                type="button"
+                className="text-sm text-indigo-600 hover:text-indigo-800 self-center"
+                onClick={() => { setExperienceFilter('all'); setSkillsFilter('all'); setPage(1) }}
+              >
+                Clear filters
+              </button>
+            )}
           </div>
           <div className="flex items-center gap-2 sm:ml-auto">
             <label className="text-sm text-gray-600 whitespace-nowrap">Rows per page</label>

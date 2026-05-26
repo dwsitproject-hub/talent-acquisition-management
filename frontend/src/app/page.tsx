@@ -3,7 +3,9 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useAuth } from '@/contexts/AuthContext'
 import { useRouter } from 'next/navigation'
+import Link from 'next/link'
 import Layout from '@/components/Layout/Layout'
+import PositionEditOverlay from '@/components/PositionEditOverlay'
 import {
   UsersIcon,
   BriefcaseIcon,
@@ -28,8 +30,18 @@ import {
   type DateRange,
 } from '@/utils/dashboardPeriod'
 import { useModalEscape } from '@/hooks/useModalEscape'
+import { usePositionEditOverlay } from '@/hooks/usePositionEditOverlay'
 
 const PRIORITY_FILTERS = ['ALL', 'P0', 'P1', 'P2'] as const
+
+const POSITION_STATUS_FILTERS = ['ALL', 'OPEN', 'CLOSED'] as const
+type PositionStatusFilterType = typeof POSITION_STATUS_FILTERS[number]
+
+/** Closed position: Close or Cancel (any status NOT in this set is treated as Open) */
+const isClosedPositionStatus = (status?: string) => {
+  const s = (status || '').trim().toLowerCase()
+  return s === 'close' || s === 'cancel' || s === 'cancelled'
+}
 
 const normalizeUiCurrentStatus = (value?: string) => (value || '').trim().toLowerCase()
 
@@ -323,6 +335,7 @@ export default function Dashboard() {
   const [dashboardApplications, setDashboardApplications] = useState<any[]>([])
   const [fptkListHydrated, setFptkListHydrated] = useState(false)
   const [priorityFilter, setPriorityFilter] = useState<typeof PRIORITY_FILTERS[number]>('ALL')
+  const [positionStatusFilter, setPositionStatusFilter] = useState<PositionStatusFilterType>('ALL')
   const [interviewDetailItems, setInterviewDetailItems] = useState<DashboardListItem[]>([])
   const [isLoadingApplicationInsights, setIsLoadingApplicationInsights] = useState(false)
   const [applicationInsightsLoaded, setApplicationInsightsLoaded] = useState(false)
@@ -395,10 +408,15 @@ export default function Dashboard() {
     }) as NonNullable<ReturnType<typeof getDashboardPeriodBounds>>
   }, [periodBounds])
 
-  const filteredPositions = useMemo(
-    () => filterPositionsByPriority(allPositions, priorityFilter),
-    [allPositions, priorityFilter]
-  )
+  const filteredPositions = useMemo(() => {
+    let positions = filterPositionsByPriority(allPositions, priorityFilter)
+    if (positionStatusFilter === 'OPEN') {
+      positions = positions.filter((p: any) => !isClosedPositionStatus(p?.currentStatus || p?.status))
+    } else if (positionStatusFilter === 'CLOSED') {
+      positions = positions.filter((p: any) => isClosedPositionStatus(p?.currentStatus || p?.status))
+    }
+    return positions
+  }, [allPositions, priorityFilter, positionStatusFilter])
 
   const openPositionItems = useMemo<DashboardListItem[]>(() => {
     const openOnly = filteredPositions.filter((position) =>
@@ -898,9 +916,9 @@ useEffect(() => {
     interviewsThisWeek: mcuHeadline,
     hiredThisMonth: hiredThisMonthHeadline,
     recentActivity: baseStats.recentActivity ?? [],
-    positionStatusByLocation: (baseStats as any).positionStatusByLocation || computePositionStatusByLocation(filteredPositions),
-    openPositionProgress: (baseStats as any).openPositionProgress || computeOpenPositionProgress(filteredPositions),
-    slaByLocation: (baseStats as any).slaByLocation || computeSlaByLocation(filteredPositions),
+    positionStatusByLocation: computePositionStatusByLocation(filteredPositions),
+    openPositionProgress: computeOpenPositionProgress(filteredPositions),
+    slaByLocation: computeSlaByLocation(filteredPositions),
   })
 }, [
   baseStats,
@@ -1221,13 +1239,13 @@ useEffect(() => {
     }
   }
 
-  const openFptkEdit = (id?: string) => {
+  const positionEdit = usePositionEditOverlay(() => {
+    void loadDashboardData()
+  })
+
+  const openFptkEdit = (id?: string, backLabel = 'Dashboard') => {
     if (!id) return
-    setDetailModal(null)
-    setOpenPositionsModalOpen(false)
-    setTotalCandidatesModal(null)
-    setTotalCandidatesQuery('')
-    router.push(`/fptk?edit=${encodeURIComponent(id)}`)
+    void positionEdit.open(id, backLabel)
   }
 
   const openCandidateView = (id?: string) => {
@@ -1271,25 +1289,51 @@ useEffect(() => {
           </div>
         </div>
 
-        {/* Priority Filter */}
-        <div className="mb-6">
-          <span className="text-sm font-medium text-gray-700 mr-4">Priority Filter:</span>
-          <div className="inline-flex rounded-md shadow-sm">
-            {PRIORITY_FILTERS.map((filter, index) => (
-              <button
-                key={filter}
-                onClick={() => setPriorityFilter(filter)}
-                className={`px-4 py-2 border text-sm font-medium ${
-                  filter === priorityFilter
-                    ? 'bg-indigo-600 text-white border-indigo-600'
-                    : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50'
-                } ${index === 0 ? 'rounded-l-md' : ''} ${
-                  index === PRIORITY_FILTERS.length - 1 ? 'rounded-r-md' : ''
-                }`}
-              >
-                {filter === 'ALL' ? 'All' : filter}
-              </button>
-            ))}
+        {/* Filter Bar: Priority + Position Status */}
+        <div className="mb-6 flex flex-wrap items-center gap-x-6 gap-y-3">
+          <div className="flex items-center gap-3">
+            <span className="text-sm font-medium text-gray-700 whitespace-nowrap">Priority:</span>
+            <div className="inline-flex rounded-md shadow-sm">
+              {PRIORITY_FILTERS.map((filter, index) => (
+                <button
+                  key={filter}
+                  onClick={() => setPriorityFilter(filter)}
+                  className={`px-3 py-1.5 border text-sm font-medium ${
+                    filter === priorityFilter
+                      ? 'bg-indigo-600 text-white border-indigo-600'
+                      : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50'
+                  } ${index === 0 ? 'rounded-l-md' : ''} ${
+                    index === PRIORITY_FILTERS.length - 1 ? 'rounded-r-md' : ''
+                  } ${index > 0 ? '-ml-px' : ''}`}
+                >
+                  {filter === 'ALL' ? 'All' : filter}
+                </button>
+              ))}
+            </div>
+          </div>
+          <div className="flex items-center gap-3">
+            <span className="text-sm font-medium text-gray-700 whitespace-nowrap">Position Status:</span>
+            <div className="inline-flex rounded-md shadow-sm">
+              {POSITION_STATUS_FILTERS.map((filter, index) => (
+                <button
+                  key={filter}
+                  onClick={() => setPositionStatusFilter(filter)}
+                  className={`px-3 py-1.5 border text-sm font-medium ${
+                    filter === positionStatusFilter
+                      ? filter === 'OPEN'
+                        ? 'bg-green-600 text-white border-green-600'
+                        : filter === 'CLOSED'
+                          ? 'bg-red-600 text-white border-red-600'
+                          : 'bg-indigo-600 text-white border-indigo-600'
+                      : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50'
+                  } ${index === 0 ? 'rounded-l-md' : ''} ${
+                    index === POSITION_STATUS_FILTERS.length - 1 ? 'rounded-r-md' : ''
+                  } ${index > 0 ? '-ml-px' : ''}`}
+                >
+                  {filter === 'ALL' ? 'All' : filter === 'OPEN' ? 'Open' : 'Closed'}
+                </button>
+              ))}
+            </div>
           </div>
         </div>
 
@@ -1394,11 +1438,11 @@ useEffect(() => {
         </div>
 
         {/* Stats Grid */}
-        <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3" data-tour="dashboard-analytics">
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5" data-tour="dashboard-analytics">
           {stats.map((item) => (
             <button
               key={item.name}
-              className="text-left relative overflow-hidden rounded-lg bg-white px-4 py-5 shadow sm:px-6 sm:py-6 hover:ring-2 hover:ring-indigo-500 focus:outline-none"
+              className="text-left relative overflow-hidden rounded-lg bg-white px-3 py-3 shadow hover:ring-2 hover:ring-indigo-500 focus:outline-none"
               onClick={async () => {
                 if (item.name === 'Total Candidates') {
                   setTotalCandidatesQuery('')
@@ -1471,15 +1515,15 @@ useEffect(() => {
               }}
             >
               <dt>
-                <div className="absolute rounded-md bg-indigo-500 p-3">
-                  <item.icon className="h-6 w-6 text-white" aria-hidden="true" />
+                <div className="absolute rounded-md bg-indigo-500 p-2">
+                  <item.icon className="h-5 w-5 text-white" aria-hidden="true" />
                 </div>
-                <p className="ml-16 truncate text-sm font-medium text-gray-500">
+                <p className="ml-12 truncate text-sm font-medium text-gray-500">
                   {item.name}
                 </p>
               </dt>
-              <dd className="ml-16 flex items-baseline pb-6 sm:pb-7">
-                <p className="text-2xl font-semibold text-gray-900 underline decoration-dotted">{item.value}</p>
+              <dd className="ml-12 flex items-baseline pb-4">
+                <p className="text-xl font-semibold text-gray-900 underline decoration-dotted">{item.value}</p>
                 {compareToPrevious ? (
                   <p
                     className={`ml-2 flex items-baseline text-sm font-semibold ${
@@ -1500,7 +1544,10 @@ useEffect(() => {
 
         {openPositionsModalOpen && (
           <div
-            className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center"
+            className={[
+              'fixed inset-0 bg-black/40 z-50 flex items-center justify-center transition-opacity duration-200',
+              positionEdit.isOpen ? 'opacity-45 pointer-events-none' : '',
+            ].join(' ')}
             onClick={() => setOpenPositionsModalOpen(false)}
           >
             <div
@@ -1554,7 +1601,7 @@ useEffect(() => {
                             <button
                               className="w-full text-left"
                               onClick={() => {
-                                openFptkEdit(p.id)
+                                openFptkEdit(p.id, 'Open Positions')
                               }}
                             >
                               <div className="text-sm font-medium text-indigo-700 hover:underline">{title}</div>
@@ -1716,10 +1763,9 @@ useEffect(() => {
             <h3 className="text-lg leading-6 font-medium text-gray-900 mb-4">
               Location Overview
             </h3>
-            <div className="hidden lg:grid grid-cols-4 gap-4 text-xs font-semibold text-gray-500 border-b pb-2 mb-4">
+            <div className="hidden lg:grid grid-cols-3 gap-4 text-xs font-semibold text-gray-500 border-b pb-2 mb-4">
               <span>Location</span>
               <span>Position Status by Location</span>
-              <span>Open Position Progress by Area Detail</span>
               <span>SLA by Location (from FPTK Receive Date)</span>
             </div>
 
@@ -1745,7 +1791,7 @@ useEffect(() => {
                       key={locationKey}
                       className="border rounded-lg p-4 hover:border-indigo-300 transition-colors"
                     >
-                      <div className="grid grid-cols-1 lg:grid-cols-4 gap-4 items-start">
+                      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 items-start">
                         {/* Location label */}
                         <div>
                           <div className="text-sm font-semibold text-gray-900 mb-1">
@@ -1764,94 +1810,24 @@ useEffect(() => {
                               Position Status
                             </div>
                             {statusData && (
-                              <div className="flex space-x-3 text-[11px] text-gray-600">
-                                <button
-                                  className="hover:underline"
-                                  onClick={() => {
-                                    const items = filteredPositions
-                                      .filter(
-                                        (j: any) =>
-                                          (j.areaDetail || j.area || j.location || 'Unknown') ===
-                                          statusData.location
-                                      )
-                                      .map((j: any) => ({
-                                        id: j.id,
-                                        kind: 'fptk',
-                                        title: j.title || j.position || 'Unknown Position',
-                                        subtitle: `${j.department || 'N/A'} • ${j.location || 'N/A'}`,
-                                        meta: j.currentStatus || j.status || 'N/A',
-                                      }))
-                                    setDetailModal({
-                                      title: `Total Positions • ${statusData.location}`,
-                                      items,
-                                    })
-                                  }}
+                              <div className="flex flex-wrap gap-x-3 gap-y-1 text-[11px]">
+                                <span className="text-gray-500">
+                                  Total: <span className="font-semibold text-gray-700">{statusData.total}</span>
+                                </span>
+                                <Link
+                                  href={`/summary-by-position?location=${encodeURIComponent(statusData.location)}&card=open`}
+                                  className="text-green-600 hover:underline font-medium"
+                                  title="View open positions in Summary by Position"
                                 >
-                                  Total:{' '}
-                                  <span className="font-semibold">{statusData.total}</span>
-                                </button>
-                                <button
-                                  className="text-green-600 hover:underline"
-                                  onClick={() => {
-                                    const items = filteredPositions
-                                      .filter(
-                                        (j: any) =>
-                                          (j.areaDetail || j.area || j.location || 'Unknown') ===
-                                          statusData.location
-                                      )
-                                      .filter((j: any) =>
-                                        isOpenCurrentStatusLabel(j.currentStatus || j.status)
-                                      )
-                                      .map((j: any) => ({
-                                        id: j.id,
-                                        kind: 'fptk',
-                                        title: j.title || j.position || 'Unknown Position',
-                                        subtitle: `${j.department || 'N/A'} • ${j.location || 'N/A'}`,
-                                        meta: j.currentStatus || j.status || 'N/A',
-                                      }))
-                                    setDetailModal({
-                                      title: `Open Positions • ${statusData.location}`,
-                                      items,
-                                    })
-                                  }}
+                                  Open: <span className="font-semibold">{statusData.open}</span> ↗
+                                </Link>
+                                <Link
+                                  href={`/summary-by-position?location=${encodeURIComponent(statusData.location)}&card=closed`}
+                                  className="text-red-600 hover:underline font-medium"
+                                  title="View closed positions in Summary by Position"
                                 >
-                                  Open:{' '}
-                                  <span className="font-semibold">{statusData.open}</span>
-                                </button>
-                                <button
-                                  className="text-red-600 hover:underline"
-                                  onClick={() => {
-                                    const items = filteredPositions
-                                      .filter(
-                                        (j: any) =>
-                                          (j.areaDetail || j.area || j.location || 'Unknown') ===
-                                          statusData.location
-                                      )
-                                      .filter((j: any) => {
-                                        const cs = j.currentStatus || j.status || ''
-                                        const n = normalizeUiCurrentStatus(cs)
-                                        return (
-                                          isClosedCurrentStatusLabel(cs) ||
-                                          n === 'cancel' ||
-                                          n === 'cancelled'
-                                        )
-                                      })
-                                      .map((j: any) => ({
-                                        id: j.id,
-                                        kind: 'fptk',
-                                        title: j.title || j.position || 'Unknown Position',
-                                        subtitle: `${j.department || 'N/A'} • ${j.location || 'N/A'}`,
-                                        meta: j.currentStatus || j.status || 'N/A',
-                                      }))
-                                    setDetailModal({
-                                      title: `Closed Positions • ${statusData.location}`,
-                                      items,
-                                    })
-                                  }}
-                                >
-                                  Closed:{' '}
-                                  <span className="font-semibold">{statusData.closed}</span>
-                                </button>
+                                  Closed: <span className="font-semibold">{statusData.closed}</span> ↗
+                                </Link>
                               </div>
                             )}
                           </div>
@@ -1898,96 +1874,6 @@ useEffect(() => {
                             </div>
                           ) : (
                             <div className="text-xs text-gray-400">No data.</div>
-                          )}
-                        </div>
-
-                        {/* Open Position Progress */}
-                        <div className="bg-gray-50 rounded-lg p-3">
-                          <div className="flex justify-between items-center mb-2">
-                            <div className="text-xs font-medium text-gray-700">Open Progress</div>
-                            {progressData && (
-                              <div className="text-[11px] text-gray-600">
-                                <span className="font-semibold">{progressData.total}</span> positions (
-                                {progressData.percentage}%)
-                              </div>
-                            )}
-                          </div>
-                          {progressData ? (
-                            <div className="space-y-1.5">
-                              {Object.entries(progressData.statusCounts).map(
-                                ([status, count]: [string, any]) => (
-                                  <div key={status} className="flex items-center">
-                                    <div className="w-24 text-[10px] text-gray-600 truncate mr-2">
-                                      {status}
-                                    </div>
-                                    <button
-                                      className="flex-1 bg-gray-200 rounded-full h-1.5 group"
-                                      onClick={() => {
-                                        const items = filteredPositions
-                                          .filter(
-                                            (j: any) =>
-                                              (j.areaDetail || j.area || j.location || 'Unknown') ===
-                                              progressData.areaDetail
-                                          )
-                                          .filter(
-                                            (j: any) =>
-                                              (j.currentStatus || j.status || 'Raise FPTK') === status
-                                          )
-                                          .map((j: any) => ({
-                                            id: j.id,
-                                            kind: 'fptk',
-                                            title: j.title || j.position || 'Unknown Position',
-                                            subtitle: `${j.department || 'N/A'} • ${j.location || 'N/A'}`,
-                                            meta: j.currentStatus || j.status || 'N/A',
-                                          }))
-                                        setDetailModal({
-                                          title: `${status} • ${progressData.areaDetail}`,
-                                          items,
-                                        })
-                                      }}
-                                      title={`${status}: ${count} positions`}
-                                    >
-                                      <div
-                                        className="bg-blue-500 h-1.5 rounded-full transition-all duration-300 group-hover:bg-blue-600"
-                                        style={{
-                                          width: `${(count / progressData.total) * 100}%`,
-                                        }}
-                                      ></div>
-                                    </button>
-                                    <button
-                                      className="w-6 text-[10px] text-gray-600 text-right ml-2 hover:underline"
-                                      onClick={() => {
-                                        const items = filteredPositions
-                                          .filter(
-                                            (j: any) =>
-                                              (j.areaDetail || j.area || j.location || 'Unknown') ===
-                                              progressData.areaDetail
-                                          )
-                                          .filter(
-                                            (j: any) =>
-                                              (j.currentStatus || j.status || 'Raise FPTK') === status
-                                          )
-                                          .map((j: any) => ({
-                                            id: j.id,
-                                            kind: 'fptk',
-                                            title: j.title || j.position || 'Unknown Position',
-                                            subtitle: `${j.department || 'N/A'} • ${j.location || 'N/A'}`,
-                                            meta: j.currentStatus || j.status || 'N/A',
-                                          }))
-                                        setDetailModal({
-                                          title: `${status} • ${progressData.areaDetail}`,
-                                          items,
-                                        })
-                                      }}
-                                    >
-                                      {count}
-                                    </button>
-                                  </div>
-                                )
-                              )}
-                            </div>
-                          ) : (
-                            <div className="text-xs text-gray-400">No progress data.</div>
                           )}
                         </div>
 
@@ -2215,7 +2101,10 @@ useEffect(() => {
       {/* Details Modal */}
       {detailModal && (
         <div
-          className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center"
+          className={[
+            'fixed inset-0 bg-black/40 z-50 flex items-center justify-center transition-opacity duration-200',
+            positionEdit.isOpen ? 'opacity-45 pointer-events-none' : '',
+          ].join(' ')}
           onClick={() => {
             setDetailModal(null)
             setDetailQuery('')
@@ -2249,7 +2138,7 @@ useEffect(() => {
                   {detailModalMeta.pagedItems.map((it: DashboardListItem, idx: number) => {
                       const clickable = !!it.id && (it.kind === 'fptk' || it.kind === 'candidate')
                       const onClick = () => {
-                        if (it.kind === 'fptk') return openFptkEdit(it.id)
+                        if (it.kind === 'fptk') return openFptkEdit(it.id, detailModal?.title || 'Dashboard')
                         if (it.kind === 'candidate') return openCandidateView(it.id)
                       }
                       return (
@@ -2312,6 +2201,15 @@ useEffect(() => {
           </div>
         </div>
       )}
+
+      <PositionEditOverlay
+        isOpen={positionEdit.isOpen}
+        jobPosting={positionEdit.jobPosting}
+        loading={positionEdit.loading}
+        onClose={positionEdit.close}
+        onSave={positionEdit.handleSave}
+        headerBackLabel={`Back to ${positionEdit.backLabel || 'Dashboard'}`}
+      />
     </Layout>
   )
 }
