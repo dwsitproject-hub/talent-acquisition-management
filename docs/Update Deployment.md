@@ -6,7 +6,7 @@ cd /opt/tas-production
 git checkout -- scripts/setup-database-url.sh
 
 # Now pull should work
-git pull origin main
+git pull origin SIT
 
 # Then proceed with your deployment
 ./scripts/setup-database-url.sh .env.production
@@ -17,10 +17,8 @@ docker compose -f docker-compose.network.yml -p tas-production --env-file .env.p
 
 Frontend
 
-
-
 cd /opt/tas-production
-git pull origin main
+git pull origin SIT
 
 docker compose -f docker-compose.frontend.yml -p tas-production --env-file .env.production up -d --build
 
