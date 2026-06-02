@@ -6,6 +6,7 @@ import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import Layout from '@/components/Layout/Layout'
 import PositionEditOverlay from '@/components/PositionEditOverlay'
+import ViewJobPostingModal from '@/components/ViewJobPostingModal'
 import Spinner from '@/components/Spinner'
 import {
   UsersIcon,
@@ -17,7 +18,7 @@ import {
   NoSymbolIcon,
   ArrowLeftOnRectangleIcon,
 } from '@heroicons/react/24/outline'
-import { DashboardStats, PositionStatusByLocation, OpenPositionProgress, SLALocation } from '@/types'
+import { DashboardStats, PositionStatusByLocation, OpenPositionProgress, SLALocation, FPTK } from '@/types'
 import { DashboardAPI, CandidatesAPI, FPTKAPI, ApplicationsAPI } from '@/lib/api'
 import { mapApiFptk } from './fptk/page'
 import { businessDaysDiffIndonesia } from '@/utils/indoBusinessDays'
@@ -147,6 +148,7 @@ export default function Dashboard() {
   })
   const [detailModal, setDetailModal] = useState<{ title: string, items: any[] } | null>(null)
   const [detailQuery, setDetailQuery] = useState('')
+  const [slaPositionView, setSlaPositionView] = useState<{ isOpen: boolean; jobPosting: FPTK | null; loading: boolean }>({ isOpen: false, jobPosting: null, loading: false })
   const [baseStats, setBaseStats] = useState<Partial<DashboardStats> | null>(null)
   const [priorityFilter, setPriorityFilter] = useState<typeof PRIORITY_FILTERS[number]>('ALL')
   const [positionStatusFilter, setPositionStatusFilter] = useState<PositionStatusFilterType>('ALL')
@@ -747,6 +749,21 @@ export default function Dashboard() {
   const openFptkEdit = (id?: string, backLabel = 'Dashboard') => {
     if (!id) return
     void positionEdit.open(id, backLabel)
+  }
+
+  const openFptkView = async (id?: string) => {
+    if (!id) return
+    setSlaPositionView({ isOpen: false, jobPosting: null, loading: true })
+    try {
+      const data = await FPTKAPI.getById(id)
+      setSlaPositionView({ isOpen: true, jobPosting: mapApiFptk(data), loading: false })
+    } catch {
+      setSlaPositionView({ isOpen: false, jobPosting: null, loading: false })
+    }
+  }
+
+  const closeFptkView = () => {
+    setSlaPositionView({ isOpen: false, jobPosting: null, loading: false })
   }
 
   const openCandidateView = (id?: string) => {
@@ -1357,7 +1374,7 @@ export default function Dashboard() {
 
                         {/* SLA by Location */}
                         <div className="bg-gray-50 rounded-lg p-3">
-                          <div className="flex justify-between items-center mb-2">
+                          <div className="flex justify-between items-center mb-1">
                             <div className="text-xs font-medium text-gray-700">SLA</div>
                             {slaData && (
                               <div className="text-[11px] text-gray-600">
@@ -1365,44 +1382,69 @@ export default function Dashboard() {
                               </div>
                             )}
                           </div>
+                          <div className="flex items-center gap-3 mb-2">
+                            <span className="flex items-center gap-1 text-[9px] text-emerald-600 font-medium">
+                              <span>✓</span>
+                              <span className="text-gray-500 font-normal">FKTK Received</span>
+                            </span>
+                            <span className="flex items-center gap-1 text-[9px] text-amber-500 font-medium">
+                              <span>⏳</span>
+                              <span className="text-gray-500 font-normal">FKTK Pending</span>
+                            </span>
+                          </div>
                           {slaData ? (
                             <div className="space-y-1.5">
                               {Object.entries(slaData.buckets).map(
                                 ([bucket, counts]: [string, any]) => {
                                   const bucketTotal = (counts?.received ?? 0) + (counts?.pending ?? 0)
                                   const openModal = () => {
-                                    setDetailModal({ title: `${bucket} • ${slaData.areaDetail}`, items: [] })
-                                    FPTKAPI.getAll({ areaDetail: slaData.areaDetail }, { limit: 500 }).then((res) => {
-                                      const data = Array.isArray(res?.data) ? res.data : []
-                                      const nowDate = new Date()
-                                      const items = data
-                                        .filter((j: any) => {
-                                          const dateValue = j?.fptkReceiveDate || j?.requestDate
-                                          if (!dateValue) return false
-                                          const d = new Date(dateValue)
-                                          if (isNaN(d.getTime())) return false
-                                          const diffDays = businessDaysDiffIndonesia(d, nowDate)
-                                          if (bucket === '0-30 Days') return diffDays <= 30
-                                          if (bucket === '31-60 Days') return diffDays > 30 && diffDays <= 60
-                                          if (bucket === '61-90 Days') return diffDays > 60 && diffDays <= 90
-                                          return diffDays > 90
+                                    const modalTitle = `${bucket} • ${slaData.areaDetail}`
+                                    setDetailModal({ title: modalTitle, items: [] })
+                                    FPTKAPI.getAll({}, { limit: 500 })
+                                      .then((res) => {
+                                        const data = Array.isArray(res?.data) ? res.data : []
+                                        const nowDate = new Date()
+                                        const items = data
+                                          .filter((j: any) => {
+                                            // Match location using the same fallback as dashboardService
+                                            const loc = j?.areaDetail || j?.area || 'Unknown'
+                                            if (loc !== slaData.areaDetail) return false
+                                            const dateValue = j?.fptkReceiveDate || j?.requestDate
+                                            if (!dateValue) return false
+                                            const d = new Date(dateValue)
+                                            if (isNaN(d.getTime())) return false
+                                            const diffDays = businessDaysDiffIndonesia(d, nowDate)
+                                            if (bucket === '0-30 Days') return diffDays <= 30
+                                            if (bucket === '31-60 Days') return diffDays > 30 && diffDays <= 60
+                                            if (bucket === '61-90 Days') return diffDays > 60 && diffDays <= 90
+                                            return diffDays > 90
+                                          })
+                                          .map((j: any) => ({
+                                            id: j.id,
+                                            kind: 'fptk',
+                                            title: j.positionTitle || j.position || 'Unknown Position',
+                                            subtitle: `${j.department || 'N/A'} • ${j.areaDetail || j.area || 'N/A'}`,
+                                            meta: `FKTK: ${j.statusFktk || 'Pending'} • FPTK Received: ${j.fptkReceiveDate || j.requestDate ? new Date(j.fptkReceiveDate || j.requestDate).toLocaleDateString() : '-'}`,
+                                          }))
+                                        setDetailModal({ title: modalTitle, items })
+                                      })
+                                      .catch(() => {
+                                        setDetailModal({
+                                          title: modalTitle,
+                                          items: [{ title: 'Failed to load positions', subtitle: 'Please try again', meta: 'Error' }],
                                         })
-                                        .map((j: any) => ({
-                                          id: j.id,
-                                          kind: 'fptk',
-                                          title: j.positionTitle || j.position || 'Unknown Position',
-                                          subtitle: `${j.department || 'N/A'} • ${j.location || j.areaDetail || 'N/A'}`,
-                                          meta: `FKTK: ${j.statusFktk || 'Pending'} • FPTK Received: ${j.fptkReceiveDate || j.requestDate ? new Date(j.fptkReceiveDate || j.requestDate).toLocaleDateString() : '-'}`,
-                                        }))
-                                      setDetailModal({ title: `${bucket} • ${slaData.areaDetail}`, items })
-                                    })
+                                      })
                                   }
                                   return (
                                     <div key={bucket}>
                                       <div className="flex items-center">
-                                        <div className="w-28 text-[10px] text-gray-600 truncate mr-2">
+                                        <button
+                                          className="w-28 text-[10px] text-gray-600 truncate mr-2 text-left hover:text-indigo-600 hover:underline transition-colors"
+                                          onClick={openModal}
+                                          title={`View positions: ${bucket}`}
+                                        >
                                           {bucket}
-                                        </div>
+                                        </button>
                                         <button
                                           className="flex-1 bg-gray-200 rounded-full h-1.5 group"
                                           onClick={openModal}
@@ -1569,7 +1611,18 @@ export default function Dashboard() {
                 ✕
               </button>
             </div>
-            <div className="max-h-[60vh] overflow-auto px-6 py-4">
+            <div className="max-h-[60vh] overflow-auto px-6 py-4 relative">
+              {slaPositionView.loading && (
+                <div className="absolute inset-0 bg-white/70 z-10 flex items-center justify-center rounded-b-lg">
+                  <div className="flex items-center gap-2 text-sm text-gray-500">
+                    <svg className="animate-spin h-4 w-4 text-indigo-500" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/>
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"/>
+                    </svg>
+                    Loading position details…
+                  </div>
+                </div>
+              )}
               <div className="mb-3">
                 <input
                   value={detailQuery}
@@ -1584,14 +1637,17 @@ export default function Dashboard() {
                   {detailModalMeta.pagedItems.map((it: DashboardListItem, idx: number) => {
                       const clickable = !!it.id && (it.kind === 'fptk' || it.kind === 'candidate')
                       const onClick = () => {
-                        if (it.kind === 'fptk') return openFptkEdit(it.id, detailModal?.title || 'Dashboard')
+                        if (it.kind === 'fptk') return void openFptkView(it.id)
                         if (it.kind === 'candidate') return openCandidateView(it.id)
                       }
                       return (
                         <li key={it.id || idx} className="py-3">
                           {clickable ? (
-                            <button className="w-full text-left" onClick={onClick}>
-                              <div className="text-sm font-medium text-indigo-700 hover:underline">{it.title}</div>
+                            <button className="w-full text-left group" onClick={onClick}>
+                              <div className="text-sm font-medium text-indigo-700 group-hover:underline flex items-center gap-1">
+                                {it.title}
+                                <span className="text-[10px] text-indigo-400 font-normal opacity-0 group-hover:opacity-100 transition-opacity">View details →</span>
+                              </div>
                               {it.subtitle && <div className="text-sm text-gray-600">{it.subtitle}</div>}
                               {it.meta && <div className="text-xs text-gray-500 mt-1">{it.meta}</div>}
                             </button>
@@ -1655,6 +1711,12 @@ export default function Dashboard() {
         onClose={positionEdit.close}
         onSave={positionEdit.handleSave}
         headerBackLabel={`Back to ${positionEdit.backLabel || 'Dashboard'}`}
+      />
+
+      <ViewJobPostingModal
+        isOpen={slaPositionView.isOpen}
+        onClose={closeFptkView}
+        jobPosting={slaPositionView.jobPosting}
       />
     </Layout>
   )
