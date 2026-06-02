@@ -1,6 +1,7 @@
 "use client"
 
-import { Suspense, useEffect, useMemo, useRef, useState } from 'react'
+import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { createPortal } from 'react-dom'
 import { useSearchParams } from 'next/navigation'
 import Layout from '@/components/Layout/Layout'
 import PositionEditOverlay from '@/components/PositionEditOverlay'
@@ -18,15 +19,22 @@ import {
   AdjustmentsHorizontalIcon,
   XMarkIcon,
 } from '@heroicons/react/24/outline'
+import Spinner from '@/components/Spinner'
 
 interface StatusCounts {
   [status: string]: number
+}
+
+interface OnboardingCandidate {
+  name: string
+  joinDate: string | null
 }
 
 interface SummaryRow {
   id: string
   priority: string
   division: string
+  area: string
   location: string
   section: string
   position: string
@@ -35,6 +43,7 @@ interface SummaryRow {
   remark: string
   sla: string
   counts: StatusCounts
+  onboardingCandidates: OnboardingCandidate[]
 }
 
 const DEFAULT_STATUSES: string[] = [
@@ -56,7 +65,7 @@ const DEFAULT_STATUSES: string[] = [
 ]
 
 const FIXED_SORT_KEYS: string[] = [
-  'priority', 'division', 'location', 'section', 'position',
+  'priority', 'division', 'area', 'location', 'section', 'position',
   'currentStatus', 'statusFktk', 'remark', 'sla',
 ]
 
@@ -73,7 +82,12 @@ const POSITIVE_STATUSES = new Set([
 
 const KIV_STATUSES = new Set(['Keep In View'])
 
-type SummaryCardKey = 'open' | 'closed' | 'sla-0-30' | 'sla-31-60' | 'sla-61-90' | 'sla-91'
+type StatusCardKey = 'open' | 'closed'
+type SlaCardKey = 'sla-0-30' | 'sla-31-60' | 'sla-61-90' | 'sla-91'
+type SummaryCardKey = StatusCardKey | SlaCardKey
+
+const STATUS_CARD_KEYS: StatusCardKey[] = ['open', 'closed']
+const SLA_CARD_KEYS: SlaCardKey[] = ['sla-0-30', 'sla-31-60', 'sla-61-90', 'sla-91']
 
 const CARD_CONFIG: Record<SummaryCardKey, {
   label: string
@@ -172,6 +186,112 @@ function SlaCell({ sla }: { sla: string }) {
   )
 }
 
+/**
+ * Badge + portal tooltip for the "On Boarding" column.
+ * Uses position:fixed rendered into document.body so the tooltip is never
+ * clipped by the overflow-x-auto table wrapper.
+ */
+function OnBoardingCell({
+  count,
+  counts,
+  onboardingCandidates,
+}: {
+  count: number
+  counts: StatusCounts
+  onboardingCandidates: OnboardingCandidate[]
+}) {
+  const triggerRef = useRef<HTMLSpanElement>(null)
+  const [coords, setCoords] = useState<{ top: number; left: number } | null>(null)
+
+  const show = useCallback(() => {
+    if (!triggerRef.current) return
+    const r = triggerRef.current.getBoundingClientRect()
+    setCoords({ top: r.top, left: r.left + r.width / 2 })
+  }, [])
+
+  const hide = useCallback(() => setCoords(null), [])
+
+  const totalApplied = counts['Applied'] ?? 0
+  const totalShortlisted = counts['Shortlisted'] ?? 0
+  const totalRejectedWithdrawn =
+    (counts['Rejected (Failed Interview / Assessment)'] ?? 0) +
+    (counts['Withdrawn'] ?? 0) +
+    (counts['Offer Rejected'] ?? 0)
+
+  const badge =
+    count === 0 ? (
+      <span className="text-gray-300 text-xs">—</span>
+    ) : (
+      <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${getBadgeClass('On Boarding', count)}`}>
+        {count}
+      </span>
+    )
+
+  const formatJoinDate = (iso: string | null) => {
+    if (!iso) return '—'
+    const d = new Date(iso)
+    return isNaN(d.getTime())
+      ? '—'
+      : d.toLocaleDateString('id-ID', { day: '2-digit', month: 'short', year: 'numeric' })
+  }
+
+  return (
+    <>
+      <span
+        ref={triggerRef}
+        onMouseEnter={show}
+        onMouseLeave={hide}
+        className="inline-block cursor-default"
+      >
+        {badge}
+      </span>
+
+      {coords &&
+        createPortal(
+          <div
+            className="pointer-events-none fixed z-[9999]"
+            style={{
+              top: coords.top - 8,
+              left: coords.left,
+              transform: 'translate(-50%, -100%)',
+            }}
+          >
+            {/* Downward arrow */}
+            <div className="absolute top-full left-1/2 -translate-x-1/2 border-4 border-transparent border-t-gray-800" />
+            <div className="bg-gray-800 text-white rounded-lg shadow-xl p-3 w-52">
+              <p className="text-[11px] font-semibold text-gray-300 uppercase tracking-wider border-b border-gray-700 pb-1.5 mb-2">
+                Position Summary
+              </p>
+              <div className="space-y-1.5">
+                <div className="flex items-center justify-between gap-4">
+                  <span className="text-gray-400 text-xs">Total Applied</span>
+                  <span className="text-xs font-bold text-blue-300">{totalApplied}</span>
+                </div>
+                <div className="flex items-center justify-between gap-4">
+                  <span className="text-gray-400 text-xs">Total Shortlisted</span>
+                  <span className="text-xs font-bold text-indigo-300">{totalShortlisted}</span>
+                </div>
+                <div className="flex items-center justify-between gap-4">
+                  <span className="text-gray-400 text-xs">Rejected / Withdrawn</span>
+                  <span className="text-xs font-bold text-red-400">{totalRejectedWithdrawn}</span>
+                </div>
+                <div className="flex items-center justify-between gap-4">
+                  <span className="text-gray-400 text-xs">Join Date</span>
+                  <span className="text-xs font-bold text-emerald-400">
+                    {onboardingCandidates.length > 0
+                      ? onboardingCandidates.map(c => formatJoinDate(c.joinDate)).join(', ')
+                      : '—'}
+                  </span>
+                </div>
+              </div>
+            </div>
+          </div>,
+          document.body,
+        )}
+    </>
+  )
+}
+
 function LoadingSkeleton() {
   return (
     <Layout>
@@ -212,6 +332,7 @@ function SummaryByPositionContent() {
   const [rows, setRows] = useState<SummaryRow[]>([])
   const [allStatuses, setAllStatuses] = useState<string[]>([])
   const [loading, setLoading] = useState(true)
+  const [refreshing, setRefreshing] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [priorityFilter, setPriorityFilter] = useState<string[]>([])
   const [divisionFilter, setDivisionFilter] = useState<string[]>([])
@@ -220,13 +341,21 @@ function SummaryByPositionContent() {
   )
   const [sortKey, setSortKey] = useState<string>('position')
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('asc')
-  const [activeCard, setActiveCard] = useState<SummaryCardKey | null>(
-    _cardParam && VALID_CARDS.includes(_cardParam as SummaryCardKey)
-      ? (_cardParam as SummaryCardKey)
+  const [activeStatusCard, setActiveStatusCard] = useState<StatusCardKey | null>(
+    _cardParam && STATUS_CARD_KEYS.includes(_cardParam as StatusCardKey)
+      ? (_cardParam as StatusCardKey)
       : null
   )
+  const [activeSlaCard, setActiveSlaCard] = useState<SlaCardKey | null>(
+    _cardParam && SLA_CARD_KEYS.includes(_cardParam as SlaCardKey)
+      ? (_cardParam as SlaCardKey)
+      : null
+  )
+  const [areaFilter, setAreaFilter] = useState<string[]>([])
+  const [statusFktkFilter, setStatusFktkFilter] = useState<string[]>([])
   const [divisions, setDivisions] = useState<string[]>([])
   const [locations, setLocations] = useState<string[]>([])
+  const [areaToLocations, setAreaToLocations] = useState<Record<string, string[]>>({})
   const [hiddenStatuses, setHiddenStatuses] = useState<Set<string>>(new Set())
   const [showColumnToggle, setShowColumnToggle] = useState(false)
 
@@ -283,11 +412,18 @@ function SummaryByPositionContent() {
     if (!options?.silent) {
       setLoading(true)
       setError(null)
+    } else {
+      setRefreshing(true)
     }
     try {
       const payload = await FPTKAPI.getSummaryByPosition()
       const allJobPostings: any[] = payload?.fptks || []
       const applicationCounts: Record<string, Record<string, number>> = payload?.applicationCounts || {}
+      // Total applicants per FPTK regardless of current status — keeps the
+      // "Applied" column cumulative (never shrinks as candidates advance).
+      const totalApplicants: Record<string, number> = payload?.totalApplicants || {}
+      // Onboarding candidates per FPTK — shown in the On Boarding tooltip
+      const onboardingCandidatesMap: Record<string, OnboardingCandidate[]> = payload?.onboardingCandidates || {}
 
       const collectedStatuses = new Set<string>(DEFAULT_STATUSES)
 
@@ -303,6 +439,10 @@ function SummaryByPositionContent() {
             collectedStatuses.add(uiStatus)
           }
         })
+
+        // Override "Applied" with the cumulative total so it stays fixed
+        // as candidates move through later stages.
+        counts['Applied'] = totalApplicants[job.id] ?? counts['Applied'] ?? 0
 
         const referenceDate = job.fptkReceiveDate || job.requestDate || job.createdAt
         const isClosed = isFptkClosedByCurrentStatus(job.currentStatus)
@@ -321,7 +461,8 @@ function SummaryByPositionContent() {
           id: job.id,
           priority: job.priority || job.urgentNormal || '—',
           division: job.department || job.division || '-',
-          location: job.areaDetail || job.area || job.location || '-',
+          area: job.area || '-',
+          location: job.areaDetail || job.location || '-',
           section: job.section || '-',
           position: job.positionTitle || job.position || job.title || '-',
           currentStatus:
@@ -332,6 +473,7 @@ function SummaryByPositionContent() {
           remark: job.remark || '-',
           sla: slaBucket,
           counts,
+          onboardingCandidates: onboardingCandidatesMap[job.id] ?? [],
         }
       })
 
@@ -346,6 +488,20 @@ function SummaryByPositionContent() {
         : Array.from(new Set(result.map((r) => r.location))).filter(Boolean)
       setDivisions(divOpts.filter(Boolean).sort())
       setLocations(locOpts.filter(Boolean).sort())
+
+      // Build area → locations map so the Location dropdown can be filtered by Area
+      const areaLocMap: Record<string, Set<string>> = {}
+      allJobPostings.forEach((job: any) => {
+        const a = job.area || '-'
+        const loc = job.areaDetail || job.location || '-'
+        if (!areaLocMap[a]) areaLocMap[a] = new Set()
+        if (loc && loc !== '-') areaLocMap[a].add(loc)
+      })
+      setAreaToLocations(
+        Object.fromEntries(
+          Object.entries(areaLocMap).map(([a, s]) => [a, Array.from(s).sort()])
+        )
+      )
     } catch (err: any) {
       console.error('Error loading summary data:', err)
       setError(err?.message || 'An unexpected error occurred.')
@@ -353,9 +509,12 @@ function SummaryByPositionContent() {
       setAllStatuses([...DEFAULT_STATUSES])
       setDivisions([])
       setLocations([])
+      setAreaToLocations({})
     } finally {
       if (!options?.silent) {
         setLoading(false)
+      } else {
+        setRefreshing(false)
       }
     }
   }
@@ -366,32 +525,48 @@ function SummaryByPositionContent() {
     () =>
       rows.filter((r) => {
         const priorityOk = priorityFilter.length === 0 || priorityFilter.includes(r.priority)
-        const divisionOk = divisionFilter.length === 0 || divisionFilter.includes(r.division)
+        const areaOk = areaFilter.length === 0 || areaFilter.includes(r.area)
         const locationOk = locationFilter.length === 0 || locationFilter.includes(r.location)
-        return priorityOk && divisionOk && locationOk
+        const divisionOk = divisionFilter.length === 0 || divisionFilter.includes(r.division)
+        const statusFktkOk = statusFktkFilter.length === 0 || statusFktkFilter.includes(r.statusFktk)
+        return priorityOk && areaOk && locationOk && divisionOk && statusFktkOk
       }),
-    [rows, priorityFilter, divisionFilter, locationFilter]
+    [rows, priorityFilter, areaFilter, locationFilter, divisionFilter, statusFktkFilter]
   )
 
+  // Location options visible in the dropdown, narrowed to the selected area(s)
+  const filteredLocationOptions = useMemo(() => {
+    if (areaFilter.length === 0) return locations
+    const allowed = new Set<string>()
+    areaFilter.forEach((a) => {
+      ;(areaToLocations[a] ?? []).forEach((loc) => allowed.add(loc))
+    })
+    return locations.filter((loc) => allowed.has(loc))
+  }, [areaFilter, locations, areaToLocations])
+
+  const SLA_BUCKET_MAP: Record<SlaCardKey, string> = {
+    'sla-0-30': '0-30 Days',
+    'sla-31-60': '31-60 Days',
+    'sla-61-90': '61-90 Days',
+    'sla-91': 'Above 91 Days',
+  }
+
   const tableRows = useMemo(() => {
-    if (!activeCard) return dropdownFilteredRows
-    switch (activeCard) {
-      case 'open':
-        return dropdownFilteredRows.filter((r) => isFptkOpenByCurrentStatus(r.currentStatus))
-      case 'closed':
-        return dropdownFilteredRows.filter((r) => isFptkClosedByCurrentStatus(r.currentStatus))
-      case 'sla-0-30':
-        return dropdownFilteredRows.filter((r) => r.sla === '0-30 Days')
-      case 'sla-31-60':
-        return dropdownFilteredRows.filter((r) => r.sla === '31-60 Days')
-      case 'sla-61-90':
-        return dropdownFilteredRows.filter((r) => r.sla === '61-90 Days')
-      case 'sla-91':
-        return dropdownFilteredRows.filter((r) => r.sla === 'Above 91 Days')
-      default:
-        return dropdownFilteredRows
+    let filtered = dropdownFilteredRows
+
+    if (activeStatusCard === 'open') {
+      filtered = filtered.filter((r) => isFptkOpenByCurrentStatus(r.currentStatus))
+    } else if (activeStatusCard === 'closed') {
+      filtered = filtered.filter((r) => isFptkClosedByCurrentStatus(r.currentStatus))
     }
-  }, [dropdownFilteredRows, activeCard])
+
+    if (activeSlaCard) {
+      const bucket = SLA_BUCKET_MAP[activeSlaCard]
+      filtered = filtered.filter((r) => r.sla === bucket)
+    }
+
+    return filtered
+  }, [dropdownFilteredRows, activeStatusCard, activeSlaCard])
 
   const openPositionCount = dropdownFilteredRows.filter((r) => isFptkOpenByCurrentStatus(r.currentStatus)).length
   const closedPositionCount = dropdownFilteredRows.filter((r) => isFptkClosedByCurrentStatus(r.currentStatus)).length
@@ -441,7 +616,11 @@ function SummaryByPositionContent() {
   }
 
   const toggleCardFilter = (key: SummaryCardKey) => {
-    setActiveCard((prev) => (prev === key ? null : key))
+    if (STATUS_CARD_KEYS.includes(key as StatusCardKey)) {
+      setActiveStatusCard((prev) => (prev === key ? null : key as StatusCardKey))
+    } else {
+      setActiveSlaCard((prev) => (prev === key ? null : key as SlaCardKey))
+    }
   }
 
   const sortIndicator = (key: string) => (
@@ -452,7 +631,9 @@ function SummaryByPositionContent() {
 
   const StatCard = ({ cardKey, count }: { cardKey: SummaryCardKey; count: number }) => {
     const cfg = CARD_CONFIG[cardKey]
-    const isActive = activeCard === cardKey
+    const isActive = STATUS_CARD_KEYS.includes(cardKey as StatusCardKey)
+      ? activeStatusCard === cardKey
+      : activeSlaCard === cardKey
 
     return (
       <button
@@ -503,6 +684,12 @@ function SummaryByPositionContent() {
               Pipeline status breakdown by Priority, Division, Section, and Position.
             </p>
           </div>
+          {refreshing && (
+            <div className="flex items-center gap-2 text-sm text-gray-400">
+              <Spinner size="sm" />
+              <span>Refreshing…</span>
+            </div>
+          )}
         </div>
 
         {/* Error Banner */}
@@ -523,7 +710,7 @@ function SummaryByPositionContent() {
         )}
 
         {/* Filters */}
-        <div className="bg-white shadow rounded-lg p-4 grid grid-cols-1 sm:grid-cols-3 gap-4">
+        <div className="bg-white shadow rounded-lg p-4 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
           <MultiSelectDropdown
             label="Priority"
             options={priorities}
@@ -531,6 +718,31 @@ function SummaryByPositionContent() {
             onChange={setPriorityFilter}
             placeholder="All priorities"
             searchPlaceholder="Search priority..."
+          />
+          <MultiSelectDropdown
+            label="Area"
+            options={['HO', 'Site']}
+            value={areaFilter}
+            onChange={(val) => {
+              setAreaFilter(val)
+              // Clear location selections that no longer belong to the new area set
+              if (val.length > 0) {
+                const allowed = new Set(
+                  val.flatMap((a) => areaToLocations[a] ?? [])
+                )
+                setLocationFilter((prev) => prev.filter((loc) => allowed.has(loc)))
+              }
+            }}
+            placeholder="All areas"
+            searchPlaceholder="HO or Site..."
+          />
+          <MultiSelectDropdown
+            label="Location"
+            options={filteredLocationOptions}
+            value={locationFilter}
+            onChange={setLocationFilter}
+            placeholder={areaFilter.length > 0 ? `Locations in ${areaFilter.join(' / ')}` : 'All locations'}
+            searchPlaceholder="Type location..."
           />
           <MultiSelectDropdown
             label="Division"
@@ -541,12 +753,12 @@ function SummaryByPositionContent() {
             searchPlaceholder="Type division..."
           />
           <MultiSelectDropdown
-            label="Location"
-            options={locations}
-            value={locationFilter}
-            onChange={setLocationFilter}
-            placeholder="All locations"
-            searchPlaceholder="Type location..."
+            label="Status FKTK"
+            options={['Pending', 'Received']}
+            value={statusFktkFilter}
+            onChange={setStatusFktkFilter}
+            placeholder="All statuses"
+            searchPlaceholder="Pending or Received..."
           />
         </div>
 
@@ -557,7 +769,7 @@ function SummaryByPositionContent() {
             <div className="h-px w-6 bg-gray-200" />
             <span>SLA Health</span>
             <span className="font-normal normal-case tracking-normal text-gray-300">
-              · Indonesia working days · click to filter
+              · Indonesia working days · combine both groups to cross-filter
             </span>
           </div>
           <div className="grid grid-cols-3 lg:grid-cols-6 gap-3">
@@ -582,17 +794,37 @@ function SummaryByPositionContent() {
                 <span className="font-semibold text-gray-900">{dropdownFilteredRows.length}</span>
                 {' '}positions
               </p>
-              {activeCard && (
-                <span className="inline-flex items-center gap-1 rounded-full bg-indigo-50 border border-indigo-200 px-2.5 py-0.5 text-xs font-medium text-indigo-700">
-                  {CARD_CONFIG[activeCard].label}
+              {activeStatusCard && (
+                <span className="inline-flex items-center gap-1 rounded-full bg-blue-50 border border-blue-200 px-2.5 py-0.5 text-xs font-medium text-blue-700">
+                  {CARD_CONFIG[activeStatusCard].label}
                   <button
-                    onClick={() => setActiveCard(null)}
-                    className="ml-0.5 text-indigo-400 hover:text-indigo-700"
-                    aria-label="Clear card filter"
+                    onClick={() => setActiveStatusCard(null)}
+                    className="ml-0.5 text-blue-400 hover:text-blue-700"
+                    aria-label="Clear position status filter"
                   >
                     <XMarkIcon className="h-3.5 w-3.5" />
                   </button>
                 </span>
+              )}
+              {activeSlaCard && (
+                <span className="inline-flex items-center gap-1 rounded-full bg-indigo-50 border border-indigo-200 px-2.5 py-0.5 text-xs font-medium text-indigo-700">
+                  {CARD_CONFIG[activeSlaCard].label}
+                  <button
+                    onClick={() => setActiveSlaCard(null)}
+                    className="ml-0.5 text-indigo-400 hover:text-indigo-700"
+                    aria-label="Clear SLA filter"
+                  >
+                    <XMarkIcon className="h-3.5 w-3.5" />
+                  </button>
+                </span>
+              )}
+              {activeStatusCard && activeSlaCard && (
+                <button
+                  onClick={() => { setActiveStatusCard(null); setActiveSlaCard(null) }}
+                  className="text-xs text-gray-400 hover:text-gray-600 underline"
+                >
+                  Clear all
+                </button>
               )}
             </div>
 
@@ -659,16 +891,23 @@ function SummaryByPositionContent() {
             </div>
           </div>
 
-          {/* Table container — single scroll context enables both sticky header and sticky column */}
-          <div className="overflow-auto max-h-[calc(100vh-400px)] min-h-[200px]">
+          {/* Table container — overflow-auto + max-h gives a true scroll context so sticky <th> cells work correctly. KPI cards/filters are outside this container and scroll naturally with the page. */}
+          <div className="overflow-auto max-h-[calc(100dvh-220px)] min-h-[300px]">
             <table className="min-w-full divide-y divide-gray-200">
-              <thead className="bg-gray-50 sticky top-0 z-10">
+              {/*
+                sticky is intentionally on each <th> rather than <thead>.
+                When overflow-x:auto creates a scroll container on the wrapper,
+                browsers mis-paint a sticky <thead> behind tbody rows.
+                Moving sticky to individual <th> cells avoids that bug entirely.
+              */}
+              <thead className="bg-gray-50">
                 <tr>
                   {(
                     [
                       { key: 'priority', label: 'Priority' },
-                      { key: 'division', label: 'Division' },
+                      { key: 'area', label: 'Area' },
                       { key: 'location', label: 'Location' },
+                      { key: 'division', label: 'Division' },
                       { key: 'section', label: 'Section' },
                       { key: 'position', label: 'Position', stickyLeft: true },
                       { key: 'currentStatus', label: 'Current Status' },
@@ -686,10 +925,10 @@ function SummaryByPositionContent() {
                           : 'none'
                       }
                       className={[
-                        'cursor-pointer px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider select-none whitespace-nowrap hover:bg-gray-100 transition-colors',
+                        'sticky top-0 cursor-pointer px-3 py-1 text-left text-xs font-medium text-gray-500 uppercase tracking-wider select-none whitespace-nowrap bg-gray-50 hover:bg-gray-100 transition-colors',
                         col.stickyLeft
-                          ? 'sticky left-0 z-20 bg-gray-50 border-r-2 border-indigo-100 shadow-[2px_0_4px_-2px_rgba(0,0,0,0.08)]'
-                          : '',
+                          ? 'left-0 z-30 border-r-2 border-indigo-100 shadow-[2px_0_4px_-2px_rgba(0,0,0,0.08)]'
+                          : 'z-20',
                       ].join(' ')}
                     >
                       {col.label} {sortIndicator(col.key)}
@@ -704,7 +943,7 @@ function SummaryByPositionContent() {
                           ? sortDir === 'asc' ? 'ascending' : 'descending'
                           : 'none'
                       }
-                      className="cursor-pointer px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider select-none hover:bg-gray-100 transition-colors"
+                      className="sticky top-0 z-20 cursor-pointer px-3 py-1 text-left text-xs font-medium text-gray-500 uppercase tracking-wider select-none bg-gray-50 hover:bg-gray-100 transition-colors"
                     >
                       <span className="whitespace-nowrap">{status} {sortIndicator(status)}</span>
                     </th>
@@ -714,40 +953,54 @@ function SummaryByPositionContent() {
               <tbody className="bg-white divide-y divide-gray-200">
                 {sortedRows.map((row) => (
                   <tr key={row.id} className="group hover:bg-gray-50 transition-colors">
-                    <td className="px-4 py-2 whitespace-nowrap text-sm text-gray-900">{row.priority}</td>
-                    <td className="px-4 py-2 whitespace-nowrap text-sm text-gray-900">{row.division}</td>
-                    <td className="px-4 py-2 whitespace-nowrap text-sm text-gray-900">{row.location}</td>
-                    <td className="px-4 py-2 whitespace-nowrap text-sm text-gray-900">{row.section}</td>
-                    <td className="px-4 py-2 whitespace-nowrap text-sm text-gray-900 sticky left-0 z-10 bg-white group-hover:bg-gray-50 border-r-2 border-indigo-100 shadow-[2px_0_4px_-2px_rgba(0,0,0,0.08)] transition-colors">
+                    <td className="px-3 py-1 whitespace-nowrap text-sm text-gray-900">{row.priority}</td>
+                    <td className="px-3 py-1 whitespace-nowrap text-sm text-gray-900">{row.area}</td>
+                    <td className="px-3 py-1 whitespace-nowrap text-sm text-gray-900">{row.location}</td>
+                    <td className="px-3 py-1 text-sm text-gray-900 max-w-[9rem] truncate" title={row.division}>{row.division}</td>
+                    <td className="px-3 py-1 text-sm text-gray-900 max-w-[12rem] truncate" title={row.section}>{row.section}</td>
+                    <td className="px-3 py-1 text-sm text-gray-900 max-w-[16rem] sticky left-0 z-10 bg-white group-hover:bg-gray-50 border-r-2 border-indigo-100 shadow-[2px_0_4px_-2px_rgba(0,0,0,0.08)] transition-colors" title={row.position}>
                       {row.id ? (
                         <button
                           type="button"
                           onClick={() => void positionEdit.open(row.id, 'Summary')}
-                          className="text-indigo-600 hover:text-indigo-800 hover:underline font-medium text-left"
+                          className="text-indigo-600 hover:text-indigo-800 hover:underline font-medium text-left w-full truncate block"
                         >
                           {row.position}
                         </button>
                       ) : (
-                        row.position
+                        <span className="truncate block">{row.position}</span>
                       )}
                     </td>
-                    <td className="px-4 py-2 whitespace-nowrap text-sm text-gray-900">
+                    <td className="px-3 py-1 whitespace-nowrap text-sm text-gray-900">
                       {displayFptkCurrentStatus(row.currentStatus)}
                     </td>
-                    <td className="px-4 py-2 whitespace-nowrap text-sm text-gray-900">{row.statusFktk}</td>
+                    <td className="px-3 py-1 whitespace-nowrap text-sm text-gray-900">{row.statusFktk}</td>
                     <td
-                      className="px-4 py-2 whitespace-nowrap text-sm text-gray-900 max-w-xs truncate"
+                      className="px-3 py-1 text-sm text-gray-900 max-w-[10rem] truncate"
                       title={row.remark}
                     >
                       {row.remark}
                     </td>
-                    <td className="px-4 py-2 whitespace-nowrap">
+                    <td className="px-3 py-1 whitespace-nowrap">
                       <SlaCell sla={row.sla} />
                     </td>
                     {visibleStatuses.map((status) => {
                       const count = row.counts[status] ?? 0
+
+                      if (status === 'On Boarding') {
+                        return (
+                          <td key={status} className="px-3 py-1 whitespace-nowrap text-sm">
+                            <OnBoardingCell
+                              count={count}
+                              counts={row.counts}
+                              onboardingCandidates={row.onboardingCandidates}
+                            />
+                          </td>
+                        )
+                      }
+
                       return (
-                        <td key={status} className="px-4 py-2 whitespace-nowrap text-sm">
+                        <td key={status} className="px-3 py-1 whitespace-nowrap text-sm">
                           {count === 0 ? (
                             <span className="text-gray-300 text-xs">—</span>
                           ) : (
@@ -766,7 +1019,7 @@ function SummaryByPositionContent() {
                 {rows.length === 0 && !error && (
                   <tr>
                     <td
-                      colSpan={9 + visibleStatuses.length}
+                      colSpan={10 + visibleStatuses.length}
                       className="px-4 py-10 text-center text-sm text-gray-500"
                     >
                       No data available. Create some positions and applications to see the summary.
@@ -776,16 +1029,16 @@ function SummaryByPositionContent() {
                 {rows.length > 0 && sortedRows.length === 0 && (
                   <tr>
                     <td
-                      colSpan={9 + visibleStatuses.length}
+                      colSpan={10 + visibleStatuses.length}
                       className="px-4 py-10 text-center text-sm text-gray-500"
                     >
                       No rows match the selected filter.{' '}
-                      {activeCard && (
+                      {(activeStatusCard || activeSlaCard) && (
                         <button
-                          onClick={() => setActiveCard(null)}
+                          onClick={() => { setActiveStatusCard(null); setActiveSlaCard(null) }}
                           className="text-indigo-600 hover:underline"
                         >
-                          Clear card filter
+                          Clear card filters
                         </button>
                       )}
                     </td>

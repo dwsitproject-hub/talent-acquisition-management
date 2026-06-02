@@ -4,8 +4,9 @@ import Link from 'next/link'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { usePathname, useRouter, useSearchParams } from 'next/navigation'
 import { useQuery } from '@tanstack/react-query'
-import { BriefcaseIcon, ChevronLeft, ChevronRight, Loader2, MapPin, Search } from 'lucide-react'
+import { ChevronLeft, ChevronRight, Loader2, MapPin, Search } from 'lucide-react'
 import { fetchPublishedJobs, type PublishedJob } from '@/lib/api'
+import NavBar from '@/components/NavBar'
 
 const PAGE_SIZES = [10, 20, 50, 100] as const
 
@@ -120,28 +121,7 @@ export default function JobsBrowse() {
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-blue-50 to-white">
-      <header className="bg-white shadow-sm">
-        <nav className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
-          <Link href="/" className="flex items-center space-x-2">
-            <BriefcaseIcon className="h-8 w-8 text-primary-600" />
-            <span className="text-2xl font-bold text-gray-900">KPN Careers</span>
-          </Link>
-          <div className="flex items-center gap-3 sm:gap-4">
-            <Link href="/jobs" className="text-primary-600 font-medium text-sm sm:text-base">
-              Browse Jobs
-            </Link>
-            <Link href="/login" className="text-gray-700 hover:text-primary-600 font-medium text-sm sm:text-base">
-              Sign In
-            </Link>
-            <Link
-              href="/register"
-              className="bg-primary-600 text-white px-3 py-2 rounded-lg hover:bg-primary-700 font-medium text-sm sm:text-base"
-            >
-              Register
-            </Link>
-          </div>
-        </nav>
-      </header>
+      <NavBar />
 
       <main className="max-w-5xl mx-auto px-4 py-8 sm:py-12">
         <div className="mb-8">

@@ -5,6 +5,7 @@ import { useAuth } from '@/contexts/AuthContext'
 import { useRouter } from 'next/navigation'
 import Layout from '@/components/Layout/Layout'
 import NewApplicationModal from '@/components/NewApplicationModal'
+import ApplicationHistoryModal from '@/components/ApplicationHistoryModal'
 import { Application } from '@/types'
 import { ApplicationsAPI } from '@/lib/api'
 import { PlusIcon, MagnifyingGlassIcon, EyeIcon, PencilIcon } from '@heroicons/react/24/outline'
@@ -20,6 +21,7 @@ export default function ApplicationsPage() {
   const [pageSize, setPageSize] = useState<10 | 50 | 100>(50)
   const [listMeta, setListMeta] = useState({ total: 0, totalPages: 1 })
   const [isNewApplicationModalOpen, setIsNewApplicationModalOpen] = useState(false)
+  const [historyApplicationId, setHistoryApplicationId] = useState<string | null>(null)
 
   useEffect(() => {
     if (!isLoading && !isAuthenticated) {
@@ -290,9 +292,13 @@ export default function ApplicationsPage() {
                       </div>
                     </div>
                     <div className="flex items-center space-x-2 ml-4">
-                      <button className="text-indigo-600 hover:text-indigo-900 text-sm font-medium flex items-center">
+                      <button
+                        onClick={() => setHistoryApplicationId(application.id)}
+                        className="text-indigo-600 hover:text-indigo-900 text-sm font-medium flex items-center"
+                        title="View status history"
+                      >
                         <EyeIcon className="h-4 w-4 mr-1" />
-                        View
+                        History
                       </button>
                       <button className="text-gray-400 hover:text-gray-600 text-sm font-medium flex items-center">
                         <PencilIcon className="h-4 w-4 mr-1" />
@@ -340,6 +346,13 @@ export default function ApplicationsPage() {
           isOpen={isNewApplicationModalOpen}
           onClose={() => setIsNewApplicationModalOpen(false)}
           onSave={handleNewApplication}
+        />
+
+        {/* Application Status History Modal */}
+        <ApplicationHistoryModal
+          isOpen={historyApplicationId !== null}
+          onClose={() => setHistoryApplicationId(null)}
+          applicationId={historyApplicationId}
         />
       </div>
     </Layout>

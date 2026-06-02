@@ -5,6 +5,7 @@ import { useModalEscape } from '@/hooks/useModalEscape'
 import { XMarkIcon } from '@heroicons/react/24/outline'
 import { FPTK } from '@/types'
 import { MasterOfficeLocationAPI, MasterDivisionAPI, CandidatesAPI, AdminUsersAPI } from '@/lib/api'
+import ApplicationHistoryModal from './ApplicationHistoryModal'
 import { fetchApplicationsForFptk } from '@/utils/mapFptkApplication'
 import { useAuth } from '@/contexts/AuthContext'
 import { compressFile, formatFileSize } from '@/utils/fileCompression'
@@ -72,6 +73,10 @@ export default function EditJobPostingModal({
   const [newSkill, setNewSkill] = useState('')
   const [appliedCandidates, setAppliedCandidates] = useState<any[]>([])
   const [expandedInterviewSections, setExpandedInterviewSections] = useState<Set<string>>(new Set())
+  const [historyApplicationId, setHistoryApplicationId] = useState<string | null>(null)
+  const [pendingStatusChange, setPendingStatusChange] = useState<{ candidateId: string; newStatus: string } | null>(null)
+  const [statusChangeReason, setStatusChangeReason] = useState('')
+  const [statusChangeBlacklist, setStatusChangeBlacklist] = useState(false)
   const [suggestedCandidates, setSuggestedCandidates] = useState<any[]>([])
   const [allCandidates, setAllCandidates] = useState<any[]>([])
   const [showCandidatePicker, setShowCandidatePicker] = useState(false)
@@ -214,6 +219,9 @@ export default function EditJobPostingModal({
           : baseInfo.joinDate != null && baseInfo.joinDate !== ''
             ? String(baseInfo.joinDate).trim().slice(0, 10)
             : null,
+      rejectionReason: candidate.rejectionReason ?? baseInfo.rejectionReason ?? null,
+      blacklisted: candidate.blacklisted ?? baseInfo.blacklisted ?? false,
+      blacklistReason: candidate.blacklistReason ?? baseInfo.blacklistReason ?? null,
       skills,
       experience,
       yearsOfExperience: experience,
@@ -895,13 +903,13 @@ export default function EditJobPostingModal({
     })
   }
 
-  const handleCandidateStatusChange = (candidateId: string, newStatus: string) => {
+  const applyStatusChange = (candidateId: string, newStatus: string, reason: string, blacklisted: boolean) => {
     setAppliedCandidates(prev => {
       const target = prev.find(
         c => c.id === candidateId || c.candidateId === candidateId
       )
       const oldStatus = target ? target.status : undefined
-      
+
       const updateData: any = {
         status: newStatus,
         backendStatus: mapAppliedStatusToBackend(newStatus),
@@ -910,19 +918,27 @@ export default function EditJobPostingModal({
       if (normalized.startsWith('rejected')) {
         updateData.rejectedDate = new Date().toISOString()
         updateData.withdrawDate = null
+        updateData.rejectionReason = reason || null
       } else if (normalized === 'withdrawn') {
         updateData.withdrawDate = new Date().toISOString()
         updateData.rejectedDate = null
+        updateData.rejectionReason = reason || null
       } else {
         updateData.rejectedDate = null
         updateData.withdrawDate = null
+        updateData.rejectionReason = null
       }
-      
+
+      if (blacklisted) {
+        updateData.blacklisted = true
+        updateData.blacklistReason = reason || null
+      }
+
       // When status changes to "Interviewed", ensure there's at least one interview entry
       if (newStatus === 'Interviewed' && (!target?.interviews || target.interviews.length === 0)) {
         updateData.interviews = [{ interviewer: '', date: '', time: '', results: '' }]
       }
-      
+
       const updated = prev.map(candidate => {
         const matches =
           candidate.id === candidateId || candidate.candidateId === candidateId
@@ -943,10 +959,38 @@ export default function EditJobPostingModal({
       }
       return updated
     })
-    
+
     if (onCandidateStatusUpdate && jobPosting) {
       onCandidateStatusUpdate(jobPosting.id, candidateId, newStatus)
     }
+  }
+
+  const handleCandidateStatusChange = (candidateId: string, newStatus: string) => {
+    const normalized = (newStatus || '').toString().trim().toLowerCase()
+    const needsReason = normalized.startsWith('rejected') || normalized === 'withdrawn'
+
+    if (needsReason) {
+      setStatusChangeReason('')
+      setStatusChangeBlacklist(false)
+      setPendingStatusChange({ candidateId, newStatus })
+      return
+    }
+
+    applyStatusChange(candidateId, newStatus, '', false)
+  }
+
+  const handleConfirmStatusChange = () => {
+    if (!pendingStatusChange) return
+    applyStatusChange(pendingStatusChange.candidateId, pendingStatusChange.newStatus, statusChangeReason, statusChangeBlacklist)
+    setPendingStatusChange(null)
+    setStatusChangeReason('')
+    setStatusChangeBlacklist(false)
+  }
+
+  const handleCancelStatusChange = () => {
+    setPendingStatusChange(null)
+    setStatusChangeReason('')
+    setStatusChangeBlacklist(false)
   }
 
   const handleCandidateJoinDateChange = (candidateId: string, dateValue: string) => {
@@ -2175,6 +2219,37 @@ export default function EditJobPostingModal({
                             <option value="Withdrawn">Withdrawn</option>
                             <option value="Keep In View">Keep In View</option>
                           </select>
+                          {candidate.applicationId && (
+                            <button
+                              type="button"
+                              onClick={() => setHistoryApplicationId(candidate.applicationId)}
+                              style={{
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                gap: '4px',
+                                marginTop: '6px',
+                                padding: '3px 8px',
+                                border: '1px solid #c7d2fe',
+                                borderRadius: '4px',
+                                fontSize: '11px',
+                                fontWeight: '500',
+                                color: '#4f46e5',
+                                backgroundColor: '#eef2ff',
+                                cursor: 'pointer',
+                              }}
+                            >
+                              <svg xmlns="http://www.w3.org/2000/svg" style={{ width: '12px', height: '12px' }} fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
+                                <path strokeLinecap="round" strokeLinejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" />
+                              </svg>
+                              History
+                            </button>
+                          )}
+                          {candidate.blacklisted && (
+                            <div style={{ marginTop: '6px', display: 'inline-flex', alignItems: 'center', gap: '4px', padding: '2px 8px', backgroundColor: '#fef2f2', border: '1px solid #fecaca', borderRadius: '4px', fontSize: '11px', fontWeight: '600', color: '#b91c1c' }}>
+                              <svg xmlns="http://www.w3.org/2000/svg" style={{ width: '11px', height: '11px' }} fill="none" viewBox="0 0 24 24" strokeWidth={2.5} stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M18.364 18.364A9 9 0 0 0 5.636 5.636m12.728 12.728A9 9 0 0 1 5.636 5.636m12.728 12.728L5.636 5.636" /></svg>
+                              Blacklisted
+                            </div>
+                          )}
                           {(candidate.status || '').toString().toLowerCase().startsWith('rejected') && candidate.rejectedDate ? (
                             <div style={{ marginTop: '6px', fontSize: '11px', color: '#b91c1c' }}>
                               Rejected Date: {formatDate(candidate.rejectedDate)}
@@ -2185,6 +2260,11 @@ export default function EditJobPostingModal({
                               Withdraw Date: {formatDate(candidate.withdrawDate)}
                             </div>
                           ) : null}
+                          {candidate.rejectionReason && (
+                            <div style={{ marginTop: '6px', padding: '6px 8px', backgroundColor: '#fef9c3', border: '1px solid #fde68a', borderRadius: '4px', fontSize: '11px', color: '#92400e' }}>
+                              <span style={{ fontWeight: '600' }}>Reason: </span>{candidate.rejectionReason}
+                            </div>
+                          )}
                           {['MCU', 'On Boarding'].includes(candidate.status) ? (
                             <div style={{ marginTop: '10px' }}>
                               <label
@@ -2922,6 +3002,92 @@ export default function EditJobPostingModal({
           </form>
         </div>
       </div>
+
+      {/* Application Status History Modal */}
+      <ApplicationHistoryModal
+        isOpen={historyApplicationId !== null}
+        onClose={() => setHistoryApplicationId(null)}
+        applicationId={historyApplicationId}
+      />
+
+      {/* Rejection / Withdrawal Reason Dialog */}
+      {pendingStatusChange && (
+        <div className="fixed inset-0 z-[1200] overflow-y-auto">
+          <div className="fixed inset-0 bg-gray-900/60" onClick={handleCancelStatusChange} />
+          <div className="flex min-h-screen items-center justify-center p-4">
+            <div
+              className="relative bg-white rounded-xl shadow-xl w-full max-w-md"
+              onClick={(e) => e.stopPropagation()}
+            >
+              {/* Header */}
+              <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100">
+                <h3 className="text-base font-semibold text-gray-900">
+                  {(pendingStatusChange.newStatus || '').toLowerCase().startsWith('rejected')
+                    ? 'Rejection Reason'
+                    : 'Withdrawal Reason'}
+                </h3>
+                <button onClick={handleCancelStatusChange} className="rounded-full p-1 text-gray-400 hover:text-gray-600 hover:bg-gray-100">
+                  <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M6 18 18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              </div>
+
+              {/* Body */}
+              <div className="px-6 py-5 space-y-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Reason <span className="text-gray-400 font-normal">(optional)</span>
+                  </label>
+                  <textarea
+                    rows={3}
+                    value={statusChangeReason}
+                    onChange={(e) => setStatusChangeReason(e.target.value)}
+                    placeholder={
+                      (pendingStatusChange.newStatus || '').toLowerCase().startsWith('rejected')
+                        ? 'e.g. Did not meet technical requirements...'
+                        : 'e.g. Candidate withdrew due to another offer...'
+                    }
+                    className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 resize-none"
+                  />
+                </div>
+                <label className="flex items-start gap-3 cursor-pointer select-none">
+                  <input
+                    type="checkbox"
+                    checked={statusChangeBlacklist}
+                    onChange={(e) => setStatusChangeBlacklist(e.target.checked)}
+                    className="mt-0.5 h-4 w-4 rounded border-gray-300 text-red-600 focus:ring-red-500"
+                  />
+                  <div>
+                    <span className="text-sm font-medium text-gray-900">Blacklist this candidate</span>
+                    <p className="text-xs text-gray-500 mt-0.5">
+                      Marks the candidate as blacklisted across all positions.
+                    </p>
+                  </div>
+                </label>
+              </div>
+
+              {/* Footer */}
+              <div className="flex justify-end gap-3 px-6 py-4 border-t border-gray-100">
+                <button
+                  type="button"
+                  onClick={handleCancelStatusChange}
+                  className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-200 rounded-lg hover:bg-gray-50"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  onClick={handleConfirmStatusChange}
+                  className="px-4 py-2 text-sm font-medium text-white bg-indigo-600 rounded-lg hover:bg-indigo-700"
+                >
+                  Confirm
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

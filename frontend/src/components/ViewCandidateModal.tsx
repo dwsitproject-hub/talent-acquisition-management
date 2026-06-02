@@ -10,6 +10,7 @@ import { ApplicationsAPI } from '@/lib/api'
 import { getApplicationStatusPillClass, mapApplicationStatusToUi } from '@/utils/applicationStatusUi'
 import PositionEditOverlay from '@/components/PositionEditOverlay'
 import { usePositionEditOverlay } from '@/hooks/usePositionEditOverlay'
+import ApplicationHistoryModal from '@/components/ApplicationHistoryModal'
 
 /** Collapse whitespace and unify dash variants so profile "Position applied for" matches FPTK titles */
 function normalizeTitleForMatch(s: string): string {
@@ -57,6 +58,7 @@ export default function ViewCandidateModal({ isOpen, onClose, candidate }: ViewC
   const [positionApplications, setPositionApplications] = useState<any[]>([])
   const [loadingPositionApplications, setLoadingPositionApplications] = useState(false)
   const [applicationsRefreshKey, setApplicationsRefreshKey] = useState(0)
+  const [historyApplicationId, setHistoryApplicationId] = useState<string | null>(null)
 
   const positionEdit = usePositionEditOverlay(() => {
     if (candidate?.id) {
@@ -655,7 +657,7 @@ export default function ViewCandidateModal({ isOpen, onClose, candidate }: ViewC
                               <p style={{ fontSize: '12px', color: '#6b7280', margin: '0 0 4px 0' }}>Division: {department}</p>
                               <p style={{ fontSize: '12px', color: '#6b7280', margin: 0 }}>Applied: {appliedAt ? formatDate(appliedAt) : '—'}</p>
                             </div>
-                            <div>
+                            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '6px' }}>
                               <span
                                 style={{
                                   padding: '4px 8px',
@@ -668,6 +670,27 @@ export default function ViewCandidateModal({ isOpen, onClose, candidate }: ViewC
                               >
                                 {uiStatus}
                               </span>
+                              <button
+                                type="button"
+                                onClick={() => setHistoryApplicationId((app as any).id)}
+                                style={{
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  gap: '4px',
+                                  fontSize: '11px',
+                                  fontWeight: '500',
+                                  color: '#6366f1',
+                                  background: 'none',
+                                  border: '1px solid #c7d2fe',
+                                  borderRadius: '6px',
+                                  padding: '3px 8px',
+                                  cursor: 'pointer',
+                                }}
+                                title="View status history"
+                              >
+                                <EyeIcon style={{ width: '12px', height: '12px' }} />
+                                History
+                              </button>
                             </div>
                           </div>
                         </div>
@@ -1448,6 +1471,12 @@ export default function ViewCandidateModal({ isOpen, onClose, candidate }: ViewC
       onClose={positionEdit.close}
       onSave={positionEdit.handleSave}
       headerBackLabel={`Back to ${positionEdit.backLabel || candidateDisplayName}`}
+    />
+
+    <ApplicationHistoryModal
+      isOpen={historyApplicationId !== null}
+      onClose={() => setHistoryApplicationId(null)}
+      applicationId={historyApplicationId}
     />
     </>
   )

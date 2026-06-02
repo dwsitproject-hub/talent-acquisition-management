@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react'
 import { TasGuidedTour } from '@/components/tour/TasGuidedTour'
 import Header from './Header'
 import Sidebar from './Sidebar'
+import NavigationProgress from '@/components/NavigationProgress'
 import { cn } from '@/lib/utils'
 
 interface LayoutProps {
@@ -26,6 +27,7 @@ export default function Layout({ children }: LayoutProps) {
 
   return (
     <div>
+      <NavigationProgress />
       <TasGuidedTour />
       <Sidebar
         sidebarOpen={sidebarOpen}

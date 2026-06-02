@@ -6,6 +6,7 @@ import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import Layout from '@/components/Layout/Layout'
 import PositionEditOverlay from '@/components/PositionEditOverlay'
+import Spinner from '@/components/Spinner'
 import {
   UsersIcon,
   BriefcaseIcon,
@@ -22,12 +23,10 @@ import { mapApiFptk } from './fptk/page'
 import { businessDaysDiffIndonesia } from '@/utils/indoBusinessDays'
 import {
   getDashboardPeriodBounds,
-  itemTimestampInRange,
   periodOverPeriodChange,
   toMonthInputValue,
   toWeekInputValue,
   type DashboardTimeMode,
-  type DateRange,
 } from '@/utils/dashboardPeriod'
 import { useModalEscape } from '@/hooks/useModalEscape'
 import { usePositionEditOverlay } from '@/hooks/usePositionEditOverlay'
@@ -109,207 +108,25 @@ const parseDateValue = (value?: string | null) => {
 const isWithinRange = (date: Date, start: Date, end: Date) =>
   date.getTime() >= start.getTime() && date.getTime() <= end.getTime()
 
-const getCurrentWeekRange = () => {
-  const now = new Date()
-  const startOfWeek = new Date(now)
-  const day = startOfWeek.getDay()
-  const diffToMonday = (day + 6) % 7
-  startOfWeek.setDate(startOfWeek.getDate() - diffToMonday)
-  startOfWeek.setHours(0, 0, 0, 0)
-
-  const endOfWeek = new Date(startOfWeek)
-  endOfWeek.setDate(startOfWeek.getDate() + 6)
-  endOfWeek.setHours(23, 59, 59, 999)
-  return { startOfWeek, endOfWeek }
-}
-
-const computePositionStatusByLocation = (positions: any[]): PositionStatusByLocation[] => {
-  const data = positions.reduce((acc: Record<string, PositionStatusByLocation>, position: any) => {
-    const location = position?.areaDetail || position?.area || position?.location || 'Unknown'
-    if (!acc[location]) {
-      acc[location] = { location, total: 0, open: 0, closed: 0 }
-    }
-    acc[location].total += 1
-    const cs = position?.currentStatus || position?.status || ''
-    if (isOpenCurrentStatusLabel(cs)) {
-      acc[location].open += 1
-    } else {
-      acc[location].closed += 1
-    }
-    return acc
-  }, {} as Record<string, PositionStatusByLocation>)
-  return Object.values(data) as PositionStatusByLocation[]
-}
-
-const computeOpenPositionProgress = (positions: any[]): OpenPositionProgress[] => {
-  const data = positions.reduce((acc: Record<string, OpenPositionProgress>, position: any) => {
-    const areaDetail = position?.areaDetail || position?.area || position?.location || 'Unknown'
-    const status = position?.currentStatus || position?.status || 'Raise FPTK'
-
-    if (!acc[areaDetail]) {
-      acc[areaDetail] = { areaDetail, statusCounts: {} as Record<string, number>, total: 0, percentage: 0 }
-    }
-
-    acc[areaDetail].statusCounts[status] = (acc[areaDetail].statusCounts[status] || 0) + 1
-    acc[areaDetail].total += 1
-    return acc
-  }, {} as Record<string, any>)
-
-  const total = positions.length || 1
-  return (Object.values(data) as OpenPositionProgress[]).map((entry) => ({
-    ...entry,
-    percentage: Math.round((entry.total / total) * 100),
-  }))
-}
-
-const computeSlaByLocation = (positions: any[]): SLALocation[] => {
-  const now = new Date()
-  const data = positions.reduce((acc: Record<string, SLALocation>, position: any) => {
-    const location = position?.areaDetail || position?.area || position?.location || 'Unknown'
-    const receivedDate =
-      parseDateValue(position?.fptkReceiveDate) || parseDateValue(position?.requestDate)
-    if (!receivedDate) return acc
-
-    if (!acc[location]) {
-      acc[location] = {
-        areaDetail: location,
-        buckets: {
-          '0-30 Days': 0,
-          '31-60 Days': 0,
-          '61-90 Days': 0,
-          'Above 91 Days': 0,
-        },
-        total: 0,
-      }
-    }
-
-    const diffDays = businessDaysDiffIndonesia(receivedDate, now)
-    if (diffDays <= 30) acc[location].buckets['0-30 Days'] += 1
-    else if (diffDays <= 60) acc[location].buckets['31-60 Days'] += 1
-    else if (diffDays <= 90) acc[location].buckets['61-90 Days'] += 1
-    else acc[location].buckets['Above 91 Days'] += 1
-
-    acc[location].total += 1
-    return acc
-  }, {} as Record<string, SLALocation>)
-
-  return Object.values(data) as SLALocation[]
-}
-
-const getHiredInRangeItems = (positions: any[], range: DateRange): DashboardListItem[] => {
-  return positions
-    .filter((position) => {
-      const s = normalizeUiCurrentStatus(position?.currentStatus || position?.status)
-      if (s !== 'close') return false
-      return itemTimestampInRange(position?.updatedAt, range)
-    })
-    .map((position) => {
-      const date = parseDateValue(position?.updatedAt)
-      return {
-        id: position?.id,
-        kind: position?.id ? ('fptk' as const) : undefined,
-        title: position?.title || position?.position || 'Unknown Position',
-        subtitle: position?.department ? `${position.department} • ${position.location || 'N/A'}` : position?.location,
-        meta: date ? `Updated ${date.toLocaleDateString()}` : undefined,
-      }
-    })
-}
-
-const getHiredAllTimeItems = (positions: any[]): DashboardListItem[] => {
-  return positions
-    .filter((position) => normalizeUiCurrentStatus(position?.currentStatus || position?.status) === 'close')
-    .map((position) => {
-      const date = parseDateValue(position?.updatedAt)
-      return {
-        id: position?.id,
-        kind: position?.id ? ('fptk' as const) : undefined,
-        title: position?.title || position?.position || 'Unknown Position',
-        subtitle: position?.department ? `${position.department} • ${position.location || 'N/A'}` : position?.location,
-        meta: date ? `Updated ${date.toLocaleDateString()}` : undefined,
-      }
-    })
-}
-
 const asUpperStatus = (value: any) => (value || '').toString().trim().toUpperCase()
-
-const appActivityTs = (a: { updatedAt?: string | null; appliedAt?: string | null } | null | undefined) =>
-  a?.updatedAt || a?.appliedAt
-const fptkActivityTs = (p: { updatedAt?: string | null; createdAt?: string | null } | null | undefined) =>
-  p?.updatedAt || p?.createdAt
-
-const appInGroupInRange = (a: any, group: Set<string>, range: DateRange) =>
-  group.has(asUpperStatus(a?.status)) && itemTimestampInRange(appActivityTs(a), range)
-
-const appInGroup = (a: any, group: Set<string>) => group.has(asUpperStatus(a?.status))
 
 const DASHBOARD_COMPARE_OFF_DELTA = {
   formattedChange: '—',
   sentiment: 'neutral' as const,
 }
 
-const APPLICATION_STATUS_GROUPS = {
-  totalCandidate: new Set(['SUBMITTED', 'SCREENING']),
-  interview: new Set(['INTERVIEW_SCHEDULED', 'INTERVIEW_COMPLETED', 'TECHNICAL_TEST']),
-  offeringStage: new Set(['OFFER_PROPOSED', 'OFFER_APPROVED', 'OFFER_ACCEPTED']),
-  mcu: new Set(['MEDICAL_CHECKUP_COMPLETED']),
-  offerRejected: new Set(['OFFER_REJECTED']),
-  rejected: new Set(['REJECTED']),
-  withdrawn: new Set(['WITHDRAWN']),
+
+/** Sum FPTK currentStatus counts for statuses that match a predicate. */
+function sumFptkStatuses(map: Record<string, number> | null | undefined, pred: (s: string) => boolean): number {
+  if (!map) return 0
+  return Object.entries(map).reduce((acc, [status, count]) => (pred(status) ? acc + (count || 0) : acc), 0)
 }
 
-const buildApplicationInsights = (
-  applications: any[],
-  weekRange: { startOfWeek: Date; endOfWeek: Date }
-) => {
-  const interviewItems: DashboardListItem[] = []
-
-  applications.forEach((application: any) => {
-    const appStatus = (application?.status || '').toString().toUpperCase()
-    if (appStatus !== 'INTERVIEW_SCHEDULED' && appStatus !== 'INTERVIEW_COMPLETED') {
-      return
-    }
-
-    const candidateName =
-      `${application?.candidate?.user?.firstName || ''} ${application?.candidate?.user?.lastName || ''}`.trim() ||
-      application?.candidate?.fullName ||
-      'Unknown Candidate'
-    const positionTitle =
-      application?.fptk?.positionTitle ||
-      application?.fptk?.position ||
-      application?.fptk?.department ||
-      'Unknown Position'
-
-    ;(application?.interviews || []).forEach((interview: any) => {
-      if (!interview?.scheduledAt) return
-      const scheduledAt = new Date(interview.scheduledAt)
-      if (isNaN(scheduledAt.getTime())) return
-      const status = (interview?.status || '').toString().toUpperCase()
-      if (
-        isWithinRange(scheduledAt, weekRange.startOfWeek, weekRange.endOfWeek) &&
-        (status === 'SCHEDULED' || status === 'CONFIRMED')
-      ) {
-        const interviewerName =
-          interview?.interviewer?.firstName || interview?.interviewer?.lastName
-            ? `${interview.interviewer.firstName || ''} ${interview.interviewer.lastName || ''}`.trim()
-            : interview?.interviewerName || ''
-        const metaParts = [
-          scheduledAt.toLocaleDateString(),
-          interview?.duration ? `${interview.duration} min` : '',
-          interviewerName,
-        ].filter(Boolean)
-
-        interviewItems.push({
-          id: application?.fptkId,
-          kind: application?.fptkId ? ('fptk' as const) : undefined,
-          title: candidateName,
-          subtitle: `${positionTitle} • ${application?.fptk?.department || 'N/A'}`,
-          meta: metaParts.join(' • '),
-        })
-      }
-    })
-  })
-
-  return { interviewItems }
+/** Sum application status counts for a specific set of statuses. */
+function sumAppStatuses(map: Record<string, number> | null | undefined, statuses: string[]): number {
+  if (!map) return 0
+  const set = new Set(statuses)
+  return Object.entries(map).reduce((acc, [status, count]) => (set.has(status) ? acc + (count || 0) : acc), 0)
 }
 
 export default function Dashboard() {
@@ -331,14 +148,9 @@ export default function Dashboard() {
   const [detailModal, setDetailModal] = useState<{ title: string, items: any[] } | null>(null)
   const [detailQuery, setDetailQuery] = useState('')
   const [baseStats, setBaseStats] = useState<Partial<DashboardStats> | null>(null)
-  const [allPositions, setAllPositions] = useState<any[]>([])
-  const [dashboardApplications, setDashboardApplications] = useState<any[]>([])
-  const [fptkListHydrated, setFptkListHydrated] = useState(false)
   const [priorityFilter, setPriorityFilter] = useState<typeof PRIORITY_FILTERS[number]>('ALL')
   const [positionStatusFilter, setPositionStatusFilter] = useState<PositionStatusFilterType>('ALL')
-  const [interviewDetailItems, setInterviewDetailItems] = useState<DashboardListItem[]>([])
-  const [isLoadingApplicationInsights, setIsLoadingApplicationInsights] = useState(false)
-  const [applicationInsightsLoaded, setApplicationInsightsLoaded] = useState(false)
+  const [isDashboardLoading, setIsDashboardLoading] = useState(false)
   const [openPositionsModalOpen, setOpenPositionsModalOpen] = useState(false)
   const [openPositionsQuery, setOpenPositionsQuery] = useState('')
   const [openPositionsLoading, setOpenPositionsLoading] = useState(false)
@@ -408,74 +220,77 @@ export default function Dashboard() {
     }) as NonNullable<ReturnType<typeof getDashboardPeriodBounds>>
   }, [periodBounds])
 
-  const filteredPositions = useMemo(() => {
-    let positions = filterPositionsByPriority(allPositions, priorityFilter)
-    if (positionStatusFilter === 'OPEN') {
-      positions = positions.filter((p: any) => !isClosedPositionStatus(p?.currentStatus || p?.status))
-    } else if (positionStatusFilter === 'CLOSED') {
-      positions = positions.filter((p: any) => isClosedPositionStatus(p?.currentStatus || p?.status))
-    }
-    return positions
-  }, [allPositions, priorityFilter, positionStatusFilter])
-
-  const openPositionItems = useMemo<DashboardListItem[]>(() => {
-    const openOnly = filteredPositions.filter((position) =>
-      isOpenCurrentStatusLabel(position?.currentStatus || position?.status)
-    )
-    const rows = compareToPrevious
-      ? openOnly.filter((position) =>
-          itemTimestampInRange(fptkActivityTs(position), activePeriod.current)
-        )
-      : openOnly
-    return rows.map((position) => ({
-      id: position?.id,
-      kind: 'fptk' as const,
-      title: position?.title || position?.position || 'Unknown Position',
-      subtitle: `${position?.department || 'N/A'} • ${position?.location || 'N/A'}`,
-      meta: position?.currentStatus || position?.status || 'N/A',
-    }))
-  }, [filteredPositions, activePeriod, compareToPrevious])
-
-  const closedPositionItems = useMemo<DashboardListItem[]>(() => {
-    return filteredPositions
-      .filter((position) => isClosedCurrentStatusLabel(position?.currentStatus || position?.status))
-      .map((position) => ({
-        id: position?.id,
-        kind: 'fptk' as const,
-        title: position?.title || position?.position || 'Unknown Position',
-        subtitle: `${position?.department || 'N/A'} • ${position?.location || 'N/A'}`,
-        meta: position?.currentStatus || position?.status || 'N/A',
-      }))
-  }, [filteredPositions])
-
-  const holdPositionItems = useMemo<DashboardListItem[]>(() => {
-    return filteredPositions
-      .filter((position) => isHoldCurrentStatusLabel(position?.currentStatus || position?.status))
-      .map((position) => ({
-        id: position?.id,
-        kind: 'fptk' as const,
-        title: position?.title || position?.position || 'Unknown Position',
-        subtitle: `${position?.department || 'N/A'} • ${position?.location || 'N/A'}`,
-        meta: position?.currentStatus || position?.status || 'N/A',
-      }))
-  }, [filteredPositions])
-
-  const hiredInPeriodItems = useMemo(
-    () =>
-      compareToPrevious
-        ? getHiredInRangeItems(filteredPositions, activePeriod.current)
-        : getHiredAllTimeItems(filteredPositions),
-    [filteredPositions, activePeriod, compareToPrevious]
+  // ── Backend-provided count maps ─────────────────────────────────────────────
+  const fptkCounts = useMemo(
+    () => baseStats?.fptkCountsByCurrentStatus ?? {},
+    [baseStats?.fptkCountsByCurrentStatus]
+  )
+  const appCounts = useMemo(
+    () => baseStats?.applicationCountsByStatus ?? {},
+    [baseStats?.applicationCountsByStatus]
+  )
+  const fptkPeriod = useMemo(
+    () => baseStats?.fptkPeriodCounts ?? { current: null, previous: null },
+    [baseStats?.fptkPeriodCounts]
+  )
+  const appPeriod = useMemo(
+    () => baseStats?.appPeriodCounts ?? { current: null, previous: null },
+    [baseStats?.appPeriodCounts]
   )
 
-  const applicationsScoped = useMemo(() => {
-    if (!dashboardApplications.length) return []
-    if (!fptkListHydrated) return dashboardApplications
-    const idSet = new Set(filteredPositions.map((p: any) => p?.id).filter(Boolean))
-    if (idSet.size === 0) return []
-    return dashboardApplications.filter((a: any) => a.fptkId && idSet.has(a.fptkId))
-  }, [dashboardApplications, filteredPositions, fptkListHydrated])
+  // ── Headline counts derived from backend maps (O(n) over unique statuses) ──
+  // When compareToPrevious is on and period data is available, show period-filtered counts
+  // so the headline numbers match the selected time window. Otherwise show all-time totals.
+  const totalCandidateHeadline = useMemo(
+    () => baseStats?.totalCandidates ?? 0,
+    [baseStats?.totalCandidates]
+  )
+  const openPositionsCount = useMemo(() => {
+    const map = compareToPrevious && fptkPeriod.current ? fptkPeriod.current : fptkCounts
+    return sumFptkStatuses(map, isOpenCurrentStatusLabel)
+  }, [compareToPrevious, fptkPeriod, fptkCounts])
+  const closedPositionsCount = useMemo(() => {
+    const map = compareToPrevious && fptkPeriod.current ? fptkPeriod.current : fptkCounts
+    return sumFptkStatuses(map, isClosedCurrentStatusLabel)
+  }, [compareToPrevious, fptkPeriod, fptkCounts])
+  const holdPositionsCount = useMemo(() => {
+    const map = compareToPrevious && fptkPeriod.current ? fptkPeriod.current : fptkCounts
+    const key = Object.keys(map).find((k) => k.toLowerCase() === 'hold')
+    return key ? (map[key] ?? 0) : 0
+  }, [compareToPrevious, fptkPeriod, fptkCounts])
+  // "Hired" = FPTKs with currentStatus exactly 'close'
+  const hiredCount = useMemo(() => {
+    const map = compareToPrevious && fptkPeriod.current ? fptkPeriod.current : fptkCounts
+    const key = Object.keys(map).find((k) => k.toLowerCase() === 'close')
+    return key ? (map[key] ?? 0) : 0
+  }, [compareToPrevious, fptkPeriod, fptkCounts])
 
+  const interviewCount = useMemo(() => {
+    const map = compareToPrevious && appPeriod.current ? appPeriod.current : appCounts
+    return sumAppStatuses(map, ['INTERVIEW_SCHEDULED', 'INTERVIEW_COMPLETED', 'TECHNICAL_TEST'])
+  }, [compareToPrevious, appPeriod, appCounts])
+  const offeringStageCount = useMemo(() => {
+    const map = compareToPrevious && appPeriod.current ? appPeriod.current : appCounts
+    return sumAppStatuses(map, ['OFFER_PROPOSED', 'OFFER_APPROVED', 'OFFER_ACCEPTED'])
+  }, [compareToPrevious, appPeriod, appCounts])
+  const mcuCount = useMemo(() => {
+    const map = compareToPrevious && appPeriod.current ? appPeriod.current : appCounts
+    return sumAppStatuses(map, ['MEDICAL_CHECKUP_COMPLETED'])
+  }, [compareToPrevious, appPeriod, appCounts])
+  const offerRejectedCount = useMemo(() => {
+    const map = compareToPrevious && appPeriod.current ? appPeriod.current : appCounts
+    return sumAppStatuses(map, ['OFFER_REJECTED'])
+  }, [compareToPrevious, appPeriod, appCounts])
+  const rejectedCount = useMemo(() => {
+    const map = compareToPrevious && appPeriod.current ? appPeriod.current : appCounts
+    return sumAppStatuses(map, ['REJECTED'])
+  }, [compareToPrevious, appPeriod, appCounts])
+  const withdrawnCount = useMemo(() => {
+    const map = compareToPrevious && appPeriod.current ? appPeriod.current : appCounts
+    return sumAppStatuses(map, ['WITHDRAWN'])
+  }, [compareToPrevious, appPeriod, appCounts])
+
+  // ── mapApplicationToDetailItem (still used for lazy-load modals) ────────────
   const mapApplicationToDetailItem = (application: any): DashboardListItem => {
     const candidateName =
       `${application?.candidate?.user?.firstName || ''} ${application?.candidate?.user?.lastName || ''}`.trim() ||
@@ -493,257 +308,79 @@ export default function Dashboard() {
     }
   }
 
-  const totalCandidateItems = useMemo(
-    () =>
-      applicationsScoped
-        .filter((a: any) =>
-          compareToPrevious
-            ? appInGroupInRange(a, APPLICATION_STATUS_GROUPS.totalCandidate, activePeriod.current)
-            : appInGroup(a, APPLICATION_STATUS_GROUPS.totalCandidate)
-        )
-        .map(mapApplicationToDetailItem),
-    [applicationsScoped, activePeriod, compareToPrevious]
-  )
+  // ── WoW deltas — now from backend period-filtered groupBy counts ────────────
+  const wowOpenPositions = useMemo(() => {
+    if (!compareToPrevious || !fptkPeriod.current || !fptkPeriod.previous) return DASHBOARD_COMPARE_OFF_DELTA
+    return periodOverPeriodChange(
+      sumFptkStatuses(fptkPeriod.current, isOpenCurrentStatusLabel),
+      sumFptkStatuses(fptkPeriod.previous, isOpenCurrentStatusLabel)
+    )
+  }, [compareToPrevious, fptkPeriod])
 
-  const interviewItems = useMemo(
-    () =>
-      applicationsScoped
-        .filter((a: any) =>
-          compareToPrevious
-            ? appInGroupInRange(a, APPLICATION_STATUS_GROUPS.interview, activePeriod.current)
-            : appInGroup(a, APPLICATION_STATUS_GROUPS.interview)
-        )
-        .map(mapApplicationToDetailItem),
-    [applicationsScoped, activePeriod, compareToPrevious]
-  )
+  const wowTotalCandidateStatus = useMemo(() => {
+    if (!compareToPrevious || !appPeriod.current || !appPeriod.previous) return DASHBOARD_COMPARE_OFF_DELTA
+    return periodOverPeriodChange(
+      sumAppStatuses(appPeriod.current, ['SUBMITTED', 'SCREENING']),
+      sumAppStatuses(appPeriod.previous, ['SUBMITTED', 'SCREENING'])
+    )
+  }, [compareToPrevious, appPeriod])
 
-  const offeringStageItems = useMemo(
-    () =>
-      applicationsScoped
-        .filter((a: any) =>
-          compareToPrevious
-            ? appInGroupInRange(a, APPLICATION_STATUS_GROUPS.offeringStage, activePeriod.current)
-            : appInGroup(a, APPLICATION_STATUS_GROUPS.offeringStage)
-        )
-        .map(mapApplicationToDetailItem),
-    [applicationsScoped, activePeriod, compareToPrevious]
-  )
+  const wowInterviewStatus = useMemo(() => {
+    if (!compareToPrevious || !appPeriod.current || !appPeriod.previous) return DASHBOARD_COMPARE_OFF_DELTA
+    return periodOverPeriodChange(
+      sumAppStatuses(appPeriod.current, ['INTERVIEW_SCHEDULED', 'INTERVIEW_COMPLETED', 'TECHNICAL_TEST']),
+      sumAppStatuses(appPeriod.previous, ['INTERVIEW_SCHEDULED', 'INTERVIEW_COMPLETED', 'TECHNICAL_TEST'])
+    )
+  }, [compareToPrevious, appPeriod])
 
-  const mcuItems = useMemo(
-    () =>
-      applicationsScoped
-        .filter((a: any) =>
-          compareToPrevious
-            ? appInGroupInRange(a, APPLICATION_STATUS_GROUPS.mcu, activePeriod.current)
-            : appInGroup(a, APPLICATION_STATUS_GROUPS.mcu)
-        )
-        .map(mapApplicationToDetailItem),
-    [applicationsScoped, activePeriod, compareToPrevious]
-  )
+  const wowOfferingStatus = useMemo(() => {
+    if (!compareToPrevious || !appPeriod.current || !appPeriod.previous) return DASHBOARD_COMPARE_OFF_DELTA
+    return periodOverPeriodChange(
+      sumAppStatuses(appPeriod.current, ['OFFER_PROPOSED', 'OFFER_APPROVED', 'OFFER_ACCEPTED']),
+      sumAppStatuses(appPeriod.previous, ['OFFER_PROPOSED', 'OFFER_APPROVED', 'OFFER_ACCEPTED'])
+    )
+  }, [compareToPrevious, appPeriod])
 
-  const offerRejectedItems = useMemo(
-    () =>
-      applicationsScoped
-        .filter((a: any) =>
-          compareToPrevious
-            ? appInGroupInRange(a, APPLICATION_STATUS_GROUPS.offerRejected, activePeriod.current)
-            : appInGroup(a, APPLICATION_STATUS_GROUPS.offerRejected)
-        )
-        .map(mapApplicationToDetailItem),
-    [applicationsScoped, activePeriod, compareToPrevious]
-  )
+  const wowMcuStatus = useMemo(() => {
+    if (!compareToPrevious || !appPeriod.current || !appPeriod.previous) return DASHBOARD_COMPARE_OFF_DELTA
+    return periodOverPeriodChange(
+      sumAppStatuses(appPeriod.current, ['MEDICAL_CHECKUP_COMPLETED']),
+      sumAppStatuses(appPeriod.previous, ['MEDICAL_CHECKUP_COMPLETED'])
+    )
+  }, [compareToPrevious, appPeriod])
 
-  const rejectedItems = useMemo(
-    () =>
-      applicationsScoped
-        .filter((a: any) =>
-          compareToPrevious
-            ? appInGroupInRange(a, APPLICATION_STATUS_GROUPS.rejected, activePeriod.current)
-            : appInGroup(a, APPLICATION_STATUS_GROUPS.rejected)
-        )
-        .map(mapApplicationToDetailItem),
-    [applicationsScoped, activePeriod, compareToPrevious]
-  )
+  const wowOfferRejected = useMemo(() => {
+    if (!compareToPrevious || !appPeriod.current || !appPeriod.previous) return DASHBOARD_COMPARE_OFF_DELTA
+    return periodOverPeriodChange(
+      sumAppStatuses(appPeriod.current, ['OFFER_REJECTED']),
+      sumAppStatuses(appPeriod.previous, ['OFFER_REJECTED'])
+    )
+  }, [compareToPrevious, appPeriod])
 
-  const withdrawnItems = useMemo(
-    () =>
-      applicationsScoped
-        .filter((a: any) =>
-          compareToPrevious
-            ? appInGroupInRange(a, APPLICATION_STATUS_GROUPS.withdrawn, activePeriod.current)
-            : appInGroup(a, APPLICATION_STATUS_GROUPS.withdrawn)
-        )
-        .map(mapApplicationToDetailItem),
-    [applicationsScoped, activePeriod, compareToPrevious]
-  )
+  const wowRejected = useMemo(() => {
+    if (!compareToPrevious || !appPeriod.current || !appPeriod.previous) return DASHBOARD_COMPARE_OFF_DELTA
+    return periodOverPeriodChange(
+      sumAppStatuses(appPeriod.current, ['REJECTED']),
+      sumAppStatuses(appPeriod.previous, ['REJECTED'])
+    )
+  }, [compareToPrevious, appPeriod])
 
-  const countOpenFptkInRange = useCallback(
-    (range: DateRange) =>
-      filteredPositions.filter(
-        (p) =>
-          isOpenCurrentStatusLabel(p?.currentStatus || p?.status) && itemTimestampInRange(fptkActivityTs(p), range)
-      ).length,
-    [filteredPositions]
-  )
+  const wowWithdrawn = useMemo(() => {
+    if (!compareToPrevious || !appPeriod.current || !appPeriod.previous) return DASHBOARD_COMPARE_OFF_DELTA
+    return periodOverPeriodChange(
+      sumAppStatuses(appPeriod.current, ['WITHDRAWN']),
+      sumAppStatuses(appPeriod.previous, ['WITHDRAWN'])
+    )
+  }, [compareToPrevious, appPeriod])
 
-  const countAppGroupInRange = useCallback(
-    (group: Set<string>, range: DateRange) =>
-      applicationsScoped.filter((a: any) => appInGroupInRange(a, group, range)).length,
-    [applicationsScoped]
-  )
-
-  const countHiredCloseInRange = useCallback(
-    (range: DateRange) =>
-      filteredPositions.filter(
-        (p) =>
-          normalizeUiCurrentStatus(p?.currentStatus || p?.status) === 'close' &&
-          itemTimestampInRange(fptkActivityTs(p), range)
-      ).length,
-    [filteredPositions]
-  )
-
-  const wowOpenPositions = useMemo(
-    () =>
-      compareToPrevious
-        ? periodOverPeriodChange(
-            countOpenFptkInRange(activePeriod.current),
-            countOpenFptkInRange(activePeriod.previous)
-          )
-        : DASHBOARD_COMPARE_OFF_DELTA,
-    [compareToPrevious, countOpenFptkInRange, activePeriod]
-  )
-
-  const wowTotalCandidateStatus = useMemo(
-    () =>
-      compareToPrevious
-        ? periodOverPeriodChange(
-            countAppGroupInRange(APPLICATION_STATUS_GROUPS.totalCandidate, activePeriod.current),
-            countAppGroupInRange(APPLICATION_STATUS_GROUPS.totalCandidate, activePeriod.previous)
-          )
-        : DASHBOARD_COMPARE_OFF_DELTA,
-    [compareToPrevious, countAppGroupInRange, activePeriod]
-  )
-
-  const wowInterviewStatus = useMemo(
-    () =>
-      compareToPrevious
-        ? periodOverPeriodChange(
-            countAppGroupInRange(APPLICATION_STATUS_GROUPS.interview, activePeriod.current),
-            countAppGroupInRange(APPLICATION_STATUS_GROUPS.interview, activePeriod.previous)
-          )
-        : DASHBOARD_COMPARE_OFF_DELTA,
-    [compareToPrevious, countAppGroupInRange, activePeriod]
-  )
-
-  const wowOfferingStatus = useMemo(
-    () =>
-      compareToPrevious
-        ? periodOverPeriodChange(
-            countAppGroupInRange(APPLICATION_STATUS_GROUPS.offeringStage, activePeriod.current),
-            countAppGroupInRange(APPLICATION_STATUS_GROUPS.offeringStage, activePeriod.previous)
-          )
-        : DASHBOARD_COMPARE_OFF_DELTA,
-    [compareToPrevious, countAppGroupInRange, activePeriod]
-  )
-
-  const wowMcuStatus = useMemo(
-    () =>
-      compareToPrevious
-        ? periodOverPeriodChange(
-            countAppGroupInRange(APPLICATION_STATUS_GROUPS.mcu, activePeriod.current),
-            countAppGroupInRange(APPLICATION_STATUS_GROUPS.mcu, activePeriod.previous)
-          )
-        : DASHBOARD_COMPARE_OFF_DELTA,
-    [compareToPrevious, countAppGroupInRange, activePeriod]
-  )
-
-  const wowOfferRejected = useMemo(
-    () =>
-      compareToPrevious
-        ? periodOverPeriodChange(
-            countAppGroupInRange(APPLICATION_STATUS_GROUPS.offerRejected, activePeriod.current),
-            countAppGroupInRange(APPLICATION_STATUS_GROUPS.offerRejected, activePeriod.previous)
-          )
-        : DASHBOARD_COMPARE_OFF_DELTA,
-    [compareToPrevious, countAppGroupInRange, activePeriod]
-  )
-
-  const wowRejected = useMemo(
-    () =>
-      compareToPrevious
-        ? periodOverPeriodChange(
-            countAppGroupInRange(APPLICATION_STATUS_GROUPS.rejected, activePeriod.current),
-            countAppGroupInRange(APPLICATION_STATUS_GROUPS.rejected, activePeriod.previous)
-          )
-        : DASHBOARD_COMPARE_OFF_DELTA,
-    [compareToPrevious, countAppGroupInRange, activePeriod]
-  )
-
-  const wowWithdrawn = useMemo(
-    () =>
-      compareToPrevious
-        ? periodOverPeriodChange(
-            countAppGroupInRange(APPLICATION_STATUS_GROUPS.withdrawn, activePeriod.current),
-            countAppGroupInRange(APPLICATION_STATUS_GROUPS.withdrawn, activePeriod.previous)
-          )
-        : DASHBOARD_COMPARE_OFF_DELTA,
-    [compareToPrevious, countAppGroupInRange, activePeriod]
-  )
-
-  const wowHiredRolling = useMemo(
-    () =>
-      compareToPrevious
-        ? periodOverPeriodChange(
-            countHiredCloseInRange(activePeriod.current),
-            countHiredCloseInRange(activePeriod.previous)
-          )
-        : DASHBOARD_COMPARE_OFF_DELTA,
-    [compareToPrevious, countHiredCloseInRange, activePeriod]
-  )
-
-  const openPositionsHeadline = useMemo(
-    () => openPositionItems.length,
-    [openPositionItems.length]
-  )
-
-  const totalCandidateHeadline = useMemo(
-    () => {
-      if (typeof baseStats?.totalCandidates === 'number') {
-        return baseStats.totalCandidates
-      }
-      return totalCandidateItems.length
-    },
-    [baseStats?.totalCandidates, totalCandidateItems.length]
-  )
-
-  const interviewHeadline = useMemo(
-    () => interviewItems.length,
-    [interviewItems.length]
-  )
-
-  const offeringStageHeadline = useMemo(
-    () => offeringStageItems.length,
-    [offeringStageItems.length]
-  )
-
-  const mcuHeadline = useMemo(
-    () => mcuItems.length,
-    [mcuItems.length]
-  )
-
-  const hiredThisMonthHeadline = useMemo(
-    () => hiredInPeriodItems.length,
-    [hiredInPeriodItems.length]
-  )
-
-  const offerRejectedHeadline = useMemo(
-    () => offerRejectedItems.length,
-    [offerRejectedItems.length]
-  )
-
-  const rejectedHeadline = useMemo(() => rejectedItems.length, [rejectedItems.length])
-
-  const withdrawnHeadline = useMemo(() => withdrawnItems.length, [withdrawnItems.length])
+  const wowHiredRolling = useMemo(() => {
+    if (!compareToPrevious || !fptkPeriod.current || !fptkPeriod.previous) return DASHBOARD_COMPARE_OFF_DELTA
+    const sumClosed = (m: Record<string, number>) => {
+      const key = Object.keys(m).find((k) => k.toLowerCase() === 'close')
+      return key ? (m[key] ?? 0) : 0
+    }
+    return periodOverPeriodChange(sumClosed(fptkPeriod.current), sumClosed(fptkPeriod.previous))
+  }, [compareToPrevious, fptkPeriod])
 
   const customRangeInvalid = timeMode === 'custom' && !periodBounds
 
@@ -816,120 +453,141 @@ export default function Dashboard() {
       },
       {
         name: 'Open Positions',
-        value: openPositionsHeadline.toString(),
+        value: openPositionsCount.toString(),
         icon: BriefcaseIcon,
         change: wowOpenPositions.formattedChange,
         changeType: wowOpenPositions.sentiment,
       },
       {
         name: 'Interview',
-        value: interviewHeadline.toString(),
+        value: interviewCount.toString(),
         icon: BriefcaseIcon,
         change: wowInterviewStatus.formattedChange,
         changeType: wowInterviewStatus.sentiment,
       },
       {
         name: 'Offering Stage',
-        value: offeringStageHeadline.toString(),
+        value: offeringStageCount.toString(),
         icon: BriefcaseIcon,
         change: wowOfferingStatus.formattedChange,
         changeType: wowOfferingStatus.sentiment,
       },
       {
         name: 'MCU',
-        value: mcuHeadline.toString(),
+        value: mcuCount.toString(),
         icon: CalendarDaysIcon,
         change: wowMcuStatus.formattedChange,
         changeType: wowMcuStatus.sentiment,
       },
       {
         name: 'Hired',
-        value: hiredThisMonthHeadline.toString(),
+        value: hiredCount.toString(),
         icon: DocumentTextIcon,
         change: wowHiredRolling.formattedChange,
         changeType: wowHiredRolling.sentiment,
       },
       {
         name: 'Offer Rejected',
-        value: offerRejectedHeadline.toString(),
+        value: offerRejectedCount.toString(),
         icon: XCircleIcon,
         change: wowOfferRejected.formattedChange,
         changeType: wowOfferRejected.sentiment,
       },
       {
         name: 'Rejected',
-        value: rejectedHeadline.toString(),
+        value: rejectedCount.toString(),
         icon: NoSymbolIcon,
         change: wowRejected.formattedChange,
         changeType: wowRejected.sentiment,
       },
       {
         name: 'Withdrawn',
-        value: withdrawnHeadline.toString(),
+        value: withdrawnCount.toString(),
         icon: ArrowLeftOnRectangleIcon,
         change: wowWithdrawn.formattedChange,
         changeType: wowWithdrawn.sentiment,
       },
     ],
     [
-      openPositionsHeadline,
+      openPositionsCount,
       wowOpenPositions,
       totalCandidateHeadline,
       wowTotalCandidateStatus,
-      interviewHeadline,
+      interviewCount,
       wowInterviewStatus,
-      offeringStageHeadline,
+      offeringStageCount,
       wowOfferingStatus,
-      mcuHeadline,
+      mcuCount,
       wowMcuStatus,
-      hiredThisMonthHeadline,
+      hiredCount,
       wowHiredRolling,
-      offerRejectedHeadline,
+      offerRejectedCount,
       wowOfferRejected,
-      rejectedHeadline,
+      rejectedCount,
       wowRejected,
-      withdrawnHeadline,
+      withdrawnCount,
       wowWithdrawn,
       compareToPrevious,
     ]
   )
 
+  // Build params for the dashboard API — re-computed whenever filters or period change
+  const currentParams = useMemo(() => ({
+    ...(priorityFilter !== 'ALL' ? { priority: priorityFilter } : {}),
+    ...(positionStatusFilter !== 'ALL' ? { positionStatus: positionStatusFilter } : {}),
+    ...(compareToPrevious && periodBounds
+      ? {
+          periodStart: periodBounds.current.start.toISOString(),
+          periodEnd: periodBounds.current.end.toISOString(),
+          previousStart: periodBounds.previous.start.toISOString(),
+          previousEnd: periodBounds.previous.end.toISOString(),
+        }
+      : {}),
+  }), [priorityFilter, positionStatusFilter, compareToPrevious, periodBounds])
+
+  const didInitialLoad = useRef(false)
+
+  // Initial load on auth
   useEffect(() => {
     if (!isLoading && !isAuthenticated) {
       router.push('/login')
     } else if (isAuthenticated) {
-      loadDashboardData()
+      didInitialLoad.current = true
+      loadDashboardData(currentParams)
     }
   }, [isAuthenticated, isLoading, router])
 
-  // Load heavy application insights only on-demand (when user opens a detail view).
+  // Re-fetch whenever filters or period change (skip the very first render)
+  useEffect(() => {
+    if (!didInitialLoad.current || !isAuthenticated) return
+    loadDashboardData(currentParams)
+  }, [currentParams])
 
-useEffect(() => {
-  if (!baseStats) return
-
-  setDashboardStats({
-    totalCandidates: totalCandidateHeadline,
-    activeApplications: baseStats.activeApplications ?? 0,
-    openPositions: openPositionsHeadline,
-    closedPositions: interviewHeadline,
-    holdPositions: offeringStageHeadline,
-    interviewsThisWeek: mcuHeadline,
-    hiredThisMonth: hiredThisMonthHeadline,
-    recentActivity: baseStats.recentActivity ?? [],
-    positionStatusByLocation: computePositionStatusByLocation(filteredPositions),
-    openPositionProgress: computeOpenPositionProgress(filteredPositions),
-    slaByLocation: computeSlaByLocation(filteredPositions),
-  })
-}, [
-  baseStats,
-  filteredPositions,
-  openPositionsHeadline,
-  totalCandidateHeadline,
-  interviewHeadline,
-  offeringStageHeadline,
-  mcuHeadline,
-  hiredThisMonthHeadline,
-])
+  // Sync dashboardStats from backend-provided data
+  useEffect(() => {
+    if (!baseStats) return
+    setDashboardStats({
+      totalCandidates: totalCandidateHeadline,
+      activeApplications: baseStats.activeApplications ?? 0,
+      openPositions: openPositionsCount,
+      closedPositions: closedPositionsCount,
+      holdPositions: holdPositionsCount,
+      interviewsThisWeek: interviewCount,
+      hiredThisMonth: hiredCount,
+      recentActivity: baseStats.recentActivity ?? [],
+      positionStatusByLocation: baseStats.positionStatusByLocation ?? [],
+      openPositionProgress: baseStats.openPositionProgress ?? [],
+      slaByLocation: baseStats.slaByLocation ?? [],
+    })
+  }, [
+    baseStats,
+    totalCandidateHeadline,
+    openPositionsCount,
+    closedPositionsCount,
+    holdPositionsCount,
+    interviewCount,
+    hiredCount,
+  ])
 
   const fetchOpenPositions = async (query: string) => {
     if (!isAuthenticated) return
@@ -969,124 +627,17 @@ useEffect(() => {
     }
   }
 
-  const loadApplicationInsights = async (): Promise<DashboardListItem[]> => {
-    if (isLoadingApplicationInsights || !isAuthenticated) return []
-
-    setIsLoadingApplicationInsights(true)
-
-    try {
-      const limit = 100
-      const maxPages = 50 // Safety limit: prevent infinite loops (max 5000 records)
-      let page = 1
-      let hasMore = true
-      const weekRange = getCurrentWeekRange()
-      const interviewItems: DashboardListItem[] = []
-
-      while (hasMore && page <= maxPages) {
-        const response = await ApplicationsAPI.getAll({}, { page, limit })
-        const data = Array.isArray(response?.data) ? response.data : []
-
-        if (data.length === 0) {
-          break
-        }
-
-        const insights = buildApplicationInsights(data, weekRange)
-        interviewItems.push(...insights.interviewItems)
-
-        const totalPages = response?.pagination?.totalPages
-        if (totalPages) {
-          hasMore = page < totalPages
-        } else {
-          hasMore = data.length === limit
-        }
-        page += 1
-      }
-      
-      if (page > maxPages) {
-        console.warn(`loadApplicationInsights: Reached maximum page limit (${maxPages}). Some applications may not be loaded.`)
-      }
-
-      setInterviewDetailItems(interviewItems)
-      setApplicationInsightsLoaded(true)
-      return interviewItems
-    } catch (error) {
-      console.error('Error loading application insights:', error)
-      return []
-    } finally {
-      setIsLoadingApplicationInsights(false)
-    }
-  }
-
-  const fetchAllFptksForDashboard = async (): Promise<any[]> => {
-    if (!isAuthenticated) return []
-    const limit = 100
-    const maxPages = 30
-    let page = 1
-    let hasMore = true
-    let positions: any[] = []
-
-    while (hasMore && page <= maxPages) {
-      const response = await FPTKAPI.getAll({}, { page, limit })
-      const data = Array.isArray(response?.data) ? response.data : []
-      positions = positions.concat(data.map((fptk: any) => mapApiFptk(fptk)))
-
-      const totalPages = response?.pagination?.totalPages
-      if (totalPages) {
-        hasMore = page < totalPages
-      } else {
-        hasMore = data.length === limit
-      }
-      page += 1
-    }
-
-    return positions
-  }
-
-  const fetchAllApplicationsForDashboard = async (): Promise<any[]> => {
-    if (!isAuthenticated) return []
-    const limit = 100
-    const maxPages = 50
-    let page = 1
-    let hasMore = true
-    const rows: any[] = []
-
-    while (hasMore && page <= maxPages) {
-      const response = await ApplicationsAPI.getAll({}, { page, limit })
-      const data = Array.isArray(response?.data) ? response.data : []
-      if (data.length === 0) break
-      rows.push(...data)
-      const totalPages = response?.pagination?.totalPages
-      if (totalPages) {
-        hasMore = page < totalPages
-      } else {
-        hasMore = data.length === limit
-      }
-      page += 1
-    }
-
-    if (page > maxPages) {
-      console.warn(
-        `fetchAllApplicationsForDashboard: Reached max pages (${maxPages}); week-over-week may be incomplete.`
-      )
-    }
-
-    return rows
-  }
-
-  const loadDashboardData = async () => {
+  /**
+   * Load all dashboard stats in a single API call.
+   * Replaces the old pattern of fetching all FPTKs (up to 3,000 records) and
+   * all applications (up to 5,000 records) via sequential paginated loops.
+   */
+  const loadDashboardData = async (params: Parameters<typeof DashboardAPI.getStats>[0] = {}) => {
     if (!isAuthenticated) return
+    setIsDashboardLoading(true)
     try {
-      // Load dashboard stats from API
-      const stats = await DashboardAPI.getStats()
-      console.log('Dashboard API Response:', stats)
-      console.log('Position Status by Location:', stats.positionStatusByLocation)
-      console.log('Open Position Progress:', stats.openPositionProgress)
-      console.log('SLA by Location:', stats.slaByLocation)
-      
-      // Trust API counts (including 0). Do not fall back to localStorage when the server
-      // correctly returns zero — stale jobPostings in localStorage caused Open Positions to
-      // show hundreds after all positions were deleted.
-      const base = {
+      const stats = await DashboardAPI.getStats(params)
+      setBaseStats({
         totalCandidates: stats.totalCandidates ?? 0,
         activeApplications: stats.activeApplications ?? 0,
         recentActivity: stats.recentActivity ?? [],
@@ -1098,102 +649,52 @@ useEffect(() => {
         positionStatusByLocation: stats.positionStatusByLocation ?? [],
         openPositionProgress: stats.openPositionProgress ?? [],
         slaByLocation: stats.slaByLocation ?? [],
-      }
-
-      console.log('Dashboard base stats:', base)
-      console.log('API closedPositions:', stats.closedPositions)
-      console.log('API holdPositions:', stats.holdPositions)
-
-      setBaseStats(base)
-      setFptkListHydrated(false)
-      setAllPositions([])
-      setDashboardApplications([])
-
-      Promise.allSettled([fetchAllFptksForDashboard(), fetchAllApplicationsForDashboard()]).then(
-        (results) => {
-          const pos = results[0].status === 'fulfilled' ? results[0].value : []
-          const apps = results[1].status === 'fulfilled' ? results[1].value : []
-          if (results[0].status === 'rejected') {
-            console.error('fetchAllFptksForDashboard failed:', results[0].reason)
-          }
-          if (results[1].status === 'rejected') {
-            console.error('fetchAllApplicationsForDashboard failed:', results[1].reason)
-          }
-          setAllPositions(pos)
-          setDashboardApplications(apps)
-          setFptkListHydrated(true)
-        }
-      )
+        fptkCountsByCurrentStatus: stats.fptkCountsByCurrentStatus ?? {},
+        applicationCountsByStatus: stats.applicationCountsByStatus ?? {},
+        fptkPeriodCounts: stats.fptkPeriodCounts ?? { current: null, previous: null },
+        appPeriodCounts: stats.appPeriodCounts ?? { current: null, previous: null },
+      })
     } catch (error: any) {
       console.error('Error loading dashboard data:', error)
-      console.error('Error details:', error.response?.data || error.message)
-      // Fallback to localStorage if API fails (only in browser)
-      let candidates: any[] = []
-      let jobPostings: any[] = []
-      let applications: any[] = []
-      
-      if (typeof window !== 'undefined') {
-        try {
-          const candidatesData = localStorage.getItem('candidates')
-          candidates = candidatesData ? JSON.parse(candidatesData) : []
-        } catch (error) {
-          console.warn('Could not load candidates from localStorage:', error)
-        }
-        
-        try {
-          const jobPostingsData = localStorage.getItem('jobPostings')
-          jobPostings = jobPostingsData ? JSON.parse(jobPostingsData) : []
-        } catch (error) {
-          console.warn('Could not load positions from localStorage:', error)
-        }
-        
-        try {
-          const applicationsData = localStorage.getItem('applications')
-          applications = applicationsData ? JSON.parse(applicationsData) : []
-        } catch (error) {
-          console.warn('Could not load applications from localStorage:', error)
-        }
-      }
-      
-      const totalCandidates = candidates.length
-      const activeApplications = applications.length
-      const recentActivity = [
-        ...candidates.slice(0, 3).map((candidate: any) => ({
-          type: 'candidate_added',
-          message: `New candidate ${candidate.personalInfo.firstName} ${candidate.personalInfo.lastName} added`,
-          timestamp: candidate.createdAt,
-          icon: 'user'
-        })),
-        ...jobPostings.slice(0, 2).map((job: any) => ({
-          type: 'job_posting_created',
-          message: `New position "${job.title}" created`,
-          timestamp: job.createdAt,
-          icon: 'briefcase'
-        }))
-      ]
-        .sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime())
-        .slice(0, 5)
-    
-      const fallbackBase = {
-        totalCandidates,
-        activeApplications,
-        recentActivity,
-      }
-      setBaseStats(fallbackBase)
-      setFptkListHydrated(false)
-      setAllPositions(jobPostings)
-      setDashboardApplications([])
-
-      Promise.allSettled([fetchAllFptksForDashboard(), fetchAllApplicationsForDashboard()]).then(
-        (results) => {
-          const pos = results[0].status === 'fulfilled' ? results[0].value : []
-          const apps = results[1].status === 'fulfilled' ? results[1].value : []
-          setAllPositions(pos.length ? pos : jobPostings)
-          setDashboardApplications(apps)
-          setFptkListHydrated(true)
-        }
-      )
+    } finally {
+      setIsDashboardLoading(false)
     }
+  }
+
+  /**
+   * Lazy-load list items for a stat card's detail modal.
+   * Called only when the user clicks on a card — no pre-loading.
+   */
+  const loadModalItems = async (cardName: string): Promise<DashboardListItem[]> => {
+    const appStatusMap: Record<string, string> = {
+      Interview: 'INTERVIEW_SCHEDULED,INTERVIEW_COMPLETED,TECHNICAL_TEST',
+      'Offering Stage': 'OFFER_PROPOSED,OFFER_APPROVED,OFFER_ACCEPTED',
+      MCU: 'MEDICAL_CHECKUP_COMPLETED',
+      'Offer Rejected': 'OFFER_REJECTED',
+      Rejected: 'REJECTED',
+      Withdrawn: 'WITHDRAWN',
+    }
+
+    const appStatus = appStatusMap[cardName]
+    if (appStatus) {
+      const res = await ApplicationsAPI.getAll({ status: appStatus }, { limit: 500 })
+      const data = Array.isArray(res?.data) ? res.data : []
+      return data.map(mapApplicationToDetailItem)
+    }
+
+    if (cardName === 'Hired') {
+      const res = await FPTKAPI.getAll({ currentStatus: 'Close' }, { limit: 500 })
+      const data = Array.isArray(res?.data) ? res.data : []
+      return data.map((p: any) => ({
+        id: p?.id,
+        kind: 'fptk' as const,
+        title: p?.positionTitle || p?.position || 'Unknown Position',
+        subtitle: `${p?.department || 'N/A'} • ${p?.areaDetail || p?.area || p?.location || 'N/A'}`,
+        meta: p?.currentStatus || 'Close',
+      }))
+    }
+
+    return []
   }
 
   const mapApiCandidatesToDashboardItems = (rows: any[]): DashboardListItem[] =>
@@ -1258,9 +759,12 @@ useEffect(() => {
 
   if (isLoading) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-indigo-600"></div>
-      </div>
+      <Layout>
+        <div className="flex flex-col items-center justify-center py-32 gap-4 text-gray-500">
+          <Spinner size="lg" />
+          <p className="text-sm font-medium">Loading dashboard…</p>
+        </div>
+      </Layout>
     )
   }
 
@@ -1280,11 +784,16 @@ useEffect(() => {
               </p>
             </div>
             <button
-              onClick={loadDashboardData}
-              className="inline-flex items-center px-3 py-2 border border-gray-300 shadow-sm text-sm leading-4 font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
+              onClick={() => loadDashboardData(currentParams)}
+              disabled={isDashboardLoading}
+              className="inline-flex items-center px-3 py-2 border border-gray-300 shadow-sm text-sm leading-4 font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-60 disabled:cursor-not-allowed"
             >
-              <ArrowPathIcon className="h-4 w-4 mr-2" />
-              Refresh
+              {isDashboardLoading ? (
+                <Spinner size="sm" className="mr-2" />
+              ) : (
+                <ArrowPathIcon className="h-4 w-4 mr-2" />
+              )}
+              {isDashboardLoading ? 'Loading…' : 'Refresh'}
             </button>
           </div>
         </div>
@@ -1466,48 +975,13 @@ useEffect(() => {
                 }
                 setDetailModal({ title: item.name, items: [] })
                 try {
-                  let items: DashboardListItem[] = []
-
-                  const mapPositionRow = (position: any): DashboardListItem => ({
-                    id: position?.id,
-                    kind: 'fptk' as const,
-                    title: position?.title || position?.position || 'Unknown Position',
-                    subtitle: `${position?.department || 'N/A'} • ${position?.location || 'N/A'}`,
-                    meta: position?.currentStatus || position?.status || 'N/A',
+                  const items = await loadModalItems(item.name)
+                  setDetailModal({
+                    title: item.name,
+                    items: items.length
+                      ? items
+                      : [{ title: 'No data available', subtitle: 'Try adjusting filters to see more results', meta: 'No data' }],
                   })
-
-                  if (item.name === 'Interview') {
-                    items = interviewItems
-                  } else if (item.name === 'Offering Stage') {
-                    items = offeringStageItems
-                  } else if (item.name === 'MCU') {
-                    items = mcuItems
-                  } else if (item.name === 'Offer Rejected') {
-                    items = offerRejectedItems
-                  } else if (item.name === 'Rejected') {
-                    items = rejectedItems
-                  } else if (item.name === 'Withdrawn') {
-                    items = withdrawnItems
-                  } else if (item.name === 'Hired') {
-                    const pos = await fetchAllFptksForDashboard()
-                    setAllPositions(pos)
-                    const scoped = filterPositionsByPriority(pos, priorityFilter)
-                    items = compareToPrevious
-                      ? getHiredInRangeItems(scoped, activePeriod.current)
-                      : getHiredAllTimeItems(scoped)
-                  }
-
-                  if (!items.length) {
-                    items = [
-                      {
-                        title: 'No data available',
-                        subtitle: 'Try adjusting filters to see more results',
-                        meta: 'No data',
-                      },
-                    ]
-                  }
-
-                  setDetailModal({ title: item.name, items })
                 } catch (error: any) {
                   console.error(`Error loading ${item.name} details:`, error)
                   setDetailModal({ title: item.name, items: [] })
@@ -1523,8 +997,12 @@ useEffect(() => {
                 </p>
               </dt>
               <dd className="ml-12 flex items-baseline pb-4">
-                <p className="text-xl font-semibold text-gray-900 underline decoration-dotted">{item.value}</p>
-                {compareToPrevious ? (
+                {isDashboardLoading ? (
+                  <div className="h-7 w-12 animate-pulse rounded bg-gray-200" />
+                ) : (
+                  <p className="text-xl font-semibold text-gray-900 underline decoration-dotted">{item.value}</p>
+                )}
+                {compareToPrevious && !isDashboardLoading ? (
                   <p
                     className={`ml-2 flex items-baseline text-sm font-semibold ${
                       item.changeType === 'positive'
@@ -1890,115 +1368,83 @@ useEffect(() => {
                           {slaData ? (
                             <div className="space-y-1.5">
                               {Object.entries(slaData.buckets).map(
-                                ([bucket, count]: [string, any]) => (
-                                  <div key={bucket} className="flex items-center">
-                                    <div className="w-28 text-[10px] text-gray-600 truncate mr-2">
-                                      {bucket}
+                                ([bucket, counts]: [string, any]) => {
+                                  const bucketTotal = (counts?.received ?? 0) + (counts?.pending ?? 0)
+                                  const openModal = () => {
+                                    setDetailModal({ title: `${bucket} • ${slaData.areaDetail}`, items: [] })
+                                    FPTKAPI.getAll({ areaDetail: slaData.areaDetail }, { limit: 500 }).then((res) => {
+                                      const data = Array.isArray(res?.data) ? res.data : []
+                                      const nowDate = new Date()
+                                      const items = data
+                                        .filter((j: any) => {
+                                          const dateValue = j?.fptkReceiveDate || j?.requestDate
+                                          if (!dateValue) return false
+                                          const d = new Date(dateValue)
+                                          if (isNaN(d.getTime())) return false
+                                          const diffDays = businessDaysDiffIndonesia(d, nowDate)
+                                          if (bucket === '0-30 Days') return diffDays <= 30
+                                          if (bucket === '31-60 Days') return diffDays > 30 && diffDays <= 60
+                                          if (bucket === '61-90 Days') return diffDays > 60 && diffDays <= 90
+                                          return diffDays > 90
+                                        })
+                                        .map((j: any) => ({
+                                          id: j.id,
+                                          kind: 'fptk',
+                                          title: j.positionTitle || j.position || 'Unknown Position',
+                                          subtitle: `${j.department || 'N/A'} • ${j.location || j.areaDetail || 'N/A'}`,
+                                          meta: `FKTK: ${j.statusFktk || 'Pending'} • FPTK Received: ${j.fptkReceiveDate || j.requestDate ? new Date(j.fptkReceiveDate || j.requestDate).toLocaleDateString() : '-'}`,
+                                        }))
+                                      setDetailModal({ title: `${bucket} • ${slaData.areaDetail}`, items })
+                                    })
+                                  }
+                                  return (
+                                    <div key={bucket}>
+                                      <div className="flex items-center">
+                                        <div className="w-28 text-[10px] text-gray-600 truncate mr-2">
+                                          {bucket}
+                                        </div>
+                                        <button
+                                          className="flex-1 bg-gray-200 rounded-full h-1.5 group"
+                                          onClick={openModal}
+                                          title={`${bucket}: ${bucketTotal} positions (✓ ${counts?.received ?? 0} received, ⏳ ${counts?.pending ?? 0} pending)`}
+                                        >
+                                          <div
+                                            className="bg-purple-500 h-1.5 rounded-full transition-all duration-300 group-hover:bg-purple-600"
+                                            style={{
+                                              width: `${
+                                                slaData.total > 0
+                                                  ? (bucketTotal / slaData.total) * 100
+                                                  : 0
+                                              }%`,
+                                            }}
+                                          ></div>
+                                        </button>
+                                        <button
+                                          className="w-6 text-[10px] text-gray-600 text-right ml-2 hover:underline"
+                                          onClick={openModal}
+                                        >
+                                          {bucketTotal}
+                                        </button>
+                                      </div>
+                                      {bucketTotal > 0 && (
+                                        <div className="flex items-center gap-2 ml-30 pl-[7.5rem] mt-0.5">
+                                          <span
+                                            className="text-[9px] text-emerald-600 font-medium"
+                                            title="FKTK Received"
+                                          >
+                                            ✓{counts?.received ?? 0}
+                                          </span>
+                                          <span
+                                            className="text-[9px] text-amber-500 font-medium"
+                                            title="FKTK Pending"
+                                          >
+                                            ⏳{counts?.pending ?? 0}
+                                          </span>
+                                        </div>
+                                      )}
                                     </div>
-                                    <button
-                                      className="flex-1 bg-gray-200 rounded-full h-1.5 group"
-                                      onClick={() => {
-                                        const bucketMatch = (position: any) => {
-                                          const nowDate = new Date()
-                                          const dateValue =
-                                            position?.fptkReceiveDate || position?.requestDate
-                                          if (!dateValue) return false
-                                          const d = new Date(dateValue)
-                                          if (isNaN(d.getTime())) return false
-                                          const diffDays = businessDaysDiffIndonesia(d, nowDate)
-                                          if (bucket === '0-30 Days') return diffDays <= 30
-                                          if (bucket === '31-60 Days')
-                                            return diffDays > 30 && diffDays <= 60
-                                          if (bucket === '61-90 Days')
-                                            return diffDays > 60 && diffDays <= 90
-                                          return diffDays > 90
-                                        }
-                                        const items = filteredPositions
-                                          .filter(
-                                            (j: any) =>
-                                              (j.areaDetail || j.area || j.location || 'Unknown') ===
-                                              slaData.areaDetail
-                                          )
-                                          .filter((j: any) => bucketMatch(j))
-                                          .map((j: any) => ({
-                                            id: j.id,
-                                            kind: 'fptk',
-                                            title: j.title || j.position || 'Unknown Position',
-                                            subtitle: `${j.department || 'N/A'} • ${j.location || 'N/A'}`,
-                                            meta: `FPTK Received: ${
-                                              j.fptkReceiveDate || j.requestDate
-                                                ? new Date(
-                                                    j.fptkReceiveDate || j.requestDate
-                                                  ).toLocaleDateString()
-                                                : '-'
-                                            }`,
-                                          }))
-                                        setDetailModal({
-                                          title: `${bucket} • ${slaData.areaDetail}`,
-                                          items,
-                                        })
-                                      }}
-                                      title={`${bucket}: ${count} positions`}
-                                    >
-                                      <div
-                                        className="bg-purple-500 h-1.5 rounded-full transition-all duration-300 group-hover:bg-purple-600"
-                                        style={{
-                                          width: `${
-                                            slaData.total > 0
-                                              ? (count / slaData.total) * 100
-                                              : 0
-                                          }%`,
-                                        }}
-                                      ></div>
-                                    </button>
-                                    <button
-                                      className="w-6 text-[10px] text-gray-600 text-right ml-2 hover:underline"
-                                      onClick={() => {
-                                        const bucketMatch = (position: any) => {
-                                          const nowDate = new Date()
-                                          const dateValue =
-                                            position?.fptkReceiveDate || position?.requestDate
-                                          if (!dateValue) return false
-                                          const d = new Date(dateValue)
-                                          if (isNaN(d.getTime())) return false
-                                          const diffDays = businessDaysDiffIndonesia(d, nowDate)
-                                          if (bucket === '0-30 Days') return diffDays <= 30
-                                          if (bucket === '31-60 Days')
-                                            return diffDays > 30 && diffDays <= 60
-                                          if (bucket === '61-90 Days')
-                                            return diffDays > 60 && diffDays <= 90
-                                          return diffDays > 90
-                                        }
-                                        const items = filteredPositions
-                                          .filter(
-                                            (j: any) =>
-                                              (j.areaDetail || j.area || j.location || 'Unknown') ===
-                                              slaData.areaDetail
-                                          )
-                                          .filter((j: any) => bucketMatch(j))
-                                          .map((j: any) => ({
-                                            id: j.id,
-                                            kind: 'fptk',
-                                            title: j.title || j.position || 'Unknown Position',
-                                            subtitle: `${j.department || 'N/A'} • ${j.location || 'N/A'}`,
-                                            meta: `FPTK Received: ${
-                                              j.fptkReceiveDate || j.requestDate
-                                                ? new Date(
-                                                    j.fptkReceiveDate || j.requestDate
-                                                  ).toLocaleDateString()
-                                                : '-'
-                                            }`,
-                                          }))
-                                        setDetailModal({
-                                          title: `${bucket} • ${slaData.areaDetail}`,
-                                          items,
-                                        })
-                                      }}
-                                    >
-                                      {count}
-                                    </button>
-                                  </div>
-                                )
+                                  )
+                                }
                               )}
                             </div>
                           ) : (
