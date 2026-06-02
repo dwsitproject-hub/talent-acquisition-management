@@ -1,3 +1,4 @@
+-- prisma-migrate: no-transaction
 -- Performance indexes for getSummaryByPosition and related queries.
 -- All indexes are created CONCURRENTLY so they do not block reads/writes
 -- on busy tables during deployment.
