@@ -73,6 +73,8 @@ const FPTK_RELATION_INCLUDE = {
           currentCompany: true,
           currentAddress: true,
           formDataDiri: true,
+          blacklisted: true,
+          blacklistReason: true,
         },
       },
       interviews: {
@@ -176,6 +178,9 @@ function normalizeAppliedCandidates(appliedCandidatesInput) {
       interviews: payload.interviews || [], // Preserve interview data
       rejectedDate: payload.rejectedDate || payload.rejectedAt || null,
       withdrawDate: payload.withdrawDate || payload.withdrawnDate || payload.withdrawnAt || null,
+      rejectionReason: payload.rejectionReason || payload.withdrawReason || null,
+      blacklisted: payload.blacklisted || false,
+      blacklistReason: payload.blacklistReason || null,
     };
     if (Object.prototype.hasOwnProperty.call(payload, 'joinDate')) {
       entry.joinDate = payload.joinDate || null;
@@ -543,6 +548,18 @@ async function syncFptkApplicationsTx(tx, fptkId, appliedCandidates, options = {
     return;
   }
 
+  // Resolve the actor's display name once for all history entries in this sync
+  let actorName = null;
+  if (options.userId) {
+    const actor = await tx.user.findUnique({
+      where: { id: options.userId },
+      select: { firstName: true, lastName: true },
+    });
+    if (actor) {
+      actorName = [actor.firstName, actor.lastName].filter(Boolean).join(' ').trim() || null;
+    }
+  }
+
   // Debug: Log received applied candidates to check interview data
   logger.info(`syncFptkApplicationsTx: Processing ${appliedCandidates.length} candidates for FPTK ${fptkId}`);
   appliedCandidates.forEach((candidate, index) => {
@@ -643,10 +660,25 @@ async function syncFptkApplicationsTx(tx, fptkId, appliedCandidates, options = {
           source,
           rejectedAt: typeof rejectedAtValue !== 'undefined' ? rejectedAtValue : undefined,
           withdrawnAt: typeof withdrawnAtValue !== 'undefined' ? withdrawnAtValue : undefined,
+          ...(item.rejectionReason !== undefined ? { rejectionReason: item.rejectionReason || null } : {}),
           ...joinDateData,
         },
       });
       applicationId = existing.id;
+
+      // Record status history only when the status actually changed
+      if (existing.status !== status) {
+        await tx.applicationStatusHistory.create({
+          data: {
+            applicationId: existing.id,
+            fromStatus: existing.status,
+            toStatus: status,
+            changedBy: options.userId || null,
+            changedByName: actorName,
+            reason: 'Status updated via position management',
+          },
+        });
+      }
     } else {
       try {
         const newApplication = await tx.application.create({
@@ -660,10 +692,23 @@ async function syncFptkApplicationsTx(tx, fptkId, appliedCandidates, options = {
             appliedByUserId: options.userId || null,
             rejectedAt: typeof rejectedAtValue !== 'undefined' ? rejectedAtValue : undefined,
             withdrawnAt: typeof withdrawnAtValue !== 'undefined' ? withdrawnAtValue : undefined,
+            ...(item.rejectionReason ? { rejectionReason: item.rejectionReason } : {}),
             ...joinDateData,
           },
         });
         applicationId = newApplication.id;
+
+        // Record the initial submission in status history
+        await tx.applicationStatusHistory.create({
+          data: {
+            applicationId: newApplication.id,
+            fromStatus: null,
+            toStatus: status,
+            changedBy: options.userId || null,
+            changedByName: actorName,
+            reason: 'Candidate added to position',
+          },
+        });
       } catch (error) {
         logger.warn(`Failed to create application for candidate ${candidateId} on FPTK ${fptkId}: ${error.message}`);
         continue; // Skip to next candidate if application creation failed
@@ -673,6 +718,18 @@ async function syncFptkApplicationsTx(tx, fptkId, appliedCandidates, options = {
     // Ensure candidate "Position Applied For" is updated (languages.positionAppliedFor)
     if (fptkId) {
       await ensureCandidatePositionAppliedForTx(tx, candidateId, fptkId, positionTitle);
+    }
+
+    // Update blacklist status on candidate if explicitly provided
+    if (item.blacklisted === true || item.blacklisted === false) {
+      await tx.candidate.update({
+        where: { id: candidateId },
+        data: {
+          blacklisted: item.blacklisted,
+          ...(item.blacklisted && item.blacklistReason ? { blacklistReason: item.blacklistReason } : {}),
+          ...(!item.blacklisted ? { blacklistReason: null } : {}),
+        },
+      });
     }
 
     // Handle interview data if provided
@@ -1243,14 +1300,27 @@ async function getSummaryByPosition(user = null) {
     updatedAt: true,
   };
 
-  let fptks, grouped;
+  let fptks, grouped, totalGrouped, onboardingApps;
+
+  // Shared select for ONBOARDING candidates (name + join date)
+  const onboardingSelect = {
+    fptkId: true,
+    joinDate: true,
+    candidate: {
+      select: {
+        user: {
+          select: { firstName: true, lastName: true },
+        },
+      },
+    },
+  };
 
   const isScopedRole = Object.keys(fptkWhere).length > 0;
 
   if (!isScopedRole) {
-    // Unrestricted roles (SUPER_ADMIN, TA_TEAM, etc.): both queries are
+    // Unrestricted roles (SUPER_ADMIN, TA_TEAM, etc.): all queries are
     // independent — run them in parallel to halve round-trip latency.
-    [fptks, grouped] = await Promise.all([
+    [fptks, grouped, totalGrouped, onboardingApps] = await Promise.all([
       prisma.fPTK.findMany({
         where: {},
         select: fptkSelect,
@@ -1259,6 +1329,17 @@ async function getSummaryByPosition(user = null) {
       prisma.application.groupBy({
         by: ['fptkId', 'status'],
         _count: { _all: true },
+      }),
+      // Total applicants per FPTK regardless of current status — used for the
+      // cumulative "Applied" count so it never decreases as candidates advance.
+      prisma.application.groupBy({
+        by: ['fptkId'],
+        _count: { _all: true },
+      }),
+      // ONBOARDING candidates with their expected join date
+      prisma.application.findMany({
+        where: { status: 'ONBOARDING' },
+        select: onboardingSelect,
       }),
     ]);
   } else {
@@ -1272,14 +1353,46 @@ async function getSummaryByPosition(user = null) {
     });
 
     const fptkIds = fptks.map((f) => f.id);
-    grouped = fptkIds.length > 0
-      ? await prisma.application.groupBy({
-          by: ['fptkId', 'status'],
-          where: { fptkId: { in: fptkIds } },
-          _count: { _all: true },
-        })
-      : [];
+    [grouped, totalGrouped, onboardingApps] = fptkIds.length > 0
+      ? await Promise.all([
+          prisma.application.groupBy({
+            by: ['fptkId', 'status'],
+            where: { fptkId: { in: fptkIds } },
+            _count: { _all: true },
+          }),
+          prisma.application.groupBy({
+            by: ['fptkId'],
+            where: { fptkId: { in: fptkIds } },
+            _count: { _all: true },
+          }),
+          prisma.application.findMany({
+            where: { status: 'ONBOARDING', fptkId: { in: fptkIds } },
+            select: onboardingSelect,
+          }),
+        ])
+      : [[], [], []];
   }
+
+  // Total applicants per FPTK (all statuses combined)
+  const totalApplicantsByFptkId = {};
+  (totalGrouped || []).forEach((g) => {
+    if (!g.fptkId) return;
+    totalApplicantsByFptkId[g.fptkId] = g._count?._all || 0;
+  });
+
+  // ONBOARDING candidates grouped by fptkId: [{ name, joinDate }]
+  const onboardingByFptkId = {};
+  (onboardingApps || []).forEach((app) => {
+    if (!app.fptkId) return;
+    const firstName = app.candidate?.user?.firstName || '';
+    const lastName = app.candidate?.user?.lastName || '';
+    const name = [firstName, lastName].filter(Boolean).join(' ') || 'Unknown';
+    if (!onboardingByFptkId[app.fptkId]) onboardingByFptkId[app.fptkId] = [];
+    onboardingByFptkId[app.fptkId].push({
+      name,
+      joinDate: app.joinDate ? app.joinDate.toISOString() : null,
+    });
+  });
 
   const countsByFptkId = {};
   const allStatuses = new Set();
@@ -1307,6 +1420,8 @@ async function getSummaryByPosition(user = null) {
   return {
     fptks,
     applicationCounts: countsByFptkId,
+    totalApplicants: totalApplicantsByFptkId,
+    onboardingCandidates: onboardingByFptkId,
     statuses: Array.from(allStatuses),
     priorities: Array.from(priorities),
     divisions: Array.from(divisions),

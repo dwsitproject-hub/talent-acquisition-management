@@ -64,12 +64,25 @@ async function createApplication(candidateId, fptkId, data = {}) {
     },
   });
 
+  // Resolve the submitter's display name if userId is provided
+  let submitterName = null;
+  if (data.userId) {
+    const submitter = await prisma.user.findUnique({
+      where: { id: data.userId },
+      select: { firstName: true, lastName: true },
+    });
+    if (submitter) {
+      submitterName = [submitter.firstName, submitter.lastName].filter(Boolean).join(' ') || null;
+    }
+  }
+
   // Create status history
   await prisma.applicationStatusHistory.create({
     data: {
       applicationId: application.id,
       fromStatus: null,
       toStatus: 'SUBMITTED',
+      changedByName: submitterName || 'Candidate',
       reason: 'Application submitted',
     },
   });
@@ -161,6 +174,9 @@ async function getCandidateApplications(candidateId, pagination) {
             location: true,
           },
         },
+        statusHistory: {
+          orderBy: { createdAt: 'asc' },
+        },
         _count: {
           select: {
             interviews: true,
@@ -233,7 +249,8 @@ async function getAllApplications(filters, pagination, user = null) {
   }
 
   if (filters.status) {
-    where.status = filters.status;
+    const statuses = String(filters.status).split(',').map((s) => s.trim()).filter(Boolean);
+    where.status = statuses.length === 1 ? statuses[0] : { in: statuses };
   }
 
   if (filters.fptkId) {
@@ -420,6 +437,19 @@ async function updateApplicationStatus(applicationId, newStatus, userId, reason 
     });
   }
 
+  // Resolve the actor's display name for the audit trail
+  let changedByName = null;
+  if (userId) {
+    const actor = await prisma.user.findUnique({
+      where: { id: userId },
+      select: { firstName: true, lastName: true, role: true },
+    });
+    if (actor) {
+      const name = [actor.firstName, actor.lastName].filter(Boolean).join(' ').trim();
+      changedByName = name || null;
+    }
+  }
+
   // Create status history
   await prisma.applicationStatusHistory.create({
     data: {
@@ -427,6 +457,7 @@ async function updateApplicationStatus(applicationId, newStatus, userId, reason 
       fromStatus: oldStatus,
       toStatus: newStatus,
       changedBy: userId,
+      changedByName,
       reason,
     },
   });

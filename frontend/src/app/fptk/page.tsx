@@ -218,11 +218,14 @@ export const mapApiFptk = (fptk: any): FPTK => {
           status: mapApplicationStatusToUi(application.status),
           backendStatus: application.status,
           appliedDate: application.appliedAt,
-        rejectedDate: application.rejectedAt,
-        withdrawDate: application.withdrawnAt,
+          rejectedDate: application.rejectedAt,
+          withdrawDate: application.withdrawnAt,
           joinDate: application.joinDate
             ? new Date(application.joinDate).toISOString().split('T')[0]
             : null,
+          rejectionReason: application.rejectionReason || null,
+          blacklisted: candidate.blacklisted || false,
+          blacklistReason: candidate.blacklistReason || null,
           source: application.source,
           skills,
           experience,
@@ -392,6 +395,9 @@ const mapAppliedCandidatesForPayload = (candidates?: any[]) => {
                   ? `${String(candidate.joinDate).trim().slice(0, 10)}T12:00:00.000Z`
                   : String(candidate.joinDate)
               ).toISOString(),
+        rejectionReason: candidate.rejectionReason || null,
+        blacklisted: candidate.blacklisted || false,
+        blacklistReason: candidate.blacklistReason || null,
       }
     })
     .filter(Boolean)

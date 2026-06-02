@@ -544,8 +544,15 @@ export const ApplicationsAPI = {
 
 // Dashboard APIs
 export const DashboardAPI = {
-  async getStats() {
-    const res = await api.get('/dashboard/stats')
+  async getStats(params?: {
+    priority?: string
+    positionStatus?: string
+    periodStart?: string
+    periodEnd?: string
+    previousStart?: string
+    previousEnd?: string
+  }) {
+    const res = await api.get('/dashboard/stats', { params })
     return res.data.data
   },
 }
