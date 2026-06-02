@@ -153,8 +153,8 @@ function checkOwnership(resourceIdParam = 'id') {
 
       // For candidates, check if they own the resource
       if (userRole === 'CANDIDATE') {
-        const candidate = await prisma.candidate.findUnique({
-          where: { userId },
+        const candidate = await prisma.candidate.findFirst({
+          where: { userId, isDeleted: false },
           select: { id: true },
         });
 

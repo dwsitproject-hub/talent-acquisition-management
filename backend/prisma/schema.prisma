@@ -172,6 +172,7 @@ model User {
   notifications         Notification[]
   onboardingTasks       OnboardingTask[]     @relation("TaskAssignedTo")
   menuAccessUpdated     MenuAccess[]         @relation("MenuAccessUpdater")
+  candidatesDeleted     Candidate[]          @relation("CandidateDeletedBy")
 
   @@index([email])
   @@index([role])
@@ -259,6 +260,10 @@ model Candidate {
   createdAt         DateTime  @default(now())
   updatedAt         DateTime  @updatedAt
 
+  isDeleted         Boolean   @default(false) @map("is_deleted")
+  deletedBy         String?   @map("deleted_by")
+  deletedByUser     User?     @relation("CandidateDeletedBy", fields: [deletedBy], references: [id], onDelete: SetNull)
+
   // Relations
   applications      Application[]
   documents         Document[]
@@ -273,6 +278,7 @@ model Candidate {
 
   @@index([nationalId])
   @@index([userId])
+  @@index([isDeleted])
   @@map("candidates")
 }
 

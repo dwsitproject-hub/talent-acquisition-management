@@ -269,6 +269,27 @@ router.put(
 );
 
 /**
+ * @route   DELETE /api/candidates/:id
+ * @desc    Soft-delete candidate (hidden from lists; retained in DB)
+ * @access  Private (TA, HRBP, Admin, CHRO)
+ */
+router.delete(
+  '/:id',
+  authenticate,
+  authorize('TA_TEAM', 'HRBP', 'SUPER_ADMIN', 'CHRO'),
+  validationRules.uuidParam('id'),
+  validate,
+  asyncHandler(async (req, res) => {
+    const result = await candidateService.softDeleteCandidate(req.params.id, req.user.id);
+    res.json({
+      success: true,
+      message: 'Candidate deleted successfully',
+      data: result,
+    });
+  })
+);
+
+/**
  * @route   POST /api/candidates/:id/documents
  * @desc    Upload candidate document (e.g., CV)
  * @access  Private (TA, HRBP, Admin)
@@ -461,6 +482,7 @@ router.get(
       const allowed = await prisma.candidate.findFirst({
         where: {
           id: req.params.id,
+          isDeleted: false,
           user: { division: req.user.division || '' },
         },
         select: { id: true },
@@ -482,6 +504,7 @@ router.get(
       const allowed = await prisma.candidate.findFirst({
         where: {
           id: req.params.id,
+          isDeleted: false,
           applications: {
             some: {
               fptk: hmScope,

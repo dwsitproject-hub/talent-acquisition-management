@@ -94,7 +94,7 @@ async function getDashboardStats(user = null, options = {}) {
     // Build role-based filters
     const fptkWhere = {};
     const applicationWhere = {};
-    const candidateWhere = {};
+    const candidateWhere = { isDeleted: false };
 
     if (user) {
       const userRole = user.role;

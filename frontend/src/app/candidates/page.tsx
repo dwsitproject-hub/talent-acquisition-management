@@ -356,6 +356,7 @@ export default function CandidatesPage() {
   const [pageSize, setPageSize] = useState<10 | 50 | 100>(50)
   const [menuAccess, setMenuAccess] = useState<Record<string, any>>({})
   const [menuAccessLoading, setMenuAccessLoading] = useState(true)
+  const [deletingCandidateId, setDeletingCandidateId] = useState<string | null>(null)
 
   useModalEscape(showLinkModal, () => setShowLinkModal(false))
 
@@ -974,9 +975,28 @@ export default function CandidatesPage() {
     }
   }
 
-  const handleDeleteCandidate = (candidateId: string) => {
-    if (confirm('Are you sure you want to delete this candidate?')) {
-      setCandidates(prev => prev.filter(candidate => candidate.id !== candidateId))
+  const handleDeleteCandidate = async (candidateId: string) => {
+    const confirmed = window.confirm(
+      'Delete this candidate? They will be removed from all lists but kept in the database for audit purposes.'
+    )
+    if (!confirmed) return
+
+    try {
+      setDeletingCandidateId(candidateId)
+      await CandidatesAPI.delete(candidateId)
+
+      if (selectedCandidate?.id === candidateId) {
+        setIsViewModalOpen(false)
+        setIsEditModalOpen(false)
+        setSelectedCandidate(null)
+      }
+
+      setCandidates((prev) => prev.filter((candidate) => candidate.id !== candidateId))
+    } catch (error: any) {
+      console.error('Error deleting candidate:', error)
+      alert(error.response?.data?.message || error.message || 'Failed to delete candidate. Please try again.')
+    } finally {
+      setDeletingCandidateId(null)
     }
   }
 
@@ -1287,11 +1307,11 @@ export default function CandidatesPage() {
                               Edit
                             </button>
                             <button 
-                              disabled={!canEdit}
+                              disabled={!canEdit || deletingCandidateId === candidate.id}
                               onClick={() => canEdit && handleDeleteCandidate(candidate.id)}
-                              className={`${canEdit ? 'text-red-600 hover:text-red-900' : 'text-gray-300 cursor-not-allowed'}`}
+                              className={`${canEdit && deletingCandidateId !== candidate.id ? 'text-red-600 hover:text-red-900' : 'text-gray-300 cursor-not-allowed'}`}
                             >
-                              Delete
+                              {deletingCandidateId === candidate.id ? 'Deleting…' : 'Delete'}
                             </button>
                           </div>
                         </td>

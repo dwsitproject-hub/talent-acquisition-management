@@ -3,6 +3,10 @@ const bcrypt = require('bcryptjs');
 const { encrypt, decrypt } = require('../utils/encryption');
 const logger = require('../utils/logger');
 const { buildTokenizedSearch } = require('../utils/search');
+const {
+  ACTIVE_CANDIDATE_WHERE,
+  withActiveCandidate,
+} = require('../utils/candidateVisibility');
 
 function buildHiringManagerScopeFromUser(user = null) {
   if (!user) return null;
@@ -379,8 +383,8 @@ async function createCandidate(data) {
  * Get candidate profile
  */
 async function getCandidateProfile(candidateId) {
-  const candidate = await prisma.candidate.findUnique({
-    where: { id: candidateId },
+  const candidate = await prisma.candidate.findFirst({
+    where: { id: candidateId, ...ACTIVE_CANDIDATE_WHERE },
     include: {
       user: {
         select: {
@@ -424,8 +428,8 @@ async function getCandidateProfile(candidateId) {
  * Get candidate by user ID
  */
 async function getCandidateByUserId(userId) {
-  const candidate = await prisma.candidate.findUnique({
-    where: { userId },
+  const candidate = await prisma.candidate.findFirst({
+    where: { userId, ...ACTIVE_CANDIDATE_WHERE },
     include: {
       user: {
         select: {
@@ -469,6 +473,14 @@ async function getCandidateByUserId(userId) {
  * Update candidate profile
  */
 async function updateCandidateProfile(candidateId, data) {
+  const existing = await prisma.candidate.findFirst({
+    where: { id: candidateId, ...ACTIVE_CANDIDATE_WHERE },
+    select: { id: true },
+  });
+  if (!existing) {
+    throw new Error('Candidate not found');
+  }
+
   // Encrypt sensitive fields
   if (data.nationalId) {
     data.nationalId = encrypt(data.nationalId);
@@ -513,8 +525,8 @@ async function updateCandidate(candidateId, data) {
   } = data;
 
   // Load candidate to get userId and existing data
-  const existing = await prisma.candidate.findUnique({ 
-    where: { id: candidateId },
+  const existing = await prisma.candidate.findFirst({
+    where: { id: candidateId, ...ACTIVE_CANDIDATE_WHERE },
     include: {
       user: {
         select: {
@@ -926,9 +938,11 @@ async function searchCandidates(filters, pagination, user = null) {
     }
   }
 
+  const activeWhere = withActiveCandidate(where);
+
   const [candidates, total] = await Promise.all([
     prisma.candidate.findMany({
-      where,
+      where: activeWhere,
       skip,
       take: limit,
       include: {
@@ -953,7 +967,7 @@ async function searchCandidates(filters, pagination, user = null) {
       },
       orderBy: { createdAt: 'desc' },
     }),
-    prisma.candidate.count({ where }),
+    prisma.candidate.count({ where: activeWhere }),
   ]);
 
   // Parse languages JSON for each candidate
@@ -1054,6 +1068,34 @@ async function deleteWorkExperience(experienceId, candidateId) {
   });
 }
 
+/**
+ * Soft-delete a candidate (retain row; hide from all list/detail APIs).
+ */
+async function softDeleteCandidate(candidateId, deletedByUserId) {
+  const existing = await prisma.candidate.findFirst({
+    where: { id: candidateId, ...ACTIVE_CANDIDATE_WHERE },
+    select: { id: true },
+  });
+
+  if (!existing) {
+    const error = new Error('Candidate not found');
+    error.statusCode = 404;
+    throw error;
+  }
+
+  await prisma.candidate.update({
+    where: { id: candidateId },
+    data: {
+      isDeleted: true,
+      deletedBy: deletedByUserId,
+    },
+  });
+
+  logger.info(`Candidate soft-deleted: ${candidateId} by user ${deletedByUserId}`);
+
+  return { id: candidateId, isDeleted: true };
+}
+
 module.exports = {
   createCandidate,
   getCandidateProfile,
@@ -1065,6 +1107,7 @@ module.exports = {
   addCertification,
   addReference,
   searchCandidates,
+  softDeleteCandidate,
   deleteEducation,
   deleteWorkExperience,
 };

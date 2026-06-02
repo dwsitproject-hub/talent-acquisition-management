@@ -488,6 +488,10 @@ export const CandidatesAPI = {
     const res = await api.put(`/candidates/${id}`, payload)
     return res.data
   },
+  async delete(id: string) {
+    const res = await api.delete(`/candidates/${id}`)
+    return res.data
+  },
   async getById(id: string) {
     const res = await api.get(`/candidates/${id}`)
     return res.data.data

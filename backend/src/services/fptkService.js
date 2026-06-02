@@ -451,7 +451,7 @@ async function resolveCandidateIdTx(tx, { candidateId, email, fullName }) {
   if (!normalizedEmail) return null;
 
   const candidate = await tx.candidate.findFirst({
-    where: { user: { email: normalizedEmail } },
+    where: { user: { email: normalizedEmail }, isDeleted: false },
     select: {
       id: true,
       user: { select: { firstName: true, lastName: true, email: true } },

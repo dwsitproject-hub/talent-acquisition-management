@@ -83,7 +83,9 @@ async function uploadCandidateDocument(candidateId, file, options = {}) {
     throw new Error('Unsupported file type');
   }
 
-  const candidate = await prisma.candidate.findUnique({ where: { id: candidateId } });
+  const candidate = await prisma.candidate.findFirst({
+    where: { id: candidateId, isDeleted: false },
+  });
   if (!candidate) {
     throw new Error('Candidate not found');
   }
