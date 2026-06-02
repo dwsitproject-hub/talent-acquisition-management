@@ -5,6 +5,8 @@ import { useModalEscape } from '@/hooks/useModalEscape'
 import { XMarkIcon } from '@heroicons/react/24/outline'
 import { FPTK } from '@/types'
 import { MasterOfficeLocationAPI, MasterDivisionAPI, CandidatesAPI, AdminUsersAPI } from '@/lib/api'
+import ApplicationHistoryModal from './ApplicationHistoryModal'
+import { fetchApplicationsForFptk } from '@/utils/mapFptkApplication'
 import { useAuth } from '@/contexts/AuthContext'
 import { compressFile, formatFileSize } from '@/utils/fileCompression'
 import {
@@ -23,8 +25,11 @@ interface EditJobPostingModalProps {
   onClose: () => void
   jobPosting: FPTK | null
   onSave: (updatedData: any) => void
-  onStatusUpdate?: (jobPostingId: string, newStatus: string) => void
   onCandidateStatusUpdate?: (jobPostingId: string, candidateId: string, newStatus: string) => void
+  /** When stacked over another modal (e.g. candidate detail), use a higher z-index */
+  overlayZIndex?: number
+  /** Optional back affordance (e.g. return to candidate profile) */
+  headerBackLabel?: string
 }
 
 export default function EditJobPostingModal({ 
@@ -32,8 +37,9 @@ export default function EditJobPostingModal({
   onClose, 
   jobPosting, 
   onSave, 
-  onStatusUpdate,
-  onCandidateStatusUpdate 
+  onCandidateStatusUpdate,
+  overlayZIndex = 1000,
+  headerBackLabel,
 }: EditJobPostingModalProps) {
   const { user } = useAuth()
   const userRole = (user as any)?.role?.name || (user as any)?.role || ''
@@ -67,8 +73,14 @@ export default function EditJobPostingModal({
   const [newSkill, setNewSkill] = useState('')
   const [appliedCandidates, setAppliedCandidates] = useState<any[]>([])
   const [expandedInterviewSections, setExpandedInterviewSections] = useState<Set<string>>(new Set())
+  const [historyApplicationId, setHistoryApplicationId] = useState<string | null>(null)
+  const [pendingStatusChange, setPendingStatusChange] = useState<{ candidateId: string; newStatus: string } | null>(null)
+  const [statusChangeReason, setStatusChangeReason] = useState('')
+  const [statusChangeBlacklist, setStatusChangeBlacklist] = useState(false)
   const [suggestedCandidates, setSuggestedCandidates] = useState<any[]>([])
   const [allCandidates, setAllCandidates] = useState<any[]>([])
+  const [showCandidatePicker, setShowCandidatePicker] = useState(false)
+  const [candidatePickerSearch, setCandidatePickerSearch] = useState('')
   const [officeLocations, setOfficeLocations] = useState<any[]>([])
   const [areaDetails, setAreaDetails] = useState<any[]>([])
   const [divisions, setDivisions] = useState<any[]>([])
@@ -207,6 +219,9 @@ export default function EditJobPostingModal({
           : baseInfo.joinDate != null && baseInfo.joinDate !== ''
             ? String(baseInfo.joinDate).trim().slice(0, 10)
             : null,
+      rejectionReason: candidate.rejectionReason ?? baseInfo.rejectionReason ?? null,
+      blacklisted: candidate.blacklisted ?? baseInfo.blacklisted ?? false,
+      blacklistReason: candidate.blacklistReason ?? baseInfo.blacklistReason ?? null,
       skills,
       experience,
       yearsOfExperience: experience,
@@ -516,47 +531,28 @@ export default function EditJobPostingModal({
         remark: (jobPosting as any).remark || ''
       })
       
-      const jobAppliedRaw = Array.isArray((jobPosting as any).appliedCandidates)
-        ? (jobPosting as any).appliedCandidates
-        : []
-
-      if (jobAppliedRaw.length > 0) {
-        const initialApplied = jobAppliedRaw.map((candidate: any) =>
-          mergeAppliedCandidateData(candidate)
-        )
-        setAppliedCandidates(initialApplied)
-      } else {
-        setAppliedCandidates([])
-      }
-
-      // Load candidates from API with pagination (same logic as ViewJobPostingModal)
       const loadCandidates = async () => {
         try {
-          // Load candidates with pagination (API max limit is 100)
           let allCandidates: any[] = []
           let page = 1
           const limit = 100
           let hasMore = true
-          
+
           while (hasMore) {
             const response = await CandidatesAPI.getAll({}, { page, limit })
             const candidatesData = response.data || []
             allCandidates = [...allCandidates, ...candidatesData]
-            
-            // Check if there are more pages
+
             const totalPages = response.pagination?.totalPages || 1
             hasMore = page < totalPages
             page++
-            
-            // Safety limit to prevent infinite loops
+
             if (page > 50) {
               console.warn('⚠️ Reached maximum page limit (50). Some candidates may not be loaded.')
               break
             }
           }
-          
-          console.log('📋 Total candidates loaded in EditJobPostingModal:', allCandidates.length)
-          
+
           const mappedCandidates = allCandidates.map(mapApiCandidate).filter((c: any) => c !== null)
           setAllCandidates(mappedCandidates)
           return mappedCandidates
@@ -566,8 +562,21 @@ export default function EditJobPostingModal({
           return []
         }
       }
-      
-      loadCandidates().then((candidates) => {
+
+      void (async () => {
+        let jobAppliedRaw: any[] = Array.isArray((jobPosting as any).appliedCandidates)
+          ? (jobPosting as any).appliedCandidates
+          : []
+
+        if (jobAppliedRaw.length === 0 && jobPosting.id) {
+          try {
+            jobAppliedRaw = await fetchApplicationsForFptk(jobPosting.id)
+          } catch (error) {
+            console.error('EditJobPostingModal: load applications by fptkId', error)
+          }
+        }
+
+        const candidates = await loadCandidates()
         const candidateMap = new Map<string, any>(
           candidates.map((candidate: any) => [candidate.id, candidate])
         )
@@ -577,101 +586,9 @@ export default function EditJobPostingModal({
           return mergeAppliedCandidateData(candidate, info)
         })
 
+        setAppliedCandidates(enrichedFromJob)
+
         const appliedIds = new Set(enrichedFromJob.map((candidate: any) => candidate.id))
-
-        // Load real applied candidates for this specific open position (fallback for legacy data)
-        // Use the same comprehensive matching logic as ViewJobPostingModal
-        const legacyApplied = candidates
-          .filter((candidate: any) => {
-            // Parse positionAppliedFor from different possible locations (same as ViewJobPostingModal)
-            let positionAppliedFor: string[] = []
-            
-            // Check direct field
-            if (candidate.positionAppliedFor !== undefined && candidate.positionAppliedFor !== null) {
-              positionAppliedFor = Array.isArray(candidate.positionAppliedFor) 
-                ? candidate.positionAppliedFor 
-                : [String(candidate.positionAppliedFor)]
-            }
-            
-            // Check languages field (where it's actually stored in backend)
-            if (positionAppliedFor.length === 0 && candidate.languages) {
-              const languagesData = typeof candidate.languages === 'string'
-                ? JSON.parse(candidate.languages || '{}')
-                : (candidate.languages || {})
-              
-              if (languagesData.positionAppliedFor) {
-                positionAppliedFor = Array.isArray(languagesData.positionAppliedFor)
-                  ? languagesData.positionAppliedFor
-                  : [String(languagesData.positionAppliedFor)]
-              }
-            }
-            
-            // Normalize position title for comparison
-            const positionTitle = (jobPosting.title || '').trim().toLowerCase()
-            const hasAppliedToThis = positionAppliedFor.some((pos: string) => {
-              const normalizedPos = (pos || '').trim().toLowerCase()
-              return normalizedPos === positionTitle
-            })
-            
-            // Also check currentPosition as fallback
-            const currentPositionMatch =
-              candidate.professionalInfo && 
-              (candidate.professionalInfo.currentPosition || '').trim().toLowerCase() === positionTitle
-            
-            return hasAppliedToThis || currentPositionMatch
-          })
-          .filter((candidate: any) => !appliedIds.has(candidate.id))
-          .map((candidate: any) => {
-            // Use the same mapping logic as ViewJobPostingModal for consistency
-            const user = candidate.user || {}
-            const formDataDiri = typeof candidate.formDataDiri === 'string' 
-              ? JSON.parse(candidate.formDataDiri || '{}') 
-              : (candidate.formDataDiri || {})
-            const languagesData = typeof candidate.languages === 'string'
-              ? JSON.parse(candidate.languages || '{}')
-              : (candidate.languages || {})
-
-            const fullName = [user.firstName, user.lastName].filter(Boolean).join(' ') ||
-              formDataDiri?.fullName || candidate.fullName || candidate.name ||
-              `Candidate ${candidate.id?.slice(0, 6) || ''}`
-
-            const email = user.email || candidate.email || formDataDiri?.email || ''
-            const skills = Array.isArray(candidate.skills)
-              ? candidate.skills
-              : Array.isArray(languagesData?.skills)
-                ? languagesData.skills
-                : candidate.professionalInfo?.skills || []
-
-            return mergeAppliedCandidateData(
-              {
-                id: candidate.id,
-                candidateId: candidate.id,
-                fullName,
-                name: fullName,
-                email,
-                phone: user.phoneNumber || '',
-                status: 'Applied',
-                backendStatus: 'SUBMITTED',
-                appliedDate: candidate.createdAt || new Date().toISOString(),
-                rejectedDate: null,
-                withdrawDate: null,
-                source: 'Manual',
-                skills,
-                experience: languagesData?.yearsOfExperience || candidate.yearsOfExperience || candidate.professionalInfo?.experience || 0,
-                yearsOfExperience: languagesData?.yearsOfExperience || candidate.yearsOfExperience || candidate.professionalInfo?.experience || 0,
-                division: user.division || candidate.division || null,
-                jobPostingId: jobPosting.id,
-                interviews: candidate.interviews || [],
-              },
-              candidate
-            )
-          })
-
-        legacyApplied.forEach((candidate: any) => appliedIds.add(candidate.id))
-
-        console.log('📊 Applied candidates found in EditJobPostingModal:', enrichedFromJob.length, 'from jobPosting,', legacyApplied.length, 'from positionAppliedFor')
-        setAppliedCandidates([...enrichedFromJob, ...legacyApplied])
-
         const jobDivision = jobPosting.department || formData.division || ''
 
         // Helper function to map API candidate to frontend structure
@@ -754,7 +671,7 @@ export default function EditJobPostingModal({
         }).slice(0, 10) // Limit to 10 suggestions
         
         setSuggestedCandidates(suggested)
-      })
+      })()
     }
   }, [jobPosting, isOpen])
 
@@ -984,18 +901,15 @@ export default function EditJobPostingModal({
       
       return updated
     })
-    if (onStatusUpdate && jobPosting) {
-      onStatusUpdate(jobPosting.id, newStatus)
-    }
   }
 
-  const handleCandidateStatusChange = (candidateId: string, newStatus: string) => {
+  const applyStatusChange = (candidateId: string, newStatus: string, reason: string, blacklisted: boolean) => {
     setAppliedCandidates(prev => {
       const target = prev.find(
         c => c.id === candidateId || c.candidateId === candidateId
       )
       const oldStatus = target ? target.status : undefined
-      
+
       const updateData: any = {
         status: newStatus,
         backendStatus: mapAppliedStatusToBackend(newStatus),
@@ -1004,19 +918,27 @@ export default function EditJobPostingModal({
       if (normalized.startsWith('rejected')) {
         updateData.rejectedDate = new Date().toISOString()
         updateData.withdrawDate = null
+        updateData.rejectionReason = reason || null
       } else if (normalized === 'withdrawn') {
         updateData.withdrawDate = new Date().toISOString()
         updateData.rejectedDate = null
+        updateData.rejectionReason = reason || null
       } else {
         updateData.rejectedDate = null
         updateData.withdrawDate = null
+        updateData.rejectionReason = null
       }
-      
+
+      if (blacklisted) {
+        updateData.blacklisted = true
+        updateData.blacklistReason = reason || null
+      }
+
       // When status changes to "Interviewed", ensure there's at least one interview entry
       if (newStatus === 'Interviewed' && (!target?.interviews || target.interviews.length === 0)) {
         updateData.interviews = [{ interviewer: '', date: '', time: '', results: '' }]
       }
-      
+
       const updated = prev.map(candidate => {
         const matches =
           candidate.id === candidateId || candidate.candidateId === candidateId
@@ -1037,10 +959,38 @@ export default function EditJobPostingModal({
       }
       return updated
     })
-    
+
     if (onCandidateStatusUpdate && jobPosting) {
       onCandidateStatusUpdate(jobPosting.id, candidateId, newStatus)
     }
+  }
+
+  const handleCandidateStatusChange = (candidateId: string, newStatus: string) => {
+    const normalized = (newStatus || '').toString().trim().toLowerCase()
+    const needsReason = normalized.startsWith('rejected') || normalized === 'withdrawn'
+
+    if (needsReason) {
+      setStatusChangeReason('')
+      setStatusChangeBlacklist(false)
+      setPendingStatusChange({ candidateId, newStatus })
+      return
+    }
+
+    applyStatusChange(candidateId, newStatus, '', false)
+  }
+
+  const handleConfirmStatusChange = () => {
+    if (!pendingStatusChange) return
+    applyStatusChange(pendingStatusChange.candidateId, pendingStatusChange.newStatus, statusChangeReason, statusChangeBlacklist)
+    setPendingStatusChange(null)
+    setStatusChangeReason('')
+    setStatusChangeBlacklist(false)
+  }
+
+  const handleCancelStatusChange = () => {
+    setPendingStatusChange(null)
+    setStatusChangeReason('')
+    setStatusChangeBlacklist(false)
   }
 
   const handleCandidateJoinDateChange = (candidateId: string, dateValue: string) => {
@@ -1076,6 +1026,32 @@ export default function EditJobPostingModal({
 
     setAppliedCandidates(prev => [...prev, newAppliedCandidate])
     setSuggestedCandidates(prev => prev.filter(c => c.id !== candidate.id))
+    if (jobPosting) {
+      appendOpenPositionLog({
+        type: 'APPLIED_CANDIDATE_ADDED',
+        details: {
+          candidateId: candidate.id,
+          candidateName: candidate.fullName || candidate.name,
+        },
+      })
+    }
+  }
+
+  const handleAddManualCandidate = (candidate: any) => {
+    const newAppliedCandidate = mergeAppliedCandidateData(
+      {
+        ...candidate,
+        id: candidate.id,
+        candidateId: candidate.id,
+        status: 'Applied',
+        appliedDate: new Date().toISOString(),
+        jobPostingId: jobPosting?.id,
+      },
+      candidate
+    )
+    setAppliedCandidates(prev => [...prev, newAppliedCandidate])
+    setSuggestedCandidates(prev => prev.filter(c => c.id !== candidate.id))
+    setCandidatePickerSearch('')
     if (jobPosting) {
       appendOpenPositionLog({
         type: 'APPLIED_CANDIDATE_ADDED',
@@ -1320,7 +1296,7 @@ export default function EditJobPostingModal({
       display: 'flex',
       alignItems: 'center',
       justifyContent: 'center',
-      zIndex: 1000
+      zIndex: overlayZIndex
     }}>
       <div style={{
         backgroundColor: 'white',
@@ -1337,16 +1313,39 @@ export default function EditJobPostingModal({
           borderBottom: '1px solid #e5e7eb',
           display: 'flex',
           justifyContent: 'space-between',
-          alignItems: 'center'
+          alignItems: 'center',
+          gap: '12px',
+          flexWrap: 'wrap',
         }}>
-          <h2 style={{
-            fontSize: '18px',
-            fontWeight: '600',
-            color: '#111827',
-            margin: 0
-          }}>
-            Edit Position - {jobPosting.title}
-          </h2>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', minWidth: 0, flex: 1 }}>
+            {headerBackLabel ? (
+              <button
+                type="button"
+                onClick={onClose}
+                style={{
+                  alignSelf: 'flex-start',
+                  background: 'none',
+                  border: 'none',
+                  padding: 0,
+                  color: '#4f46e5',
+                  fontSize: '13px',
+                  fontWeight: '500',
+                  cursor: 'pointer',
+                  textDecoration: 'none',
+                }}
+              >
+                ← {headerBackLabel}
+              </button>
+            ) : null}
+            <h2 style={{
+              fontSize: '18px',
+              fontWeight: '600',
+              color: '#111827',
+              margin: 0
+            }}>
+              Edit Position - {jobPosting.title}
+            </h2>
+          </div>
           <button
             onClick={onClose}
             style={{
@@ -1994,7 +1993,6 @@ export default function EditJobPostingModal({
                   <option value="Open">Open</option>
                   <option value="Pending FKTK">Pending FKTK</option>
                   <option value="Re-Open">Re-Open</option>
-                  <option value="Hold">Hold</option>
                   <option value="Cancel">Cancel</option>
                   <option value="Internal Movement">Internal Movement</option>
                   <option value="Close">Close</option>
@@ -2221,6 +2219,37 @@ export default function EditJobPostingModal({
                             <option value="Withdrawn">Withdrawn</option>
                             <option value="Keep In View">Keep In View</option>
                           </select>
+                          {candidate.applicationId && (
+                            <button
+                              type="button"
+                              onClick={() => setHistoryApplicationId(candidate.applicationId)}
+                              style={{
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                gap: '4px',
+                                marginTop: '6px',
+                                padding: '3px 8px',
+                                border: '1px solid #c7d2fe',
+                                borderRadius: '4px',
+                                fontSize: '11px',
+                                fontWeight: '500',
+                                color: '#4f46e5',
+                                backgroundColor: '#eef2ff',
+                                cursor: 'pointer',
+                              }}
+                            >
+                              <svg xmlns="http://www.w3.org/2000/svg" style={{ width: '12px', height: '12px' }} fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
+                                <path strokeLinecap="round" strokeLinejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" />
+                              </svg>
+                              History
+                            </button>
+                          )}
+                          {candidate.blacklisted && (
+                            <div style={{ marginTop: '6px', display: 'inline-flex', alignItems: 'center', gap: '4px', padding: '2px 8px', backgroundColor: '#fef2f2', border: '1px solid #fecaca', borderRadius: '4px', fontSize: '11px', fontWeight: '600', color: '#b91c1c' }}>
+                              <svg xmlns="http://www.w3.org/2000/svg" style={{ width: '11px', height: '11px' }} fill="none" viewBox="0 0 24 24" strokeWidth={2.5} stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M18.364 18.364A9 9 0 0 0 5.636 5.636m12.728 12.728A9 9 0 0 1 5.636 5.636m12.728 12.728L5.636 5.636" /></svg>
+                              Blacklisted
+                            </div>
+                          )}
                           {(candidate.status || '').toString().toLowerCase().startsWith('rejected') && candidate.rejectedDate ? (
                             <div style={{ marginTop: '6px', fontSize: '11px', color: '#b91c1c' }}>
                               Rejected Date: {formatDate(candidate.rejectedDate)}
@@ -2231,6 +2260,11 @@ export default function EditJobPostingModal({
                               Withdraw Date: {formatDate(candidate.withdrawDate)}
                             </div>
                           ) : null}
+                          {candidate.rejectionReason && (
+                            <div style={{ marginTop: '6px', padding: '6px 8px', backgroundColor: '#fef9c3', border: '1px solid #fde68a', borderRadius: '4px', fontSize: '11px', color: '#92400e' }}>
+                              <span style={{ fontWeight: '600' }}>Reason: </span>{candidate.rejectionReason}
+                            </div>
+                          )}
                           {['MCU', 'On Boarding'].includes(candidate.status) ? (
                             <div style={{ marginTop: '10px' }}>
                               <label
@@ -2804,6 +2838,123 @@ export default function EditJobPostingModal({
                   </div>
                 )}
               </div>
+
+              {/* Add Any Candidate */}
+              <div style={{ marginBottom: '20px' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+                  <h4 style={{ fontSize: '14px', fontWeight: '500', color: '#374151', margin: 0 }}>
+                    Add Candidate Manually
+                  </h4>
+                  <button
+                    type="button"
+                    onClick={() => { setShowCandidatePicker(v => !v); setCandidatePickerSearch('') }}
+                    style={{
+                      padding: '6px 14px',
+                      border: '1px solid #6366f1',
+                      borderRadius: '6px',
+                      fontSize: '13px',
+                      fontWeight: '500',
+                      color: '#6366f1',
+                      backgroundColor: 'white',
+                      cursor: 'pointer',
+                    }}
+                  >
+                    {showCandidatePicker ? 'Close' : '+ Add Candidate'}
+                  </button>
+                </div>
+                {showCandidatePicker && (() => {
+                  const alreadyAppliedIds = new Set(appliedCandidates.map((c: any) => c.id || c.candidateId))
+                  const searchLower = candidatePickerSearch.toLowerCase()
+                  const pickerCandidates = allCandidates.filter((c: any) => {
+                    if (alreadyAppliedIds.has(c.id)) return false
+                    if (!searchLower) return true
+                    const name = (c.fullName || c.name || [c.personalInfo?.firstName, c.personalInfo?.lastName].filter(Boolean).join(' ') || '').toLowerCase()
+                    const email = (c.email || c.contactInfo?.email || '').toLowerCase()
+                    return name.includes(searchLower) || email.includes(searchLower)
+                  })
+                  return (
+                    <div style={{
+                      border: '1px solid #e5e7eb',
+                      borderRadius: '8px',
+                      overflow: 'hidden',
+                      backgroundColor: '#fff',
+                    }}>
+                      <div style={{ padding: '10px 12px', borderBottom: '1px solid #e5e7eb' }}>
+                        <input
+                          type="text"
+                          placeholder="Search by name or email…"
+                          value={candidatePickerSearch}
+                          onChange={e => setCandidatePickerSearch(e.target.value)}
+                          style={{
+                            width: '100%',
+                            padding: '7px 10px',
+                            border: '1px solid #d1d5db',
+                            borderRadius: '6px',
+                            fontSize: '13px',
+                            outline: 'none',
+                            boxSizing: 'border-box',
+                          }}
+                        />
+                      </div>
+                      <div style={{ maxHeight: '280px', overflowY: 'auto' }}>
+                        {pickerCandidates.length === 0 ? (
+                          <p style={{ padding: '16px', textAlign: 'center', fontSize: '13px', color: '#6b7280', margin: 0 }}>
+                            {allCandidates.length === 0 ? 'Loading candidates…' : 'No candidates found.'}
+                          </p>
+                        ) : (
+                          pickerCandidates.map((candidate: any) => {
+                            const name = candidate.fullName || candidate.name || [candidate.personalInfo?.firstName, candidate.personalInfo?.lastName].filter(Boolean).join(' ') || 'Unknown'
+                            const email = candidate.email || candidate.contactInfo?.email || ''
+                            const exp = candidate.experience ?? candidate.yearsOfExperience ?? candidate.professionalInfo?.experience ?? 0
+                            const skills: string[] = candidate.skills || candidate.professionalInfo?.skills || []
+                            return (
+                              <div key={candidate.id} style={{
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'space-between',
+                                padding: '10px 14px',
+                                borderBottom: '1px solid #f3f4f6',
+                              }}>
+                                <div style={{ flex: 1, minWidth: 0 }}>
+                                  <p style={{ fontSize: '13px', fontWeight: '600', color: '#111827', margin: '0 0 2px 0', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                                    {name}
+                                  </p>
+                                  <p style={{ fontSize: '12px', color: '#6b7280', margin: '0 0 2px 0' }}>{email}</p>
+                                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: '3px', marginTop: '4px' }}>
+                                    <span style={{ fontSize: '11px', color: '#6b7280' }}>{exp} yr exp</span>
+                                    {skills.slice(0, 4).map((s: string, i: number) => (
+                                      <span key={i} style={{ padding: '1px 5px', backgroundColor: '#e0e7ff', color: '#3730a3', borderRadius: '3px', fontSize: '10px' }}>{s}</span>
+                                    ))}
+                                    {skills.length > 4 && <span style={{ fontSize: '10px', color: '#9ca3af' }}>+{skills.length - 4} more</span>}
+                                  </div>
+                                </div>
+                                <button
+                                  type="button"
+                                  onClick={() => handleAddManualCandidate(candidate)}
+                                  style={{
+                                    marginLeft: '12px',
+                                    flexShrink: 0,
+                                    padding: '5px 12px',
+                                    border: 'none',
+                                    borderRadius: '4px',
+                                    fontSize: '12px',
+                                    fontWeight: '500',
+                                    color: 'white',
+                                    backgroundColor: '#6366f1',
+                                    cursor: 'pointer',
+                                  }}
+                                >
+                                  Add
+                                </button>
+                              </div>
+                            )
+                          })
+                        )}
+                      </div>
+                    </div>
+                  )
+                })()}
+              </div>
             </div>
 
             {/* Footer */}
@@ -2851,6 +3002,92 @@ export default function EditJobPostingModal({
           </form>
         </div>
       </div>
+
+      {/* Application Status History Modal */}
+      <ApplicationHistoryModal
+        isOpen={historyApplicationId !== null}
+        onClose={() => setHistoryApplicationId(null)}
+        applicationId={historyApplicationId}
+      />
+
+      {/* Rejection / Withdrawal Reason Dialog */}
+      {pendingStatusChange && (
+        <div className="fixed inset-0 z-[1200] overflow-y-auto">
+          <div className="fixed inset-0 bg-gray-900/60" onClick={handleCancelStatusChange} />
+          <div className="flex min-h-screen items-center justify-center p-4">
+            <div
+              className="relative bg-white rounded-xl shadow-xl w-full max-w-md"
+              onClick={(e) => e.stopPropagation()}
+            >
+              {/* Header */}
+              <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100">
+                <h3 className="text-base font-semibold text-gray-900">
+                  {(pendingStatusChange.newStatus || '').toLowerCase().startsWith('rejected')
+                    ? 'Rejection Reason'
+                    : 'Withdrawal Reason'}
+                </h3>
+                <button onClick={handleCancelStatusChange} className="rounded-full p-1 text-gray-400 hover:text-gray-600 hover:bg-gray-100">
+                  <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M6 18 18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              </div>
+
+              {/* Body */}
+              <div className="px-6 py-5 space-y-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Reason <span className="text-gray-400 font-normal">(optional)</span>
+                  </label>
+                  <textarea
+                    rows={3}
+                    value={statusChangeReason}
+                    onChange={(e) => setStatusChangeReason(e.target.value)}
+                    placeholder={
+                      (pendingStatusChange.newStatus || '').toLowerCase().startsWith('rejected')
+                        ? 'e.g. Did not meet technical requirements...'
+                        : 'e.g. Candidate withdrew due to another offer...'
+                    }
+                    className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 resize-none"
+                  />
+                </div>
+                <label className="flex items-start gap-3 cursor-pointer select-none">
+                  <input
+                    type="checkbox"
+                    checked={statusChangeBlacklist}
+                    onChange={(e) => setStatusChangeBlacklist(e.target.checked)}
+                    className="mt-0.5 h-4 w-4 rounded border-gray-300 text-red-600 focus:ring-red-500"
+                  />
+                  <div>
+                    <span className="text-sm font-medium text-gray-900">Blacklist this candidate</span>
+                    <p className="text-xs text-gray-500 mt-0.5">
+                      Marks the candidate as blacklisted across all positions.
+                    </p>
+                  </div>
+                </label>
+              </div>
+
+              {/* Footer */}
+              <div className="flex justify-end gap-3 px-6 py-4 border-t border-gray-100">
+                <button
+                  type="button"
+                  onClick={handleCancelStatusChange}
+                  className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-200 rounded-lg hover:bg-gray-50"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  onClick={handleConfirmStatusChange}
+                  className="px-4 py-2 text-sm font-medium text-white bg-indigo-600 rounded-lg hover:bg-indigo-700"
+                >
+                  Confirm
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

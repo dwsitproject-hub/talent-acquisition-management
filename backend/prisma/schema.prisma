@@ -247,6 +247,10 @@ model Candidate {
   // AI Scoring
   overallScore      Float?    @default(0)
   aiMatchScore      Json?     // Scores per job application
+
+  // Blacklist
+  blacklisted       Boolean   @default(false)
+  blacklistReason   String?   @db.Text
   
   // Privacy & Consent
   gdprConsent       Boolean   @default(false)
@@ -453,6 +457,8 @@ model FPTK {
   @@index([department])
   @@index([division])
   @@index([priority])
+  @@index([currentStatus])
+  @@index([createdAt])
   @@map("fptk")
 }
 
@@ -537,6 +543,7 @@ model Application {
   @@index([candidateId])
   @@index([fptkId])
   @@index([status])
+  @@index([fptkId, status])
   @@index([appliedAt])
   @@index([joinDate])
   @@map("applications")
@@ -566,6 +573,7 @@ model ApplicationStatusHistory {
   fromStatus      ApplicationStatus?
   toStatus        ApplicationStatus
   changedBy       String?
+  changedByName   String?            // Display name of who made the change (denormalized for audit trail)
   reason          String?
   notes           String?
   

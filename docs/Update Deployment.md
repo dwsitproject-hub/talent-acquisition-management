@@ -12,6 +12,9 @@ git pull origin main
 ./scripts/setup-database-url.sh .env.production
 docker compose -f docker-compose.network.yml -f /tmp/docker-compose.override.yml -p tas-production --env-file .env.production up -d --build backend
 
+# Run pending database migrations (required after any schema change)
+docker compose -f docker-compose.network.yml -p tas-production --env-file .env.production exec backend npx prisma migrate deploy
+
 Frontend
 
 

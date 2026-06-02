@@ -1,9 +1,9 @@
 'use client'
 
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { Suspense, useEffect, useMemo, useRef, useState } from 'react'
 import { useModalEscape } from '@/hooks/useModalEscape'
 import { useAuth } from '@/contexts/AuthContext'
-import { useRouter } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 import Layout from '@/components/Layout/Layout'
 import CreateJobPostingModal from '@/components/CreateJobPostingModal'
 import ViewJobPostingModal from '@/components/ViewJobPostingModal'
@@ -49,7 +49,6 @@ const CURRENT_STATUS_OPTIONS = [
   'Open',
   'Pending FKTK',
   'Re-Open',
-  'Hold',
   'Cancel',
   'Internal Movement',
   'Close',
@@ -75,7 +74,6 @@ const mapUiStatusToDbStatus = (value?: string, fallback?: string) => {
     'partially_filled': 'PARTIALLY_FILLED',
     're-open': 'OPEN',
     'pending fktk': 'DRAFT',
-    hold: 'DRAFT',
     cancel: 'CANCELLED',
     'internal movement': 'DRAFT',
     close: 'FILLED',
@@ -220,11 +218,14 @@ export const mapApiFptk = (fptk: any): FPTK => {
           status: mapApplicationStatusToUi(application.status),
           backendStatus: application.status,
           appliedDate: application.appliedAt,
-        rejectedDate: application.rejectedAt,
-        withdrawDate: application.withdrawnAt,
+          rejectedDate: application.rejectedAt,
+          withdrawDate: application.withdrawnAt,
           joinDate: application.joinDate
             ? new Date(application.joinDate).toISOString().split('T')[0]
             : null,
+          rejectionReason: application.rejectionReason || null,
+          blacklisted: candidate.blacklisted || false,
+          blacklistReason: candidate.blacklistReason || null,
           source: application.source,
           skills,
           experience,
@@ -394,14 +395,19 @@ const mapAppliedCandidatesForPayload = (candidates?: any[]) => {
                   ? `${String(candidate.joinDate).trim().slice(0, 10)}T12:00:00.000Z`
                   : String(candidate.joinDate)
               ).toISOString(),
+        rejectionReason: candidate.rejectionReason || null,
+        blacklisted: candidate.blacklisted || false,
+        blacklistReason: candidate.blacklistReason || null,
       }
     })
     .filter(Boolean)
 }
 
-export default function FPTKPage() {
+function FPTKPageContent() {
   const { isAuthenticated, isLoading, user } = useAuth()
   const router = useRouter()
+  const searchParams = useSearchParams()
+  const editIdFromUrl = searchParams.get('edit')?.trim() || null
   const backendRole = (user as any)?.role?.name || (user as any)?.role || 'TA_TEAM'
   const roleName = mapEnumToRole(backendRole)
   const [fptks, setFptks] = useState<FPTK[]>([])
@@ -421,7 +427,8 @@ export default function FPTKPage() {
   const [isUploadModalOpen, setIsUploadModalOpen] = useState(false)
   const [isUploading, setIsUploading] = useState(false)
   const [uploadResult, setUploadResult] = useState<FPTKUploadResult | null>(null)
-  const autoEditHandledRef = useRef(false)
+  const deepLinkOpenedIdRef = useRef<string | null>(null)
+  const loadFptksGenerationRef = useRef(0)
   const [menuAccess, setMenuAccess] = useState<Record<string, any>>({})
   const [menuAccessLoading, setMenuAccessLoading] = useState(true)
   const [deletingId, setDeletingId] = useState<string | null>(null)
@@ -493,9 +500,50 @@ export default function FPTKPage() {
     }
   }, [isAuthenticated, isLoading, router])
 
-  const loadFPTKs = async () => {
+  const refreshStatusCounts = async () => {
     try {
-      setLoading(true)
+      const counts = await FPTKAPI.getCountsByCurrentStatus({
+        ...(searchTerm?.trim() ? { search: searchTerm } : {}),
+        ...(ptFilter.length
+          ? { pt: ptFilter.map((s) => s.trim()).filter(Boolean).join(',') }
+          : {}),
+        ...(areaFilter.length
+          ? { area: areaFilter.map((s) => s.trim()).filter(Boolean).join(',') }
+          : {}),
+        ...(areaDetailFilter.length
+          ? { areaDetail: areaDetailFilter.map((s) => s.trim()).filter(Boolean).join(',') }
+          : {}),
+      })
+      setStatusCounts(counts || {})
+    } catch (error) {
+      console.error('Error refreshing status counts:', error)
+    }
+  }
+
+  const applyFptkListUpdate = (mapped: FPTK) => {
+    const rowStatus = (mapped.currentStatus || DEFAULT_CURRENT_STATUS).trim()
+    const matchesStatusFilter =
+      statusFilters.length === 0 ||
+      statusFilters.some((filter) => filter.trim() === rowStatus)
+
+    setFptks((prev) => {
+      if (!matchesStatusFilter) {
+        return prev.filter((f) => f.id !== mapped.id)
+      }
+      const idx = prev.findIndex((f) => f.id === mapped.id)
+      if (idx === -1) return prev
+      const next = [...prev]
+      next[idx] = mapped
+      return next
+    })
+    setSelectedJobPosting((prev) => (prev?.id === mapped.id ? mapped : prev))
+  }
+
+  const loadFPTKs = async (options?: { silent?: boolean }) => {
+    const generation = ++loadFptksGenerationRef.current
+    const silent = options?.silent ?? false
+    try {
+      if (!silent) setLoading(true)
       const currentStatusParam =
         statusFilters.length > 0 ? statusFilters.map((s) => s.trim()).join(',') : undefined
       const listParams: Parameters<typeof FPTKAPI.getAll>[0] = {
@@ -526,6 +574,7 @@ export default function FPTKPage() {
             : {}),
         }),
       ])
+      if (generation !== loadFptksGenerationRef.current) return
       const mappedFPTKs: FPTK[] = (response.data || []).map((fptk: any) => mapApiFptk(fptk))
       setFptks(mappedFPTKs)
       const pag = response.pagination || {}
@@ -535,12 +584,17 @@ export default function FPTKPage() {
       })
       setStatusCounts(counts || {})
     } catch (error) {
+      if (generation !== loadFptksGenerationRef.current) return
       console.error('Error loading FPTKs:', error)
-      alert('Failed to load positions. Please try again.')
-      setFptks([])
-      setListPagination({ total: 0, totalPages: 1 })
+      if (!silent) {
+        alert('Failed to load positions. Please try again.')
+        setFptks([])
+        setListPagination({ total: 0, totalPages: 1 })
+      }
     } finally {
-      setLoading(false)
+      if (!silent && generation === loadFptksGenerationRef.current) {
+        setLoading(false)
+      }
     }
   }
 
@@ -564,18 +618,37 @@ export default function FPTKPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [page, pageSize, searchTerm, statusFilterKey, locationFilterKey, isAuthenticated, isLoading])
 
-  // Deep-link: /fptk?edit=<id> opens Edit modal directly
+  // Deep-link: /fptk?edit=<id> opens Edit modal (fetch by id — not limited to current list page)
   useEffect(() => {
     if (!isAuthenticated || isLoading) return
-    if (autoEditHandledRef.current) return
-    if (typeof window === 'undefined') return
-    const editId = new URLSearchParams(window.location.search).get('edit')
-    if (!editId) return
-    const found = fptks.find((f) => f.id === editId)
-    if (!found) return
-    autoEditHandledRef.current = true
-    handleEditJobPosting(found)
-  }, [isAuthenticated, isLoading, fptks])
+
+    if (!editIdFromUrl) {
+      deepLinkOpenedIdRef.current = null
+      return
+    }
+
+    if (deepLinkOpenedIdRef.current === editIdFromUrl) return
+
+    let cancelled = false
+    ;(async () => {
+      try {
+        const fullFptkData = await FPTKAPI.getById(editIdFromUrl)
+        if (cancelled) return
+        deepLinkOpenedIdRef.current = editIdFromUrl
+        setSelectedJobPosting(mapApiFptk(fullFptkData))
+        setIsEditModalOpen(true)
+      } catch (error) {
+        if (!cancelled) {
+          console.error('Deep link: could not load position', error)
+          deepLinkOpenedIdRef.current = null
+        }
+      }
+    })()
+
+    return () => {
+      cancelled = true
+    }
+  }, [isAuthenticated, isLoading, editIdFromUrl])
 
   useEffect(() => {
     setSelectedIds((prev) => prev.filter((id) => fptks.some((f) => f.id === id)))
@@ -810,9 +883,11 @@ export default function FPTKPage() {
       console.log('FPTK Update Payload:', JSON.stringify(payload, null, 2))
       console.log('Applied Candidates with Interviews:', JSON.stringify(payload.appliedCandidates, null, 2))
 
-      await FPTKAPI.update(selectedJobPosting.id, payload)
-      // Reload FPTKs to get the updated one
-      await loadFPTKs()
+      const updated = await FPTKAPI.update(selectedJobPosting.id, payload)
+      const mapped = mapApiFptk(updated)
+      applyFptkListUpdate(mapped)
+      void refreshStatusCounts()
+      void loadFPTKs({ silent: true })
       setIsEditModalOpen(false)
       setSelectedJobPosting(null)
     } catch (error: any) {
@@ -827,12 +902,14 @@ export default function FPTKPage() {
       // Map to backend status enum (keep existing logic for backward compatibility)
       const dbStatus = mapUiStatusToDbStatus(newStatus, 'DRAFT')
 
-      await FPTKAPI.update(jobPostingId, { 
-        currentStatus: newStatus, // Send currentStatus to backend
-        status: dbStatus // Keep status enum for backward compatibility
+      const updated = await FPTKAPI.update(jobPostingId, {
+        currentStatus: newStatus,
+        status: dbStatus,
       })
-      // Reload FPTKs to get the updated status
-      await loadFPTKs()
+      const mapped = mapApiFptk(updated)
+      applyFptkListUpdate(mapped)
+      void refreshStatusCounts()
+      void loadFPTKs({ silent: true })
     } catch (error: any) {
       console.error('Error updating FPTK status:', error)
       alert(error.response?.data?.message || 'Failed to update status. Please try again.')
@@ -1551,7 +1628,6 @@ export default function FPTKPage() {
           }}
           jobPosting={selectedJobPosting}
           onSave={handleUpdateJobPosting}
-          onStatusUpdate={handleStatusUpdate}
           onCandidateStatusUpdate={handleCandidateStatusUpdate}
         />
 
@@ -1658,5 +1734,13 @@ export default function FPTKPage() {
         )}
       </div>
     </Layout>
+  )
+}
+
+export default function FPTKPage() {
+  return (
+    <Suspense>
+      <FPTKPageContent />
+    </Suspense>
   )
 }

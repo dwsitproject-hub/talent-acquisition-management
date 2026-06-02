@@ -374,6 +374,11 @@ export interface DashboardStats {
   positionStatusByLocation: PositionStatusByLocation[]
   openPositionProgress: OpenPositionProgress[]
   slaByLocation: SLALocation[]
+  // Aggregated counts returned by the backend (no pagination loops needed)
+  fptkCountsByCurrentStatus?: Record<string, number>
+  applicationCountsByStatus?: Record<string, number>
+  fptkPeriodCounts?: { current: Record<string, number> | null; previous: Record<string, number> | null }
+  appPeriodCounts?: { current: Record<string, number> | null; previous: Record<string, number> | null }
 }
 
 export interface PositionStatusByLocation {
@@ -390,13 +395,18 @@ export interface OpenPositionProgress {
   percentage: number
 }
 
+export interface SLABucketCounts {
+  received: number
+  pending: number
+}
+
 export interface SLALocation {
   areaDetail: string
   buckets: {
-    '0-30 Days': number
-    '31-60 Days': number
-    '61-90 Days': number
-    'Above 91 Days': number
+    '0-30 Days': SLABucketCounts
+    '31-60 Days': SLABucketCounts
+    '61-90 Days': SLABucketCounts
+    'Above 91 Days': SLABucketCounts
   }
   total: number
 }

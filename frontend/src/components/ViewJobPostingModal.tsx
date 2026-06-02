@@ -5,7 +5,9 @@ import { useModalEscape } from '@/hooks/useModalEscape'
 import { XMarkIcon } from '@heroicons/react/24/outline'
 import { FPTK, Candidate } from '@/types'
 import ViewCandidateModal from './ViewCandidateModal'
+import ApplicationHistoryModal from './ApplicationHistoryModal'
 import { CandidatesAPI } from '@/lib/api'
+import { fetchApplicationsForFptk } from '@/utils/mapFptkApplication'
 import { mapApiCandidate } from '@/app/candidates/page'
 import { mapApplicationStatusToUi } from '@/utils/applicationStatusUi'
 
@@ -41,6 +43,7 @@ export default function ViewJobPostingModal({ isOpen, onClose, jobPosting, onSta
   const [selectedCandidate, setSelectedCandidate] = useState<Candidate | null>(null)
   const [isCandidateModalOpen, setIsCandidateModalOpen] = useState(false)
   const [loadingCandidate, setLoadingCandidate] = useState(false)
+  const [historyApplicationId, setHistoryApplicationId] = useState<string | null>(null)
 
   // Load applied candidates when job posting changes
   useEffect(() => {
@@ -65,124 +68,12 @@ export default function ViewJobPostingModal({ isOpen, onClose, jobPosting, onSta
         }))
       }
 
-      // If no applications found, try to find candidates by positionAppliedFor (legacy fallback)
-      if (candidates.length === 0 && jobPosting.title) {
+      // If embedded FPTK data has no applications, load by fptk id (never by position title)
+      if (candidates.length === 0 && jobPosting.id) {
         try {
-          console.log('🔍 No applications found, searching candidates by positionAppliedFor for:', jobPosting.title)
-          
-          // Load candidates with pagination (API max limit is 100)
-          let allCandidates: any[] = []
-          let page = 1
-          const limit = 100
-          let hasMore = true
-          
-          while (hasMore) {
-            const response = await CandidatesAPI.getAll({}, { page, limit })
-            const candidatesData = response.data || []
-            allCandidates = [...allCandidates, ...candidatesData]
-            
-            // Check if there are more pages
-            const totalPages = response.pagination?.totalPages || 1
-            hasMore = page < totalPages
-            page++
-            
-            // Safety limit to prevent infinite loops
-            if (page > 50) {
-              console.warn('⚠️ Reached maximum page limit (50). Some candidates may not be loaded.')
-              break
-            }
-          }
-          
-          console.log('📋 Total candidates loaded:', allCandidates.length)
-          
-          // Find candidates who have this position in their positionAppliedFor
-          const matchingCandidates = allCandidates.filter((candidate: any) => {
-            // Parse positionAppliedFor from different possible locations
-            let positionAppliedFor: string[] = []
-            
-            // Check direct field
-            if (candidate.positionAppliedFor !== undefined && candidate.positionAppliedFor !== null) {
-              positionAppliedFor = Array.isArray(candidate.positionAppliedFor) 
-                ? candidate.positionAppliedFor 
-                : [String(candidate.positionAppliedFor)]
-            }
-            
-            // Check languages field (where it's actually stored in backend)
-            if (positionAppliedFor.length === 0 && candidate.languages) {
-              const languagesData = typeof candidate.languages === 'string'
-                ? JSON.parse(candidate.languages || '{}')
-                : (candidate.languages || {})
-              
-              if (languagesData.positionAppliedFor) {
-                positionAppliedFor = Array.isArray(languagesData.positionAppliedFor)
-                  ? languagesData.positionAppliedFor
-                  : [String(languagesData.positionAppliedFor)]
-              }
-            }
-            
-            // Normalize position title for comparison
-            const positionTitle = (jobPosting.title || '').trim().toLowerCase()
-            const matches = positionAppliedFor.some((pos: string) => {
-              const normalizedPos = (pos || '').trim().toLowerCase()
-              const isMatch = normalizedPos === positionTitle
-              if (isMatch) {
-                console.log('✅ Match found:', pos, '===', jobPosting.title)
-              }
-              return isMatch
-            })
-            
-            if (matches) {
-              console.log('🎯 Candidate matched:', candidate.id, candidate.user?.firstName, candidate.user?.lastName, 'Positions:', positionAppliedFor)
-            }
-            
-            return matches
-          })
-          
-          console.log('📊 Matching candidates found:', matchingCandidates.length)
-
-          // Map to applied candidates format
-          candidates = matchingCandidates.map((candidate: any) => {
-            const user = candidate.user || {}
-            const formDataDiri = typeof candidate.formDataDiri === 'string' 
-              ? JSON.parse(candidate.formDataDiri || '{}') 
-              : (candidate.formDataDiri || {})
-            const languagesData = typeof candidate.languages === 'string'
-              ? JSON.parse(candidate.languages || '{}')
-              : (candidate.languages || {})
-
-            const fullName = [user.firstName, user.lastName].filter(Boolean).join(' ') ||
-              formDataDiri?.fullName || candidate.fullName || candidate.name ||
-              `Candidate ${candidate.id?.slice(0, 6) || ''}`
-
-            const email = user.email || candidate.email || formDataDiri?.email || ''
-            const skills = Array.isArray(candidate.skills)
-              ? candidate.skills
-              : Array.isArray(languagesData?.skills)
-                ? languagesData.skills
-                : []
-
-            return {
-              id: candidate.id,
-              candidateId: candidate.id,
-              fullName,
-              name: fullName,
-              email,
-              phone: user.phoneNumber || '',
-              status: 'Applied',
-              backendStatus: 'SUBMITTED',
-              appliedDate: candidate.createdAt || new Date().toISOString(),
-              rejectedDate: null,
-              withdrawDate: null,
-              source: 'Manual',
-              skills,
-              experience: languagesData?.yearsOfExperience || 0,
-              yearsOfExperience: languagesData?.yearsOfExperience || 0,
-              division: user.division || candidate.division || null,
-              interviews: [],
-            }
-          })
+          candidates = await fetchApplicationsForFptk(jobPosting.id)
         } catch (error) {
-          console.error('Error loading candidates by positionAppliedFor:', error)
+          console.error('ViewJobPostingModal: load applications by fptkId', error)
         }
       }
 
@@ -216,55 +107,26 @@ export default function ViewJobPostingModal({ isOpen, onClose, jobPosting, onSta
   })()
 
   return (
-    <div style={{
-      position: 'fixed',
-      top: 0,
-      left: 0,
-      right: 0,
-      bottom: 0,
-      backgroundColor: 'rgba(0, 0, 0, 0.5)',
-      display: 'flex',
-      alignItems: 'center',
-      justifyContent: 'center',
-      zIndex: 1000
-    }}>
-      <div style={{
-        backgroundColor: 'white',
-        borderRadius: '8px',
-        width: '95%',
-        maxWidth: '900px',
-        maxHeight: '90vh',
-        overflow: 'auto',
-        boxShadow: '0 10px 25px rgba(0, 0, 0, 0.1)'
-      }}>
+    <div className="fixed inset-0 z-[1000] overflow-y-auto">
+      <div
+        className="fixed inset-0 bg-gray-900/60 transition-opacity"
+        onClick={onClose}
+      />
+      <div className="flex min-h-screen items-center justify-center p-4">
+      <div
+        className="relative bg-white rounded-xl shadow-xl w-full max-w-[900px] max-h-[90vh] overflow-auto"
+        onClick={(e) => e.stopPropagation()}
+      >
         {/* Header */}
-        <div style={{
-          padding: '20px',
-          borderBottom: '1px solid #e5e7eb',
-          display: 'flex',
-          justifyContent: 'space-between',
-          alignItems: 'center'
-        }}>
-          <h2 style={{
-            fontSize: '18px',
-            fontWeight: '600',
-            color: '#111827',
-            margin: 0
-          }}>
+        <div className="flex items-center justify-between px-6 py-5 border-b border-gray-100 sticky top-0 bg-white z-10">
+          <h2 className="text-lg font-semibold text-gray-900">
             Position Details
           </h2>
           <button
             onClick={onClose}
-            style={{
-              background: 'none',
-              border: 'none',
-              cursor: 'pointer',
-              padding: '4px',
-              borderRadius: '4px',
-              color: '#6b7280'
-            }}
+            className="rounded-full p-1 text-gray-400 hover:text-gray-600 hover:bg-gray-100"
           >
-            <XMarkIcon style={{ width: '20px', height: '20px' }} />
+            <XMarkIcon className="h-5 w-5" />
           </button>
         </div>
 
@@ -543,7 +405,6 @@ export default function ViewJobPostingModal({ isOpen, onClose, jobPosting, onSta
                   const fixedMilestones = [
                     'Pending FKTK',
                     'Open',
-                    'Hold',
                     'Re-Open',
                     'Internal Movement',
                     'Cancel'
@@ -778,7 +639,7 @@ export default function ViewJobPostingModal({ isOpen, onClose, jobPosting, onSta
                             )}
                           </div>
                         </div>
-                        <div>
+                        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '6px' }}>
                           <span style={{
                             padding: '4px 8px',
                             borderRadius: '4px',
@@ -789,22 +650,57 @@ export default function ViewJobPostingModal({ isOpen, onClose, jobPosting, onSta
                           }}>
                             {statusLabel}
                           </span>
+                          {(candidate.applicationId) && (
+                            <button
+                              type="button"
+                              onClick={() => setHistoryApplicationId(candidate.applicationId)}
+                              style={{
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                gap: '4px',
+                                padding: '3px 8px',
+                                border: '1px solid #c7d2fe',
+                                borderRadius: '4px',
+                                fontSize: '11px',
+                                fontWeight: '500',
+                                color: '#4f46e5',
+                                backgroundColor: '#eef2ff',
+                                cursor: 'pointer',
+                              }}
+                            >
+                              <svg xmlns="http://www.w3.org/2000/svg" style={{ width: '12px', height: '12px' }} fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
+                                <path strokeLinecap="round" strokeLinejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" />
+                              </svg>
+                              History
+                            </button>
+                          )}
+                          {candidate.blacklisted && (
+                            <div style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', padding: '2px 8px', backgroundColor: '#fef2f2', border: '1px solid #fecaca', borderRadius: '4px', fontSize: '11px', fontWeight: '600', color: '#b91c1c' }}>
+                              <svg xmlns="http://www.w3.org/2000/svg" style={{ width: '11px', height: '11px' }} fill="none" viewBox="0 0 24 24" strokeWidth={2.5} stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M18.364 18.364A9 9 0 0 0 5.636 5.636m12.728 12.728A9 9 0 0 1 5.636 5.636m12.728 12.728L5.636 5.636" /></svg>
+                              Blacklisted
+                            </div>
+                          )}
                           {(statusLabel || '').toString().toLowerCase().startsWith('rejected') && candidate.rejectedDate ? (
-                            <div style={{ marginTop: '6px', fontSize: '11px', color: '#b91c1c' }}>
+                            <div style={{ fontSize: '11px', color: '#b91c1c' }}>
                               Rejected Date: {formatDate(candidate.rejectedDate)}
                             </div>
                           ) : null}
                           {statusLabel === 'Withdrawn' && candidate.withdrawDate ? (
-                            <div style={{ marginTop: '6px', fontSize: '11px', color: '#92400e' }}>
+                            <div style={{ fontSize: '11px', color: '#92400e' }}>
                               Withdraw Date: {formatDate(candidate.withdrawDate)}
                             </div>
                           ) : null}
                           {candidate.joinDate ? (
-                            <div style={{ marginTop: '6px', fontSize: '11px', color: '#1e40af' }}>
+                            <div style={{ fontSize: '11px', color: '#1e40af' }}>
                               Join Date: {formatDate(candidate.joinDate)}
                             </div>
                           ) : null}
                         </div>
+                        {candidate.rejectionReason && (
+                          <div style={{ marginTop: '10px', padding: '8px 10px', backgroundColor: '#fef9c3', border: '1px solid #fde68a', borderRadius: '6px', fontSize: '12px', color: '#92400e' }}>
+                            <span style={{ fontWeight: '600' }}>Reason: </span>{candidate.rejectionReason}
+                          </div>
+                        )}
                       </div>
 
                       {/* Show interview details for all candidates who have interview data */}
@@ -953,30 +849,18 @@ export default function ViewJobPostingModal({ isOpen, onClose, jobPosting, onSta
         </div>
 
         {/* Footer */}
-        <div style={{
-          padding: '20px',
-          borderTop: '1px solid #e5e7eb',
-          display: 'flex',
-          justifyContent: 'flex-end'
-        }}>
+        <div className="flex justify-end px-6 py-4 border-t border-gray-100 sticky bottom-0 bg-white">
           <button
             onClick={onClose}
-            style={{
-              padding: '8px 16px',
-              border: '1px solid #d1d5db',
-              borderRadius: '6px',
-              fontSize: '14px',
-              fontWeight: '500',
-              color: '#374151',
-              backgroundColor: 'white',
-              cursor: 'pointer'
-            }}
+            className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-200 rounded-lg hover:bg-gray-50"
           >
             Close
           </button>
         </div>
       </div>
       
+      </div>{/* end centering wrapper */}
+
       {/* Candidate Detail Modal */}
       <ViewCandidateModal
         isOpen={isCandidateModalOpen}
@@ -985,6 +869,13 @@ export default function ViewJobPostingModal({ isOpen, onClose, jobPosting, onSta
           setSelectedCandidate(null)
         }}
         candidate={selectedCandidate}
+      />
+
+      {/* Application Status History Modal */}
+      <ApplicationHistoryModal
+        isOpen={historyApplicationId !== null}
+        onClose={() => setHistoryApplicationId(null)}
+        applicationId={historyApplicationId}
       />
     </div>
   )

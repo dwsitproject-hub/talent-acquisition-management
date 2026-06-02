@@ -1,9 +1,11 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { TasGuidedTour } from '@/components/tour/TasGuidedTour'
 import Header from './Header'
 import Sidebar from './Sidebar'
+import NavigationProgress from '@/components/NavigationProgress'
+import { cn } from '@/lib/utils'
 
 interface LayoutProps {
   children: React.ReactNode
@@ -11,13 +13,33 @@ interface LayoutProps {
 
 export default function Layout({ children }: LayoutProps) {
   const [sidebarOpen, setSidebarOpen] = useState(false)
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
+
+  useEffect(() => {
+    const stored = localStorage.getItem('sidebarCollapsed')
+    if (stored === 'true') setSidebarCollapsed(true)
+  }, [])
+
+  const handleSetSidebarCollapsed = (collapsed: boolean) => {
+    setSidebarCollapsed(collapsed)
+    localStorage.setItem('sidebarCollapsed', String(collapsed))
+  }
 
   return (
     <div>
+      <NavigationProgress />
       <TasGuidedTour />
-      <Sidebar sidebarOpen={sidebarOpen} setSidebarOpen={setSidebarOpen} />
+      <Sidebar
+        sidebarOpen={sidebarOpen}
+        setSidebarOpen={setSidebarOpen}
+        sidebarCollapsed={sidebarCollapsed}
+        setSidebarCollapsed={handleSetSidebarCollapsed}
+      />
 
-      <div className="lg:pl-72">
+      <div className={cn(
+        'transition-all duration-300',
+        sidebarCollapsed ? 'lg:pl-16' : 'lg:pl-72'
+      )}>
         <Header setSidebarOpen={setSidebarOpen} />
 
         <main className="py-10">
