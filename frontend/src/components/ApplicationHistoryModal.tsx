@@ -22,6 +22,8 @@ interface ApplicationHistoryModalProps {
   isOpen: boolean
   onClose: () => void
   applicationId: string | null
+  /** When stacked over another modal, use a higher z-index than the parent */
+  overlayZIndex?: number
 }
 
 function formatDateTime(iso: string): string {
@@ -65,7 +67,12 @@ function TimelineDot({ status, isCurrent }: { status: string; isCurrent: boolean
   )
 }
 
-export default function ApplicationHistoryModal({ isOpen, onClose, applicationId }: ApplicationHistoryModalProps) {
+export default function ApplicationHistoryModal({
+  isOpen,
+  onClose,
+  applicationId,
+  overlayZIndex = 50,
+}: ApplicationHistoryModalProps) {
   const [loading, setLoading] = useState(false)
   const [application, setApplication] = useState<any>(null)
   const [error, setError] = useState<string | null>(null)
@@ -101,7 +108,7 @@ export default function ApplicationHistoryModal({ isOpen, onClose, applicationId
     : []
 
   return (
-    <div className="fixed inset-0 z-50 overflow-y-auto">
+    <div className="fixed inset-0 overflow-y-auto" style={{ zIndex: overlayZIndex }}>
       <div
         className="fixed inset-0 bg-gray-500 bg-opacity-60 transition-opacity"
         onClick={onClose}

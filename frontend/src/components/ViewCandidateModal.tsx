@@ -142,7 +142,10 @@ export default function ViewCandidateModal({ isOpen, onClose, candidate }: ViewC
     }
   }, [candidate])
 
-  useModalEscape(isOpen && !!candidate && !positionEdit.isOpen, onClose)
+  useModalEscape(
+    isOpen && !!candidate && !positionEdit.isOpen && historyApplicationId === null,
+    onClose
+  )
 
   const candidateDisplayName =
     [candidate?.personalInfo?.firstName, candidate?.personalInfo?.lastName].filter(Boolean).join(' ') ||
@@ -211,9 +214,9 @@ export default function ViewCandidateModal({ isOpen, onClose, candidate }: ViewC
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
-        opacity: positionEdit.isOpen ? 0.45 : 1,
+        opacity: positionEdit.isOpen || historyApplicationId !== null ? 0.45 : 1,
         transition: 'opacity 0.2s ease',
-        pointerEvents: positionEdit.isOpen ? 'none' : 'auto',
+        pointerEvents: positionEdit.isOpen || historyApplicationId !== null ? 'none' : 'auto',
       }}
       onClick={onClose}
     >
@@ -1477,6 +1480,7 @@ export default function ViewCandidateModal({ isOpen, onClose, candidate }: ViewC
       isOpen={historyApplicationId !== null}
       onClose={() => setHistoryApplicationId(null)}
       applicationId={historyApplicationId}
+      overlayZIndex={10060}
     />
     </>
   )

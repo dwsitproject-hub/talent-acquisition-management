@@ -383,6 +383,7 @@ export interface DashboardStats {
 
 export interface PositionStatusByLocation {
   location: string
+  area?: string
   total: number
   open: number
   closed: number
@@ -390,6 +391,7 @@ export interface PositionStatusByLocation {
 
 export interface OpenPositionProgress {
   areaDetail: string
+  area?: string
   statusCounts: { [status: string]: number }
   total: number
   percentage: number
@@ -402,6 +404,7 @@ export interface SLABucketCounts {
 
 export interface SLALocation {
   areaDetail: string
+  area?: string
   buckets: {
     '0-30 Days': SLABucketCounts
     '31-60 Days': SLABucketCounts

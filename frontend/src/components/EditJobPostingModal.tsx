@@ -3008,6 +3008,7 @@ export default function EditJobPostingModal({
         isOpen={historyApplicationId !== null}
         onClose={() => setHistoryApplicationId(null)}
         applicationId={historyApplicationId}
+        overlayZIndex={overlayZIndex + 100}
       />
 
       {/* Rejection / Withdrawal Reason Dialog */}
