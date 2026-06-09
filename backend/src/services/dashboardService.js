@@ -387,6 +387,7 @@ async function getDashboardStats(user = null, options = {}) {
       if (!positionStatusByLocationMap[location]) {
         positionStatusByLocationMap[location] = {
           location,
+          area: fptk.area || '',
           total: 0,
           closed: 0,
           open: 0,
@@ -410,6 +411,7 @@ async function getDashboardStats(user = null, options = {}) {
       if (!openPositionProgressMap[areaDetail]) {
         openPositionProgressMap[areaDetail] = {
           areaDetail,
+          area: fptk.area || '',
           statusCounts: {},
           total: 0,
         };
@@ -442,6 +444,7 @@ async function getDashboardStats(user = null, options = {}) {
       if (!slaByLocationMap[areaDetail]) {
         slaByLocationMap[areaDetail] = {
           areaDetail,
+          area: fptk.area || '',
           buckets: {
             '0-30 Days':     { received: 0, pending: 0 },
             '31-60 Days':    { received: 0, pending: 0 },

@@ -37,6 +37,9 @@ const PRIORITY_FILTERS = ['ALL', 'P0', 'P1', 'P2'] as const
 const POSITION_STATUS_FILTERS = ['ALL', 'OPEN', 'CLOSED'] as const
 type PositionStatusFilterType = typeof POSITION_STATUS_FILTERS[number]
 
+const LOCATION_AREA_FILTERS = ['ALL', 'Site', 'HO'] as const
+type LocationAreaFilterType = typeof LOCATION_AREA_FILTERS[number]
+
 /** Closed position: Close or Cancel (any status NOT in this set is treated as Open) */
 const isClosedPositionStatus = (status?: string) => {
   const s = (status || '').trim().toLowerCase()
@@ -152,6 +155,7 @@ export default function Dashboard() {
   const [baseStats, setBaseStats] = useState<Partial<DashboardStats> | null>(null)
   const [priorityFilter, setPriorityFilter] = useState<typeof PRIORITY_FILTERS[number]>('ALL')
   const [positionStatusFilter, setPositionStatusFilter] = useState<PositionStatusFilterType>('ALL')
+  const [locationAreaFilter, setLocationAreaFilter] = useState<LocationAreaFilterType>('ALL')
   const [isDashboardLoading, setIsDashboardLoading] = useState(false)
   const [openPositionsModalOpen, setOpenPositionsModalOpen] = useState(false)
   const [openPositionsQuery, setOpenPositionsQuery] = useState('')
@@ -426,6 +430,24 @@ export default function Dashboard() {
     setOpenPositionsPage(1)
   }, [openPositionsList, openPositionsModalOpen])
 
+  const locationAreaMap = useMemo(() => {
+    const map = new Map<string, string>()
+
+    dashboardStats.positionStatusByLocation.forEach((item) => {
+      if (item.location && item.area) map.set(item.location, item.area)
+    })
+
+    dashboardStats.openPositionProgress.forEach((item: any) => {
+      if (item.areaDetail && item.area) map.set(item.areaDetail, item.area)
+    })
+
+    dashboardStats.slaByLocation.forEach((item: any) => {
+      if (item.areaDetail && item.area) map.set(item.areaDetail, item.area)
+    })
+
+    return map
+  }, [dashboardStats.positionStatusByLocation, dashboardStats.openPositionProgress, dashboardStats.slaByLocation])
+
   const combinedLocations = useMemo(() => {
     const locationsSet = new Set<string>()
 
@@ -441,8 +463,15 @@ export default function Dashboard() {
       if (item.areaDetail) locationsSet.add(item.areaDetail)
     })
 
-    return Array.from(locationsSet).sort()
-  }, [dashboardStats.positionStatusByLocation, dashboardStats.openPositionProgress, dashboardStats.slaByLocation])
+    const sorted = Array.from(locationsSet).sort()
+
+    if (locationAreaFilter === 'ALL') return sorted
+
+    return sorted.filter((key) => {
+      const area = locationAreaMap.get(key) || ''
+      return area.toLowerCase() === locationAreaFilter.toLowerCase()
+    })
+  }, [dashboardStats.positionStatusByLocation, dashboardStats.openPositionProgress, dashboardStats.slaByLocation, locationAreaFilter, locationAreaMap])
 
   const stats = useMemo(
     () => [
@@ -1255,9 +1284,31 @@ export default function Dashboard() {
         {/* Charts Section - Location aligned view */}
         <div className="mt-8 bg-white shadow rounded-lg">
           <div className="px-4 py-5 sm:p-6">
-            <h3 className="text-lg leading-6 font-medium text-gray-900 mb-4">
-              Location Overview
-            </h3>
+            <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
+              <h3 className="text-lg leading-6 font-medium text-gray-900">
+                Location Overview
+              </h3>
+              <div className="flex items-center gap-2">
+                <span className="text-sm font-medium text-gray-600 whitespace-nowrap">Area:</span>
+                <div className="inline-flex rounded-md shadow-sm">
+                  {LOCATION_AREA_FILTERS.map((filter, index) => (
+                    <button
+                      key={filter}
+                      onClick={() => setLocationAreaFilter(filter)}
+                      className={`px-3 py-1.5 border text-sm font-medium ${
+                        filter === locationAreaFilter
+                          ? 'bg-indigo-600 text-white border-indigo-600'
+                          : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50'
+                      } ${index === 0 ? 'rounded-l-md' : ''} ${
+                        index === LOCATION_AREA_FILTERS.length - 1 ? 'rounded-r-md' : ''
+                      } ${index > 0 ? '-ml-px' : ''}`}
+                    >
+                      {filter}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </div>
             <div className="hidden lg:grid grid-cols-3 gap-4 text-xs font-semibold text-gray-500 border-b pb-2 mb-4">
               <span>Location</span>
               <span>Position Status by Location</span>

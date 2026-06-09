@@ -876,6 +876,7 @@ export default function ViewJobPostingModal({ isOpen, onClose, jobPosting, onSta
         isOpen={historyApplicationId !== null}
         onClose={() => setHistoryApplicationId(null)}
         applicationId={historyApplicationId}
+        overlayZIndex={1100}
       />
     </div>
   )
