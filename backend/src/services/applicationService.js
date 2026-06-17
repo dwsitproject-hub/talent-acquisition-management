@@ -2,6 +2,7 @@ const prisma = require('../config/database');
 const logger = require('../utils/logger');
 const { buildTokenizedSearch } = require('../utils/search');
 const { withActiveCandidateOnApplication } = require('../utils/candidateVisibility');
+const { assertCandidateCanApplyToPosition } = require('../utils/candidateApplicationLock');
 
 function buildHiringManagerScopeFromUser(user = null) {
   if (!user) return null;
@@ -52,6 +53,8 @@ async function createApplication(candidateId, fptkId, data = {}) {
   if (!fptk.isPublished || fptk.status === 'FILLED') {
     throw new Error('This position is no longer accepting applications');
   }
+
+  await assertCandidateCanApplyToPosition(prisma, candidateId, fptkId);
 
   const application = await prisma.application.create({
     data: {

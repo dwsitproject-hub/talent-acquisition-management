@@ -19,6 +19,11 @@ import {
   getCandidateDivisions,
   parseLanguagesData,
 } from '@/utils/candidateProfileShape'
+import {
+  candidateEligibleForPositionSuggestion,
+  extractCandidateLockFields,
+  getCandidateLockMessage,
+} from '@/utils/candidateApplicationLock'
 
 interface EditJobPostingModalProps {
   isOpen: boolean
@@ -537,9 +542,13 @@ export default function EditJobPostingModal({
           let page = 1
           const limit = 100
           let hasMore = true
+          const forFptkId = jobPosting?.id ? String(jobPosting.id) : undefined
 
           while (hasMore) {
-            const response = await CandidatesAPI.getAll({}, { page, limit })
+            const response = await CandidatesAPI.getAll(
+              forFptkId ? { forFptkId } : {},
+              { page, limit }
+            )
             const candidatesData = response.data || []
             allCandidates = [...allCandidates, ...candidatesData]
 
@@ -654,6 +663,7 @@ export default function EditJobPostingModal({
             division: candidate.division,
             divisionList: candidate.divisionList,
             languages: candidate.languages,
+            ...extractCandidateLockFields(candidate),
           }
         }
         
@@ -664,10 +674,11 @@ export default function EditJobPostingModal({
           const allDivisions = getCandidateDivisions(candidate)
           const hasMatchingDivision = candidateDivisionMatchesJob(jobDivision, candidate)
           const notApplied = !appliedIds.has(candidate.id)
-          if (hasMatchingDivision && notApplied) {
+          const eligible = candidateEligibleForPositionSuggestion(candidate)
+          if (hasMatchingDivision && notApplied && eligible) {
             console.log('[EditJobPostingModal] Initial suggested candidate:', candidate.id, 'divisions:', allDivisions)
           }
-          return hasMatchingDivision && notApplied
+          return hasMatchingDivision && notApplied && eligible
         }).slice(0, 10) // Limit to 10 suggestions
         
         setSuggestedCandidates(suggested)
@@ -768,6 +779,7 @@ export default function EditJobPostingModal({
       division: candidate.division,
       divisionList: candidate.divisionList,
       languages: candidate.languages,
+      ...extractCandidateLockFields(candidate),
     }
   }
 
@@ -777,7 +789,11 @@ export default function EditJobPostingModal({
       const loadSuggestedCandidates = async () => {
         try {
           console.log('[EditJobPostingModal] Loading suggested candidates for division:', formData.division)
-          const response = await CandidatesAPI.getAll({}, { page: 1, limit: 100 })
+          const forFptkId = jobPosting?.id ? String(jobPosting.id) : undefined
+          const response = await CandidatesAPI.getAll(
+            forFptkId ? { forFptkId } : {},
+            { page: 1, limit: 100 }
+          )
           const rawCandidates = response.data || []
           console.log('[EditJobPostingModal] Loaded candidates:', rawCandidates.length)
           
@@ -791,8 +807,9 @@ export default function EditJobPostingModal({
 
             const hasMatchingDivision = candidateDivisionMatchesJob(jobDivision, candidate)
             const notApplied = !appliedCandidates.find((applied: any) => applied.id === candidate.id)
+            const eligible = candidateEligibleForPositionSuggestion(candidate)
 
-            const shouldInclude = hasMatchingDivision && notApplied
+            const shouldInclude = hasMatchingDivision && notApplied && eligible
             if (shouldInclude) {
               console.log('[EditJobPostingModal] Including candidate:', candidate.id, 'with divisions:', allDivisions)
             }
@@ -812,7 +829,7 @@ export default function EditJobPostingModal({
     } else if (!formData.division) {
       setSuggestedCandidates([])
     }
-  }, [formData.division, appliedCandidates])
+  }, [formData.division, appliedCandidates, jobPosting?.id])
 
   // Simple localStorage logger
   const appendOpenPositionLog = (entry: any) => {
@@ -1012,6 +1029,11 @@ export default function EditJobPostingModal({
   }
 
   const handleAddSuggestedCandidate = (candidate: any) => {
+    if (!candidateEligibleForPositionSuggestion(candidate)) {
+      alert(getCandidateLockMessage(candidate))
+      return
+    }
+
     const newAppliedCandidate = mergeAppliedCandidateData(
       {
         ...candidate,
@@ -1038,6 +1060,11 @@ export default function EditJobPostingModal({
   }
 
   const handleAddManualCandidate = (candidate: any) => {
+    if (!candidateEligibleForPositionSuggestion(candidate)) {
+      alert(getCandidateLockMessage(candidate))
+      return
+    }
+
     const newAppliedCandidate = mergeAppliedCandidateData(
       {
         ...candidate,
@@ -2867,6 +2894,7 @@ export default function EditJobPostingModal({
                   const searchLower = candidatePickerSearch.toLowerCase()
                   const pickerCandidates = allCandidates.filter((c: any) => {
                     if (alreadyAppliedIds.has(c.id)) return false
+                    if (!candidateEligibleForPositionSuggestion(c)) return false
                     if (!searchLower) return true
                     const name = (c.fullName || c.name || [c.personalInfo?.firstName, c.personalInfo?.lastName].filter(Boolean).join(' ') || '').toLowerCase()
                     const email = (c.email || c.contactInfo?.email || '').toLowerCase()

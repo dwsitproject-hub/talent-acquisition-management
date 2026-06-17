@@ -214,16 +214,17 @@ async function getDashboardStats(user = null, options = {}) {
       const pe = new Date(end);
       if (isNaN(ps.getTime()) || isNaN(pe.getTime())) return [Promise.resolve([]), Promise.resolve([])];
 
+      // updatedAt is non-nullable (@updatedAt); use createdAt/appliedAt as fallback via OR
       const fptkDateCondition = {
         OR: [
           { updatedAt: { gte: ps, lte: pe } },
-          { AND: [{ updatedAt: null }, { createdAt: { gte: ps, lte: pe } }] },
+          { createdAt: { gte: ps, lte: pe } },
         ],
       };
       const appDateCondition = {
         OR: [
           { updatedAt: { gte: ps, lte: pe } },
-          { AND: [{ updatedAt: null }, { appliedAt: { gte: ps, lte: pe } }] },
+          { appliedAt: { gte: ps, lte: pe } },
         ],
       };
 

@@ -7,6 +7,7 @@ const {
   ACTIVE_CANDIDATE_WHERE,
   withActiveCandidate,
 } = require('../utils/candidateVisibility');
+const { enrichCandidatesWithApplicationLock, enrichCandidateWithApplicationLock } = require('../utils/candidateApplicationLock');
 
 function buildHiringManagerScopeFromUser(user = null) {
   if (!user) return null;
@@ -382,7 +383,7 @@ async function createCandidate(data) {
 /**
  * Get candidate profile
  */
-async function getCandidateProfile(candidateId) {
+async function getCandidateProfile(candidateId, options = {}) {
   const candidate = await prisma.candidate.findFirst({
     where: { id: candidateId, ...ACTIVE_CANDIDATE_WHERE },
     include: {
@@ -421,7 +422,7 @@ async function getCandidateProfile(candidateId) {
 
   parseFormDataDiri(candidate);
 
-  return candidate;
+  return enrichCandidateWithApplicationLock(candidate, options.forFptkId || null, prisma);
 }
 
 /**
@@ -1020,9 +1021,16 @@ async function searchCandidates(filters, pagination, user = null) {
 
   candidatesWithParsedData.forEach(parseFormDataDiri);
 
+  const forFptkId = filters.forFptkId || null;
+  const candidatesWithLock = await enrichCandidatesWithApplicationLock(
+    candidatesWithParsedData,
+    forFptkId,
+    prisma
+  );
+
   // Log a sample candidate to verify data structure
-  if (candidatesWithParsedData.length > 0) {
-    const sample = candidatesWithParsedData[0];
+  if (candidatesWithLock.length > 0) {
+    const sample = candidatesWithLock[0];
     logger.info(`SEARCH CANDIDATES - Sample candidate data:`, JSON.stringify({
       id: sample.id,
       division: sample.user?.division,
@@ -1034,7 +1042,7 @@ async function searchCandidates(filters, pagination, user = null) {
   }
 
   return {
-    candidates: candidatesWithParsedData,
+    candidates: candidatesWithLock,
     pagination: {
       page,
       limit,

@@ -46,6 +46,11 @@ export interface Candidate {
   // Additional fields for UI
   division?: string | string[] // Division can be string or array
   positionAppliedFor?: string | string[] // Position applied for can be string or array
+  /** True when candidate has ONBOARDING/HIRED on another position (relative to forFptkId when provided). */
+  isLockedForOtherPositions?: boolean
+  lockReason?: string | null
+  lockedApplicationFptkId?: string | null
+  lockedPositionTitle?: string | null
   formDataDiri?: any
   placeOfBirth?: string
   ethnicity?: string

@@ -42,7 +42,7 @@ export default function Layout({ children }: LayoutProps) {
       )}>
         <Header setSidebarOpen={setSidebarOpen} />
 
-        <main className="py-10">
+        <main className="py-6">
           <div className="px-4 sm:px-6 lg:px-8">
             {children}
           </div>

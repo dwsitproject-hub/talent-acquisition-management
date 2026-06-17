@@ -226,6 +226,7 @@ router.get(
       search: req.query.search,
       skills: req.query.skills ? req.query.skills.split(',') : undefined,
       minScore: req.query.minScore,
+      forFptkId: req.query.forFptkId || undefined,
     };
     
     const pagination = {
@@ -521,7 +522,9 @@ router.get(
       }
     }
 
-    const candidate = await candidateService.getCandidateProfile(req.params.id);
+    const candidate = await candidateService.getCandidateProfile(req.params.id, {
+      forFptkId: req.query.forFptkId || undefined,
+    });
     console.log('GET CANDIDATE - Returning candidate:', JSON.stringify({
       id: candidate.id,
       division: candidate.user?.division,
