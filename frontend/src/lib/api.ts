@@ -443,7 +443,14 @@ export const FPTKAPI = {
 // Candidates APIs
 export const CandidatesAPI = {
   async getAll(
-    filters?: { search?: string; skills?: string[]; minScore?: number; sortBy?: 'name' | string },
+    filters?: {
+      search?: string
+      skills?: string[]
+      minScore?: number
+      sortBy?: 'name' | string
+      /** When set, lock flags are relative to applying on this FPTK. */
+      forFptkId?: string
+    },
     pagination?: { page?: number; limit?: number }
   ) {
     const params: any = { ...pagination }
@@ -451,6 +458,7 @@ export const CandidatesAPI = {
     if (filters?.skills) params.skills = filters.skills.join(',')
     if (filters?.minScore) params.minScore = filters.minScore
     if (filters?.sortBy) params.sortBy = filters.sortBy
+    if (filters?.forFptkId) params.forFptkId = filters.forFptkId
     const res = await api.get('/candidates', { params })
     // API returns { success: true, data: [...], pagination: {...} }
     // Return the full response so frontend can access .data and .pagination

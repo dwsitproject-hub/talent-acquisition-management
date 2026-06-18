@@ -1,0 +1,67 @@
+const {
+  BLOCK_NEW_APPLICATION_STATUSES,
+  lockFieldsFromBlocking,
+  buildCandidateLockError,
+  attachApplicationLockFields,
+} = require('../../src/utils/candidateApplicationLock');
+
+describe('candidateApplicationLock', () => {
+  test('BLOCK_NEW_APPLICATION_STATUSES includes ONBOARDING and HIRED', () => {
+    expect(BLOCK_NEW_APPLICATION_STATUSES).toEqual(['ONBOARDING', 'HIRED']);
+  });
+
+  test('lockFieldsFromBlocking returns unlocked when no blocking app', () => {
+    expect(lockFieldsFromBlocking(null)).toEqual({
+      isLockedForOtherPositions: false,
+      lockReason: null,
+      lockedApplicationFptkId: null,
+      lockedPositionTitle: null,
+    });
+  });
+
+  test('lockFieldsFromBlocking returns locked fields from blocking app', () => {
+    expect(
+      lockFieldsFromBlocking({
+        fptkId: 'fptk-1',
+        status: 'ONBOARDING',
+        fptk: { positionTitle: 'Software Engineer' },
+      })
+    ).toEqual({
+      isLockedForOtherPositions: true,
+      lockReason: 'ONBOARDING',
+      lockedApplicationFptkId: 'fptk-1',
+      lockedPositionTitle: 'Software Engineer',
+    });
+  });
+
+  test('buildCandidateLockError includes position title and status code', () => {
+    const err = buildCandidateLockError({
+      fptkId: 'fptk-1',
+      status: 'ONBOARDING',
+      fptk: { position: 'Analyst' },
+    });
+    expect(err.statusCode).toBe(409);
+    expect(err.code).toBe('CANDIDATE_LOCKED_FOR_OTHER_POSITION');
+    expect(err.message).toContain('Analyst');
+    expect(err.message).toContain('Withdrawn');
+  });
+
+  test('attachApplicationLockFields merges lock state onto candidate', () => {
+    const blockingMap = new Map([
+      [
+        'cand-1',
+        {
+          fptkId: 'fptk-2',
+          status: 'HIRED',
+          fptk: { positionTitle: 'Manager' },
+        },
+      ],
+    ]);
+
+    const result = attachApplicationLockFields({ id: 'cand-1', name: 'Jane' }, blockingMap);
+    expect(result.name).toBe('Jane');
+    expect(result.isLockedForOtherPositions).toBe(true);
+    expect(result.lockReason).toBe('HIRED');
+    expect(result.lockedPositionTitle).toBe('Manager');
+  });
+});

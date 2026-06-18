@@ -5,6 +5,7 @@ const { buildHrbpFptkFilterFromUser } = require('../utils/hrbpScope');
 const { buildTokenizedSearch } = require('../utils/search');
 const masterOfficeLocationService = require('./masterOfficeLocationService');
 const masterDivisionService = require('./masterDivisionService');
+const { assertCandidateCanApplyToPosition } = require('../utils/candidateApplicationLock');
 
 const PRISMA_APP_STATUS_STRINGS = new Set(Object.values($Enums.ApplicationStatus));
 
@@ -681,6 +682,8 @@ async function syncFptkApplicationsTx(tx, fptkId, appliedCandidates, options = {
       }
     } else {
       try {
+        await assertCandidateCanApplyToPosition(tx, candidateId, fptkId);
+
         const newApplication = await tx.application.create({
           data: {
             candidateId,
@@ -710,6 +713,9 @@ async function syncFptkApplicationsTx(tx, fptkId, appliedCandidates, options = {
           },
         });
       } catch (error) {
+        if (error?.code === 'CANDIDATE_LOCKED_FOR_OTHER_POSITION' || error?.statusCode === 409) {
+          throw error;
+        }
         logger.warn(`Failed to create application for candidate ${candidateId} on FPTK ${fptkId}: ${error.message}`);
         continue; // Skip to next candidate if application creation failed
       }

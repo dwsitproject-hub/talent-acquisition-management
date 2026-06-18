@@ -104,6 +104,8 @@ function errorHandler(err, req, res, next) {
   res.status(statusCode).json({
     success: false,
     message,
+    ...(err.code && { code: err.code }),
+    ...(err.details && { details: err.details }),
     ...(process.env.NODE_ENV === 'development' && { stack: err.stack }),
   });
 }
