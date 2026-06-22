@@ -1,11 +1,46 @@
 const {
   buildAreaFilterCondition,
+  buildAreaDetailsFilterCondition,
   buildFptkDateCondition,
+  parseAreaDetailsParam,
   resolveNormalizedArea,
   getLocationKey,
 } = require('../../src/services/dashboardService');
 
 describe('dashboardService filter helpers', () => {
+  describe('parseAreaDetailsParam', () => {
+    it('returns null when param omitted', () => {
+      expect(parseAreaDetailsParam(undefined)).toBeNull();
+      expect(parseAreaDetailsParam(null)).toBeNull();
+    });
+
+    it('parses comma-separated values', () => {
+      expect(parseAreaDetailsParam('Jakarta A, Surabaya')).toEqual(['Jakarta A', 'Surabaya']);
+    });
+
+    it('returns empty array for empty string', () => {
+      expect(parseAreaDetailsParam('')).toEqual([]);
+    });
+  });
+
+  describe('buildAreaDetailsFilterCondition', () => {
+    it('returns null when no filter', () => {
+      expect(buildAreaDetailsFilterCondition(null)).toBeNull();
+    });
+
+    it('returns impossible id for empty list', () => {
+      expect(buildAreaDetailsFilterCondition([])).toEqual({
+        id: '00000000-0000-0000-0000-000000000000',
+      });
+    });
+
+    it('returns areaDetail in filter', () => {
+      expect(buildAreaDetailsFilterCondition(['Jakarta A', 'Surabaya'])).toEqual({
+        areaDetail: { in: ['Jakarta A', 'Surabaya'] },
+      });
+    });
+  });
+
   describe('buildAreaFilterCondition', () => {
     it('returns null for ALL or empty', () => {
       expect(buildAreaFilterCondition('ALL')).toBeNull();

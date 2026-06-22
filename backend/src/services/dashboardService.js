@@ -123,6 +123,24 @@ function buildAreaFilterCondition(areaFilter) {
   return null;
 }
 
+/** Parse comma-separated areaDetail list from query string; null = no filter. */
+function parseAreaDetailsParam(areaDetailsParam) {
+  if (areaDetailsParam === undefined || areaDetailsParam === null) return null;
+  return String(areaDetailsParam)
+    .split(',')
+    .map((s) => s.trim())
+    .filter(Boolean);
+}
+
+/** Prisma condition for areaDetail IN list; empty array = match nothing. */
+function buildAreaDetailsFilterCondition(details) {
+  if (details === null) return null;
+  if (details.length === 0) {
+    return { id: '00000000-0000-0000-0000-000000000000' };
+  }
+  return { areaDetail: { in: details } };
+}
+
 /** Resolve canonical area label from FPTK row (area column, then location fallback). */
 function resolveNormalizedArea(fptk) {
   const area = (fptk?.area || '').trim();
@@ -151,6 +169,7 @@ function cloneWhere(where) {
  * @param {string} [options.priority]       - FPTK priority ('P0'|'P1'|'P2'; omit/'ALL' = no filter)
  * @param {string} [options.positionStatus] - 'OPEN'|'CLOSED'; omit for all positions
  * @param {string} [options.area]           - 'Site'|'HO'; omit/'ALL' = no area filter
+ * @param {string} [options.areaDetails]    - comma-separated areaDetail values; empty string = no matches
  * @param {string} [options.periodStart]    - ISO date: start of current period (enables WoW groupBy)
  * @param {string} [options.periodEnd]      - ISO date: end of current period
  * @param {string} [options.previousStart]  - ISO date: start of previous period
@@ -262,6 +281,17 @@ async function getDashboardStats(user = null, options = {}) {
         applicationWhere.fptk = { AND: [applicationWhere.fptk, areaFilterCondition] };
       } else {
         addConditionToWhere(applicationWhere, { fptk: areaFilterCondition });
+      }
+    }
+
+    const parsedAreaDetails = parseAreaDetailsParam(options.areaDetails);
+    if (parsedAreaDetails !== null) {
+      const areaDetailsCondition = buildAreaDetailsFilterCondition(parsedAreaDetails);
+      addConditionToWhere(fptkWhere, areaDetailsCondition);
+      if (applicationWhere.fptk) {
+        applicationWhere.fptk = { AND: [applicationWhere.fptk, areaDetailsCondition] };
+      } else {
+        addConditionToWhere(applicationWhere, { fptk: areaDetailsCondition });
       }
     }
 
@@ -618,7 +648,9 @@ async function getDashboardStats(user = null, options = {}) {
 module.exports = {
   getDashboardStats,
   buildAreaFilterCondition,
+  buildAreaDetailsFilterCondition,
   buildFptkDateCondition,
+  parseAreaDetailsParam,
   resolveNormalizedArea,
   getLocationKey,
 };

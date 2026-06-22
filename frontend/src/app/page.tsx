@@ -5,6 +5,7 @@ import { useAuth } from '@/contexts/AuthContext'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import Layout from '@/components/Layout/Layout'
+import MultiSelectDropdown from '@/components/MultiSelectDropdown'
 import PositionEditOverlay from '@/components/PositionEditOverlay'
 import ViewJobPostingModal from '@/components/ViewJobPostingModal'
 import Spinner from '@/components/Spinner'
@@ -19,7 +20,7 @@ import {
   ArrowLeftOnRectangleIcon,
 } from '@heroicons/react/24/outline'
 import { DashboardStats, PositionStatusByLocation, OpenPositionProgress, SLALocation, FPTK } from '@/types'
-import { DashboardAPI, CandidatesAPI, FPTKAPI, ApplicationsAPI } from '@/lib/api'
+import { DashboardAPI, CandidatesAPI, FPTKAPI, ApplicationsAPI, MasterOfficeLocationAPI } from '@/lib/api'
 import { mapApiFptk } from './fptk/page'
 import { businessDaysDiffIndonesia } from '@/utils/indoBusinessDays'
 import {
@@ -156,6 +157,9 @@ export default function Dashboard() {
   const [priorityFilter, setPriorityFilter] = useState<typeof PRIORITY_FILTERS[number]>('ALL')
   const [positionStatusFilter, setPositionStatusFilter] = useState<PositionStatusFilterType>('ALL')
   const [locationAreaFilter, setLocationAreaFilter] = useState<LocationAreaFilterType>('ALL')
+  const [areaDetailOptions, setAreaDetailOptions] = useState<string[]>([])
+  const [selectedAreaDetails, setSelectedAreaDetails] = useState<string[]>([])
+  const [areaDetailOptionsLoading, setAreaDetailOptionsLoading] = useState(false)
   const [isDashboardLoading, setIsDashboardLoading] = useState(false)
   const [openPositionsModalOpen, setOpenPositionsModalOpen] = useState(false)
   const [openPositionsQuery, setOpenPositionsQuery] = useState('')
@@ -538,10 +542,19 @@ export default function Dashboard() {
   )
 
   // Build params for the dashboard API — re-computed whenever filters or period change
+  const areaDetailFilterActive = locationAreaFilter !== 'ALL'
+  const areaDetailSelectionEmpty = areaDetailFilterActive && selectedAreaDetails.length === 0
+
   const currentParams = useMemo(() => ({
     ...(priorityFilter !== 'ALL' ? { priority: priorityFilter } : {}),
     ...(positionStatusFilter !== 'ALL' ? { positionStatus: positionStatusFilter } : {}),
     ...(locationAreaFilter !== 'ALL' ? { area: locationAreaFilter } : {}),
+    ...(areaDetailFilterActive
+      ? {
+          areaDetails:
+            selectedAreaDetails.length > 0 ? selectedAreaDetails.join(',') : '',
+        }
+      : {}),
     ...(compareToPrevious && periodBounds
       ? {
           periodStart: periodBounds.current.start.toISOString(),
@@ -550,9 +563,82 @@ export default function Dashboard() {
           previousEnd: periodBounds.previous.end.toISOString(),
         }
       : {}),
-  }), [priorityFilter, positionStatusFilter, locationAreaFilter, compareToPrevious, periodBounds])
+  }), [
+    priorityFilter,
+    positionStatusFilter,
+    locationAreaFilter,
+    areaDetailFilterActive,
+    selectedAreaDetails,
+    compareToPrevious,
+    periodBounds,
+  ])
 
   const didInitialLoad = useRef(false)
+
+  // Load Area Detail options when Site/HO is selected (master office locations)
+  useEffect(() => {
+    if (!isAuthenticated || locationAreaFilter === 'ALL') {
+      setAreaDetailOptions([])
+      setSelectedAreaDetails([])
+      setAreaDetailOptionsLoading(false)
+      return
+    }
+
+    let cancelled = false
+    const loadAreaDetails = async () => {
+      setAreaDetailOptionsLoading(true)
+      try {
+        const rows = (await MasterOfficeLocationAPI.getAll(
+          undefined,
+          undefined,
+          locationAreaFilter
+        )) as Array<{ areaDetail?: string }>
+        const details = [
+          ...new Set(
+            rows
+              .map((row) => (row.areaDetail || '').trim())
+              .filter((d: string) => d.length > 0)
+          ),
+        ].sort((a, b) => a.localeCompare(b))
+        if (cancelled) return
+        setAreaDetailOptions(details)
+        setSelectedAreaDetails(details)
+      } catch (error) {
+        console.error('Error loading area detail options:', error)
+        if (!cancelled) {
+          setAreaDetailOptions([])
+          setSelectedAreaDetails([])
+        }
+      } finally {
+        if (!cancelled) setAreaDetailOptionsLoading(false)
+      }
+    }
+
+    void loadAreaDetails()
+    return () => {
+      cancelled = true
+    }
+  }, [isAuthenticated, locationAreaFilter])
+
+  const clearDashboardStats = useCallback(() => {
+    setBaseStats({
+      totalCandidates: 0,
+      activeApplications: 0,
+      recentActivity: [],
+      openPositions: 0,
+      closedPositions: 0,
+      holdPositions: 0,
+      interviewsThisWeek: 0,
+      hiredThisMonth: 0,
+      positionStatusByLocation: [],
+      openPositionProgress: [],
+      slaByLocation: [],
+      fptkCountsByCurrentStatus: {},
+      applicationCountsByStatus: {},
+      fptkPeriodCounts: { current: null, previous: null },
+      appPeriodCounts: { current: null, previous: null },
+    })
+  }, [])
 
   // Initial load on auth
   useEffect(() => {
@@ -567,8 +653,13 @@ export default function Dashboard() {
   // Re-fetch whenever filters or period change (skip the very first render)
   useEffect(() => {
     if (!didInitialLoad.current || !isAuthenticated) return
+    if (areaDetailSelectionEmpty) {
+      clearDashboardStats()
+      return
+    }
+    if (areaDetailFilterActive && areaDetailOptionsLoading) return
     loadDashboardData(currentParams)
-  }, [currentParams])
+  }, [currentParams, areaDetailSelectionEmpty, areaDetailFilterActive, areaDetailOptionsLoading, isAuthenticated, clearDashboardStats])
 
   // Sync dashboardStats from backend-provided data
   useEffect(() => {
@@ -1284,18 +1375,48 @@ export default function Dashboard() {
         {/* Charts Section - Location aligned view */}
         <div className="mt-4 bg-white shadow rounded-lg">
           <div className="px-4 py-4 sm:px-6">
-            <div className="flex items-center mb-3">
+            <div className="flex flex-wrap items-end justify-between gap-3 mb-3">
               <h3 className="text-base font-semibold text-gray-900">
                 Location Overview
               </h3>
+
+              {areaDetailFilterActive && (
+                <div className="flex flex-wrap items-end gap-x-3 gap-y-2">
+                  {areaDetailOptionsLoading ? (
+                    <div className="flex items-center gap-2 text-sm text-gray-500 pb-2">
+                      <Spinner size="sm" />
+                      Loading area details…
+                    </div>
+                  ) : (
+                    <MultiSelectDropdown
+                      label={`Area Detail (${locationAreaFilter})`}
+                      options={areaDetailOptions}
+                      value={selectedAreaDetails}
+                      onChange={setSelectedAreaDetails}
+                      placeholder={
+                        areaDetailOptions.length === 0
+                          ? 'No area details'
+                          : 'Select area details…'
+                      }
+                      searchPlaceholder="Search area detail…"
+                      className="w-52 sm:w-64"
+                    />
+                  )}
+                </div>
+              )}
             </div>
+
             <div className="hidden lg:grid grid-cols-3 gap-4 text-xs font-semibold text-gray-500 border-b pb-2 mb-4">
               <span>Location</span>
               <span>Position Status by Location</span>
               <span>SLA by Location (from FPTK Receive Date)</span>
             </div>
 
-            {combinedLocations.length === 0 ? (
+            {areaDetailSelectionEmpty ? (
+              <div className="text-sm text-gray-500 py-4">
+                Select at least one Area Detail to view location and dashboard data.
+              </div>
+            ) : combinedLocations.length === 0 ? (
               <div className="text-sm text-gray-500">
                 No location data available. Create some positions to see the chart.
               </div>

@@ -560,6 +560,7 @@ export const DashboardAPI = {
     priority?: string
     positionStatus?: string
     area?: string
+    areaDetails?: string
     periodStart?: string
     periodEnd?: string
     previousStart?: string

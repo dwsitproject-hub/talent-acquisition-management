@@ -43,6 +43,18 @@ export default function MultiSelectDropdown({
     else onChange([...value, v])
   }
 
+  const selectAll = () => {
+    const targets = query.trim()
+      ? filtered.map((o) => o.value)
+      : normalized.map((o) => o.value)
+    onChange(Array.from(new Set([...value, ...targets])))
+  }
+
+  const clearAll = () => onChange([])
+
+  const displayCount = query.trim() ? filtered.length : normalized.length
+  const selectAllCount = query.trim() ? filtered.length : normalized.length
+
   const selectedText = value.length === 0 ? placeholder : `${value.length} selected`
 
   return (
@@ -70,21 +82,39 @@ export default function MultiSelectDropdown({
               leaveFrom="opacity-100 translate-y-0"
               leaveTo="opacity-0 translate-y-1"
             >
-              <Popover.Panel className="absolute z-20 mt-2 w-full rounded-md border bg-white shadow-lg p-2">
-                <div className="flex items-center gap-2 mb-2">
+              <Popover.Panel className="absolute z-20 mt-2 w-full min-w-[16rem] rounded-md border bg-white shadow-lg p-2">
+                <div className="flex items-center justify-between gap-2 mb-2 px-0.5">
+                  <div className="text-xs">
+                    <button
+                      type="button"
+                      className="text-indigo-600 hover:underline disabled:opacity-50 disabled:no-underline"
+                      disabled={selectAllCount === 0}
+                      onClick={selectAll}
+                    >
+                      Select all {selectAllCount}
+                    </button>
+                    <span className="text-gray-400 mx-1">-</span>
+                    <button
+                      type="button"
+                      className="text-indigo-600 hover:underline disabled:opacity-50 disabled:no-underline"
+                      disabled={value.length === 0}
+                      onClick={clearAll}
+                    >
+                      Clear
+                    </button>
+                  </div>
+                  <span className="text-xs text-gray-500 whitespace-nowrap">
+                    Displaying {displayCount}
+                  </span>
+                </div>
+
+                <div className="mb-2">
                   <input
-                    className="w-full border border-gray-200 rounded-md px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                    className="w-full border border-gray-200 rounded-md px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
                     value={query}
                     onChange={(e) => setQuery(e.target.value)}
                     placeholder={searchPlaceholder}
                   />
-                  <button
-                    type="button"
-                    className="text-xs text-indigo-600 hover:underline whitespace-nowrap"
-                    onClick={() => onChange([])}
-                  >
-                    Clear
-                  </button>
                 </div>
 
                 <div className="max-h-56 overflow-auto">
