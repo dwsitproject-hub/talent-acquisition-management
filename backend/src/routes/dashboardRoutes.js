@@ -14,8 +14,8 @@ router.get(
   authenticate,
   authorize('TA_TEAM', 'HRBP', 'SUPER_ADMIN', 'CHRO', 'DEPARTMENT_HEAD', 'HIRING_MANAGER'),
   asyncHandler(async (req, res) => {
-    const { priority, positionStatus, periodStart, periodEnd, previousStart, previousEnd } = req.query;
-    const options = { priority, positionStatus, periodStart, periodEnd, previousStart, previousEnd };
+    const { priority, positionStatus, area, periodStart, periodEnd, previousStart, previousEnd } = req.query;
+    const options = { priority, positionStatus, area, periodStart, periodEnd, previousStart, previousEnd };
     const stats = await dashboardService.getDashboardStats(req.user, options);
     res.set('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
     res.set('Pragma', 'no-cache');
@@ -37,8 +37,8 @@ router.get(
   authenticate,
   authorize('TA_TEAM', 'HRBP', 'SUPER_ADMIN', 'CHRO', 'DEPARTMENT_HEAD', 'HIRING_MANAGER'),
   asyncHandler(async (req, res) => {
-    const { priority, positionStatus, periodStart, periodEnd, previousStart, previousEnd } = req.query;
-    const options = { priority, positionStatus, periodStart, periodEnd, previousStart, previousEnd };
+    const { priority, positionStatus, area, periodStart, periodEnd, previousStart, previousEnd } = req.query;
+    const options = { priority, positionStatus, area, periodStart, periodEnd, previousStart, previousEnd };
     const stats = await dashboardService.getDashboardStats(req.user, options);
     res.set('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
     res.set('Pragma', 'no-cache');
