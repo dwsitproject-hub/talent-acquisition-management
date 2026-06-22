@@ -430,24 +430,6 @@ export default function Dashboard() {
     setOpenPositionsPage(1)
   }, [openPositionsList, openPositionsModalOpen])
 
-  const locationAreaMap = useMemo(() => {
-    const map = new Map<string, string>()
-
-    dashboardStats.positionStatusByLocation.forEach((item) => {
-      if (item.location && item.area) map.set(item.location, item.area)
-    })
-
-    dashboardStats.openPositionProgress.forEach((item: any) => {
-      if (item.areaDetail && item.area) map.set(item.areaDetail, item.area)
-    })
-
-    dashboardStats.slaByLocation.forEach((item: any) => {
-      if (item.areaDetail && item.area) map.set(item.areaDetail, item.area)
-    })
-
-    return map
-  }, [dashboardStats.positionStatusByLocation, dashboardStats.openPositionProgress, dashboardStats.slaByLocation])
-
   const combinedLocations = useMemo(() => {
     const locationsSet = new Set<string>()
 
@@ -463,15 +445,8 @@ export default function Dashboard() {
       if (item.areaDetail) locationsSet.add(item.areaDetail)
     })
 
-    const sorted = Array.from(locationsSet).sort()
-
-    if (locationAreaFilter === 'ALL') return sorted
-
-    return sorted.filter((key) => {
-      const area = locationAreaMap.get(key) || ''
-      return area.toLowerCase() === locationAreaFilter.toLowerCase()
-    })
-  }, [dashboardStats.positionStatusByLocation, dashboardStats.openPositionProgress, dashboardStats.slaByLocation, locationAreaFilter, locationAreaMap])
+    return Array.from(locationsSet).sort()
+  }, [dashboardStats.positionStatusByLocation, dashboardStats.openPositionProgress, dashboardStats.slaByLocation])
 
   const stats = useMemo(
     () => [
@@ -566,6 +541,7 @@ export default function Dashboard() {
   const currentParams = useMemo(() => ({
     ...(priorityFilter !== 'ALL' ? { priority: priorityFilter } : {}),
     ...(positionStatusFilter !== 'ALL' ? { positionStatus: positionStatusFilter } : {}),
+    ...(locationAreaFilter !== 'ALL' ? { area: locationAreaFilter } : {}),
     ...(compareToPrevious && periodBounds
       ? {
           periodStart: periodBounds.current.start.toISOString(),
@@ -574,7 +550,7 @@ export default function Dashboard() {
           previousEnd: periodBounds.previous.end.toISOString(),
         }
       : {}),
-  }), [priorityFilter, positionStatusFilter, compareToPrevious, periodBounds])
+  }), [priorityFilter, positionStatusFilter, locationAreaFilter, compareToPrevious, periodBounds])
 
   const didInitialLoad = useRef(false)
 

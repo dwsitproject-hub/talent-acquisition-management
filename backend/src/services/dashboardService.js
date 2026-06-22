@@ -78,12 +78,79 @@ function addConditionToWhere(where, condition) {
   }
 }
 
+/** FPTK date window: updatedAt or createdAt within [start, end]. */
+function buildFptkDateCondition(start, end) {
+  if (!start || !end) return null;
+  const ps = new Date(start);
+  const pe = new Date(end);
+  if (isNaN(ps.getTime()) || isNaN(pe.getTime())) return null;
+  return {
+    OR: [
+      { updatedAt: { gte: ps, lte: pe } },
+      { createdAt: { gte: ps, lte: pe } },
+    ],
+  };
+}
+
+/** UI Area filter (Site / HO) with legacy location-field fallback. */
+function buildAreaFilterCondition(areaFilter) {
+  const target = (areaFilter || '').trim();
+  if (!target || target.toUpperCase() === 'ALL') return null;
+
+  const normalized = target.toLowerCase();
+  const emptyArea = { OR: [{ area: null }, { area: '' }] };
+
+  if (normalized === 'ho') {
+    return {
+      OR: [
+        { area: { equals: 'HO', mode: 'insensitive' } },
+        {
+          AND: [emptyArea, { location: { equals: 'Head Office', mode: 'insensitive' } }],
+        },
+      ],
+    };
+  }
+  if (normalized === 'site') {
+    return {
+      OR: [
+        { area: { equals: 'Site', mode: 'insensitive' } },
+        {
+          AND: [emptyArea, { location: { equals: 'Site', mode: 'insensitive' } }],
+        },
+      ],
+    };
+  }
+  return null;
+}
+
+/** Resolve canonical area label from FPTK row (area column, then location fallback). */
+function resolveNormalizedArea(fptk) {
+  const area = (fptk?.area || '').trim();
+  if (area) return area;
+  const loc = (fptk?.location || '').trim().toLowerCase();
+  if (loc === 'head office') return 'HO';
+  if (loc === 'site') return 'Site';
+  return '';
+}
+
+/** Location display key — always prefer areaDetail over raw area code. */
+function getLocationKey(fptk) {
+  const detail = (fptk?.areaDetail || '').trim();
+  if (detail) return detail;
+  return 'Unassigned';
+}
+
+function cloneWhere(where) {
+  return JSON.parse(JSON.stringify(where));
+}
+
 /**
  * Get dashboard statistics.
  * @param {object|null} user - authenticated user (for role-based scoping)
  * @param {object} [options={}] - optional UI-level filters and period params
  * @param {string} [options.priority]       - FPTK priority ('P0'|'P1'|'P2'; omit/'ALL' = no filter)
  * @param {string} [options.positionStatus] - 'OPEN'|'CLOSED'; omit for all positions
+ * @param {string} [options.area]           - 'Site'|'HO'; omit/'ALL' = no area filter
  * @param {string} [options.periodStart]    - ISO date: start of current period (enables WoW groupBy)
  * @param {string} [options.periodEnd]      - ISO date: end of current period
  * @param {string} [options.previousStart]  - ISO date: start of previous period
@@ -188,6 +255,23 @@ async function getDashboardStats(user = null, options = {}) {
       });
     }
 
+    const areaFilterCondition = buildAreaFilterCondition(options.area);
+    if (areaFilterCondition) {
+      addConditionToWhere(fptkWhere, areaFilterCondition);
+      if (applicationWhere.fptk) {
+        applicationWhere.fptk = { AND: [applicationWhere.fptk, areaFilterCondition] };
+      } else {
+        addConditionToWhere(applicationWhere, { fptk: areaFilterCondition });
+      }
+    }
+
+    // Location charts: same scope as cards (priority/status/area) + current period when Compare is on
+    const fptkLocationWhere = cloneWhere(fptkWhere);
+    const locationPeriodCondition = buildFptkDateCondition(options.periodStart, options.periodEnd);
+    if (locationPeriodCondition) {
+      addConditionToWhere(fptkLocationWhere, locationPeriodCondition);
+    }
+
     // Compute all date ranges upfront (before any DB queries)
     const now = new Date();
     const weekStart = startOfWeekMonday(now);
@@ -209,18 +293,11 @@ async function getDashboardStats(user = null, options = {}) {
     // Uses updatedAt-or-createdAt for FPTKs and updatedAt-or-appliedAt for applications so
     // records that were created within the period but never subsequently updated are included.
     const buildPeriodGroupBys = (start, end) => {
-      if (!start || !end) return [Promise.resolve([]), Promise.resolve([])];
+      const fptkDateCondition = buildFptkDateCondition(start, end);
+      if (!fptkDateCondition) return [Promise.resolve([]), Promise.resolve([])];
+
       const ps = new Date(start);
       const pe = new Date(end);
-      if (isNaN(ps.getTime()) || isNaN(pe.getTime())) return [Promise.resolve([]), Promise.resolve([])];
-
-      // updatedAt is non-nullable (@updatedAt); use createdAt/appliedAt as fallback via OR
-      const fptkDateCondition = {
-        OR: [
-          { updatedAt: { gte: ps, lte: pe } },
-          { createdAt: { gte: ps, lte: pe } },
-        ],
-      };
       const appDateCondition = {
         OR: [
           { updatedAt: { gte: ps, lte: pe } },
@@ -228,7 +305,7 @@ async function getDashboardStats(user = null, options = {}) {
         ],
       };
 
-      const fptkPeriodWhere = { ...fptkWhere };
+      const fptkPeriodWhere = cloneWhere(fptkWhere);
       addConditionToWhere(fptkPeriodWhere, fptkDateCondition);
 
       const appPeriodWhere = { ...applicationWhere };
@@ -253,7 +330,7 @@ async function getDashboardStats(user = null, options = {}) {
       pendingInterviews,
       interviewsThisWeek,
       hiredThisMonth,
-      allFPTKs,
+      locationFPTKs,
       recentCandidates,
       recentFPTKs,
       fptkGroupedAll,
@@ -290,11 +367,12 @@ async function getDashboardStats(user = null, options = {}) {
         },
       }),
       prisma.fPTK.findMany({
-        where: fptkWhere,
+        where: fptkLocationWhere,
         select: {
           id: true,
           areaDetail: true,
           area: true,
+          location: true,
           requestDate: true,
           fptkReceiveDate: true,
           statusFktk: true,
@@ -338,26 +416,23 @@ async function getDashboardStats(user = null, options = {}) {
       previous: options.previousStart ? groupByToMap(appGroupedPreviousPeriod, 'status') : null,
     };
 
-    // Derive open/closed counts from already-fetched chart data (no extra query needed)
+    // Derive open/closed counts from location-scoped chart data (no extra query needed)
     const statusCounts = {};
-    allFPTKs.forEach((fptk) => {
+    locationFPTKs.forEach((fptk) => {
       const status = (fptk.currentStatus || '').trim();
       statusCounts[status] = (statusCounts[status] || 0) + 1;
     });
     logger.debug('Dashboard: FPTK status distribution:', JSON.stringify(statusCounts));
 
-    const openPositionsCount = allFPTKs.filter((fptk) => isOpenCurrentStatus(fptk.currentStatus)).length;
-    const closedPositionsCount = allFPTKs.filter((fptk) => isClosedCurrentStatus(fptk.currentStatus)).length;
+    const openPositionsCount = locationFPTKs.filter((fptk) => isOpenCurrentStatus(fptk.currentStatus)).length;
+    const closedPositionsCount = locationFPTKs.filter((fptk) => isClosedCurrentStatus(fptk.currentStatus)).length;
 
     logger.debug(`Dashboard: Position counts - Open: ${openPositionsCount}, Closed: ${closedPositionsCount}`);
-    logger.debug(`Dashboard: allFPTKs.length: ${allFPTKs.length}, fptkWhere keys: ${Object.keys(fptkWhere).join(', ')}`);
+    logger.debug(
+      `Dashboard: locationFPTKs.length: ${locationFPTKs.length}, fptkLocationWhere keys: ${Object.keys(fptkLocationWhere).join(', ')}`
+    );
 
-    logger.debug(`Dashboard: Fetched ${allFPTKs.length} FPTKs for charts`);
-
-    // Helper function to get location (areaDetail or area or 'Unknown')
-    const getLocation = (fptk) => {
-      return fptk.areaDetail || fptk.area || 'Unknown';
-    };
+    logger.debug(`Dashboard: Fetched ${locationFPTKs.length} FPTKs for location charts`);
 
     // Helper function to get status for display (currentStatus or status or default)
     const getStatus = (fptk) => {
@@ -381,19 +456,25 @@ async function getDashboardStats(user = null, options = {}) {
     // Location chart: green = actively open recruiting; red = everything else (Close, Cancel, etc.)
     const isClosed = (fptk) => !isOpenCurrentStatus(fptk.currentStatus || getStatus(fptk));
 
+    const assignBucketArea = (bucket, fptk) => {
+      const resolved = resolveNormalizedArea(fptk);
+      if (resolved && !bucket.area) bucket.area = resolved;
+    };
+
     // Calculate Position Status by Location
     const positionStatusByLocationMap = {};
-    allFPTKs.forEach((fptk) => {
-      const location = getLocation(fptk);
+    locationFPTKs.forEach((fptk) => {
+      const location = getLocationKey(fptk);
       if (!positionStatusByLocationMap[location]) {
         positionStatusByLocationMap[location] = {
           location,
-          area: fptk.area || '',
+          area: resolveNormalizedArea(fptk),
           total: 0,
           closed: 0,
           open: 0,
         };
       }
+      assignBucketArea(positionStatusByLocationMap[location], fptk);
       positionStatusByLocationMap[location].total += 1;
       if (isClosed(fptk)) {
         positionStatusByLocationMap[location].closed += 1;
@@ -405,18 +486,19 @@ async function getDashboardStats(user = null, options = {}) {
 
     // Calculate Open Position Progress by Area Detail
     const openPositionProgressMap = {};
-    allFPTKs.forEach((fptk) => {
-      const areaDetail = getLocation(fptk);
+    locationFPTKs.forEach((fptk) => {
+      const areaDetail = getLocationKey(fptk);
       const status = getStatus(fptk);
       
       if (!openPositionProgressMap[areaDetail]) {
         openPositionProgressMap[areaDetail] = {
           areaDetail,
-          area: fptk.area || '',
+          area: resolveNormalizedArea(fptk),
           statusCounts: {},
           total: 0,
         };
       }
+      assignBucketArea(openPositionProgressMap[areaDetail], fptk);
       
       if (!openPositionProgressMap[areaDetail].statusCounts[status]) {
         openPositionProgressMap[areaDetail].statusCounts[status] = 0;
@@ -427,7 +509,7 @@ async function getDashboardStats(user = null, options = {}) {
     });
 
     // Calculate percentages for each area detail
-    const totalOpenPositions = allFPTKs.length;
+    const totalOpenPositions = locationFPTKs.length;
     Object.values(openPositionProgressMap).forEach((areaData) => {
       areaData.percentage = totalOpenPositions > 0 
         ? Math.round((areaData.total / totalOpenPositions) * 100) 
@@ -438,14 +520,14 @@ async function getDashboardStats(user = null, options = {}) {
     // Calculate SLA by Location (from FPTK Receive Date, fallback to Request Date)
     const nowDate = new Date();
     const slaByLocationMap = {};
-    allFPTKs.forEach((fptk) => {
-      const areaDetail = getLocation(fptk);
+    locationFPTKs.forEach((fptk) => {
+      const areaDetail = getLocationKey(fptk);
       const referenceDate = fptk.fptkReceiveDate || fptk.requestDate;
       
       if (!slaByLocationMap[areaDetail]) {
         slaByLocationMap[areaDetail] = {
           areaDetail,
-          area: fptk.area || '',
+          area: resolveNormalizedArea(fptk),
           buckets: {
             '0-30 Days':     { received: 0, pending: 0 },
             '31-60 Days':    { received: 0, pending: 0 },
@@ -455,6 +537,7 @@ async function getDashboardStats(user = null, options = {}) {
           total: 0,
         };
       }
+      assignBucketArea(slaByLocationMap[areaDetail], fptk);
       
       if (referenceDate && !isNaN(new Date(referenceDate).getTime())) {
         const requestDateObj = new Date(referenceDate);
@@ -534,5 +617,9 @@ async function getDashboardStats(user = null, options = {}) {
 
 module.exports = {
   getDashboardStats,
+  buildAreaFilterCondition,
+  buildFptkDateCondition,
+  resolveNormalizedArea,
+  getLocationKey,
 };
 

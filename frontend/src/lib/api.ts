@@ -559,6 +559,7 @@ export const DashboardAPI = {
   async getStats(params?: {
     priority?: string
     positionStatus?: string
+    area?: string
     periodStart?: string
     periodEnd?: string
     previousStart?: string
