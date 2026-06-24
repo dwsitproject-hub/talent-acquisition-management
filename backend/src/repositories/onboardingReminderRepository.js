@@ -85,7 +85,7 @@ async function markEmailSent(dispatchId, emailSentAt) {
 async function findTaTeamEmails() {
   const users = await prisma.user.findMany({
     where: {
-      role: 'TA_TEAM',
+      role: 'TA_HO',
       isActive: true,
     },
     select: { email: true },

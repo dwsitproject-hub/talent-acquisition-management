@@ -18,7 +18,7 @@ const bulkImportService = require('../services/bulkImportService');
 router.get(
   '/divisions',
   authenticate,
-  authorize('TA_TEAM', 'HRBP', 'SUPER_ADMIN', 'HIRING_MANAGER'),
+  authorize('TA_HO', 'HRBP', 'TA_SITE', 'SUPER_ADMIN', 'HIRING_MANAGER'),
   asyncHandler(async (req, res) => {
     const filters = {
       search: req.query.search,
@@ -42,7 +42,7 @@ router.get(
 router.post(
   '/divisions',
   authenticate,
-  authorize('TA_TEAM', 'SUPER_ADMIN'),
+  authorize('TA_HO', 'SUPER_ADMIN'),
   asyncHandler(async (req, res) => {
     const division = await masterDivisionService.createDivision(req.body);
 
@@ -62,7 +62,7 @@ router.post(
 router.get(
   '/divisions/bulk-template',
   authenticate,
-  authorize('TA_TEAM', 'SUPER_ADMIN'),
+  authorize('TA_HO', 'SUPER_ADMIN'),
   asyncHandler(async (req, res) => {
     const format = (req.query.format || 'csv').toString();
     return sendTemplate(res, {
@@ -81,7 +81,7 @@ router.get(
 router.post(
   '/divisions/bulk-upload',
   authenticate,
-  authorize('TA_TEAM', 'SUPER_ADMIN'),
+  authorize('TA_HO', 'SUPER_ADMIN'),
   asyncHandler(async (req, res) => {
     if (!req.files || !req.files.file) {
       return res.status(400).json({
@@ -109,7 +109,7 @@ router.post(
 router.get(
   '/divisions/:id',
   authenticate,
-  authorize('TA_TEAM', 'HRBP', 'SUPER_ADMIN'),
+  authorize('TA_HO', 'HRBP', 'TA_SITE', 'SUPER_ADMIN'),
   validationRules.uuidParam('id'),
   validate,
   asyncHandler(async (req, res) => {
@@ -130,7 +130,7 @@ router.get(
 router.put(
   '/divisions/:id',
   authenticate,
-  authorize('TA_TEAM', 'SUPER_ADMIN'),
+  authorize('TA_HO', 'SUPER_ADMIN'),
   validationRules.uuidParam('id'),
   validate,
   asyncHandler(async (req, res) => {
@@ -152,7 +152,7 @@ router.put(
 router.delete(
   '/divisions/:id',
   authenticate,
-  authorize('TA_TEAM', 'SUPER_ADMIN'),
+  authorize('TA_HO', 'SUPER_ADMIN'),
   validationRules.uuidParam('id'),
   validate,
   asyncHandler(async (req, res) => {
@@ -175,7 +175,7 @@ router.delete(
 router.get(
   '/office-locations',
   authenticate,
-  authorize('TA_TEAM', 'HRBP', 'SUPER_ADMIN', 'HIRING_MANAGER'),
+  authorize('TA_HO', 'HRBP', 'TA_SITE', 'SUPER_ADMIN', 'HIRING_MANAGER'),
   asyncHandler(async (req, res) => {
     const filters = {
       search: req.query.search,
@@ -200,7 +200,7 @@ router.get(
 router.post(
   '/office-locations',
   authenticate,
-  authorize('TA_TEAM', 'SUPER_ADMIN'),
+  authorize('TA_HO', 'SUPER_ADMIN'),
   asyncHandler(async (req, res) => {
     const officeLocation = await masterOfficeLocationService.createOfficeLocation(req.body);
 
@@ -220,7 +220,7 @@ router.post(
 router.get(
   '/office-locations/bulk-template',
   authenticate,
-  authorize('TA_TEAM', 'SUPER_ADMIN'),
+  authorize('TA_HO', 'SUPER_ADMIN'),
   asyncHandler(async (req, res) => {
     const format = (req.query.format || 'csv').toString();
     return sendTemplate(res, {
@@ -239,7 +239,7 @@ router.get(
 router.post(
   '/office-locations/bulk-upload',
   authenticate,
-  authorize('TA_TEAM', 'SUPER_ADMIN'),
+  authorize('TA_HO', 'SUPER_ADMIN'),
   asyncHandler(async (req, res) => {
     if (!req.files || !req.files.file) {
       return res.status(400).json({
@@ -267,7 +267,7 @@ router.post(
 router.get(
   '/office-locations/:id',
   authenticate,
-  authorize('TA_TEAM', 'HRBP', 'SUPER_ADMIN'),
+  authorize('TA_HO', 'HRBP', 'TA_SITE', 'SUPER_ADMIN'),
   validationRules.uuidParam('id'),
   validate,
   asyncHandler(async (req, res) => {
@@ -288,7 +288,7 @@ router.get(
 router.put(
   '/office-locations/:id',
   authenticate,
-  authorize('TA_TEAM', 'SUPER_ADMIN'),
+  authorize('TA_HO', 'SUPER_ADMIN'),
   validationRules.uuidParam('id'),
   validate,
   asyncHandler(async (req, res) => {
@@ -310,7 +310,7 @@ router.put(
 router.delete(
   '/office-locations/:id',
   authenticate,
-  authorize('TA_TEAM', 'SUPER_ADMIN'),
+  authorize('TA_HO', 'SUPER_ADMIN'),
   validationRules.uuidParam('id'),
   validate,
   asyncHandler(async (req, res) => {

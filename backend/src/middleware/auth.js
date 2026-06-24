@@ -87,7 +87,8 @@ function authorize(...allowedRoles) {
         'CHRO': 'Management',
         'DEPARTMENT_HEAD': 'Head of Division',
         'HRBP': 'HRBP',
-        'TA_TEAM': 'TA_TEAM',
+        'TA_HO': 'TA_HO',
+        'TA_SITE': 'TA_SITE',
         'HIRING_MANAGER': 'HIRING_MANAGER',
         'INTERVIEWER': 'INTERVIEWER',
         'CANDIDATE': 'CANDIDATE',
@@ -105,7 +106,8 @@ function authorize(...allowedRoles) {
         'Management': 'CHRO',
         'Head of Division': 'DEPARTMENT_HEAD',
         'HRBP': 'HRBP',
-        'TA_TEAM': 'TA_TEAM',
+        'TA_HO': 'TA_HO',
+        'TA_SITE': 'TA_SITE',
         'HIRING_MANAGER': 'HIRING_MANAGER',
         'INTERVIEWER': 'INTERVIEWER',
         'CANDIDATE': 'CANDIDATE',
@@ -147,7 +149,7 @@ function checkOwnership(resourceIdParam = 'id') {
       const userRole = req.user.role;
 
       // Admins and HR can access everything
-      if (['SUPER_ADMIN', 'CHRO', 'HRBP', 'TA_TEAM'].includes(userRole)) {
+      if (['SUPER_ADMIN', 'CHRO', 'HRBP', 'TA_HO', 'TA_SITE'].includes(userRole)) {
         return next();
       }
 

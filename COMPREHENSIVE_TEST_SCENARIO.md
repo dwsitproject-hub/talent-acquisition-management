@@ -31,17 +31,17 @@
 ## Test Environment
 
 ### Prerequisites
-- Production database with credentials: `tasadmin/tasadminkpn@2025`
-- Production user: `jerry.hakim@energi-up.com` / `DefaultPassword123!`
+- Production database with credentials: `your_db_user/your_secure_db_password`
+- Production user: `admin@example.com` / `your-secure-admin-password`
 - All services running (backend, frontend, database, Redis)
 - Test data populated
 
 ### Test Users
-1. **SUPER_ADMIN**: jerry.hakim@energi-up.com
+1. **SUPER_ADMIN**: admin@example.com
 2. **HIRING_MANAGER**: (create test user)
 3. **Head of Division**: (create test user)
 4. **HRBP**: (create test user with PT/Area/Area Detail)
-5. **TA_TEAM**: (create test user)
+5. **TA_HO**: (create test user)
 6. **CANDIDATE**: (create test candidate)
 
 ---
@@ -52,8 +52,8 @@
 **Objective**: Verify user can login successfully
 **Steps**:
 1. Navigate to login page
-2. Enter email: `jerry.hakim@energi-up.com`
-3. Enter password: `DefaultPassword123!`
+2. Enter email: `admin@example.com`
+3. Enter password: `your-secure-admin-password`
 4. Click "Login"
 **Expected**: User logged in, redirected to dashboard, JWT token stored
 **Status**: ⬜ Not Tested

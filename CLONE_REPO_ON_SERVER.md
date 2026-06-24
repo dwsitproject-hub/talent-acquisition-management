@@ -1,29 +1,29 @@
-# Clone Repository on AliCloud Server
+# Clone Repository on Deployment Server
 
 ## Problem
-The server doesn't have an SSH key added to GitHub, so SSH cloning fails.
+The server may not have SSH keys configured for GitHub, so SSH cloning can fail.
 
 ## Solution 1: Use Personal Access Token (HTTPS) - RECOMMENDED
 
-**On the server (via PuTTY):**
+**On the server:**
 
 ```bash
 # Clone using HTTPS with Personal Access Token
-git clone https://jerrypra0906:<YOUR_TOKEN>@github.com/jerrypra0906/talent-acquisition-management.git tas
+git clone https://<GITHUB_USERNAME>:<YOUR_TOKEN>@github.com/<GITHUB_ORG>/talent-acquisition-management.git tas
 ```
 
-**Replace `<YOUR_TOKEN>` with your GitHub Personal Access Token.**
+**Replace `<GITHUB_USERNAME>`, `<GITHUB_ORG>`, and `<YOUR_TOKEN>` with your values.**
 
 **If you don't have a token:**
 1. Go to: https://github.com/settings/tokens
 2. Click "Generate new token" → "Generate new token (classic)"
-3. Name: `AliCloud Server Clone`
-4. Select scope: `repo` (full control)
+3. Name: `Production Server Clone`
+4. Select scope: `repo` (full control of private repositories)
 5. Generate and copy the token
 
-**Example:**
+**Example (replace placeholders):**
 ```bash
-git clone https://jerrypra0906:ghp_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx@github.com/jerrypra0906/talent-acquisition-management.git tas
+git clone https://<GITHUB_USERNAME>:<YOUR_TOKEN>@github.com/<GITHUB_ORG>/talent-acquisition-management.git tas
 ```
 
 ---
@@ -33,13 +33,11 @@ git clone https://jerrypra0906:ghp_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx@github.c
 **On the server, generate SSH key:**
 
 ```bash
-# Generate SSH key for the server
-ssh-keygen -t ed25519 -C "jerry.pratama.mail@gmail.com"
+ssh-keygen -t ed25519 -C "your_email@example.com"
 
 # When prompted:
-# - "Enter file in which to save the key": Press Enter (use default: /root/.ssh/id_ed25519)
-# - "Enter passphrase": Press Enter (no passphrase)
-# - "Enter same passphrase again": Press Enter
+# - "Enter file in which to save the key": Press Enter (default: ~/.ssh/id_ed25519)
+# - "Enter passphrase": Use a passphrase or press Enter
 ```
 
 **Display the public key:**
@@ -52,7 +50,7 @@ cat ~/.ssh/id_ed25519.pub
 **Add to GitHub:**
 1. Go to: https://github.com/settings/keys
 2. Click "New SSH key"
-3. Title: `AliCloud Backend Server` (or `AliCloud Frontend Server`)
+3. Title: `Production Server`
 4. Paste the public key
 5. Save
 
@@ -61,86 +59,70 @@ cat ~/.ssh/id_ed25519.pub
 ssh -T git@github.com
 ```
 
-**Should see:**
-```
-Hi jerrypra0906! You've successfully authenticated, but GitHub does not provide shell access.
-```
-
 **Then clone:**
 ```bash
-git clone git@github.com:jerrypra0906/talent-acquisition-management.git tas
+git clone git@github.com:<GITHUB_ORG>/talent-acquisition-management.git tas
 ```
 
 ---
 
 ## Solution 3: Use SSH Agent Forwarding (Advanced)
 
-If you want to use your Windows SSH key from the server:
+If you want to use your local SSH key from the server:
 
-**On Windows, enable SSH agent:**
+**On your local machine, enable SSH agent:**
 ```powershell
-# Start SSH agent
 Start-Service ssh-agent
-
-# Add your key
 ssh-add $env:USERPROFILE\.ssh\id_ed25519
 ```
 
 **Connect to server with agent forwarding:**
 ```powershell
-ssh -A -p 1819 root@147.139.176.70
+ssh -A -p <SSH_PORT> <USER>@<SERVER_HOST>
 ```
 
 **Then on server, clone:**
 ```bash
-git clone git@github.com:jerrypra0906/talent-acquisition-management.git tas
+git clone git@github.com:<GITHUB_ORG>/talent-acquisition-management.git tas
 ```
 
 ---
 
 ## Recommended: Use Personal Access Token
 
-**For production servers, using HTTPS with a token is simpler:**
+**For production servers, HTTPS with a scoped token is often simpler:**
 
 ```bash
-# Clone
-git clone https://jerrypra0906:<TOKEN>@github.com/jerrypra0906/talent-acquisition-management.git tas
+git clone https://<GITHUB_USERNAME>:<TOKEN>@github.com/<GITHUB_ORG>/talent-acquisition-management.git tas
 
-# For future updates
 cd tas
-git pull https://jerrypra0906:<TOKEN>@github.com/jerrypra0906/talent-acquisition-management.git
+git pull https://<GITHUB_USERNAME>:<TOKEN>@github.com/<GITHUB_ORG>/talent-acquisition-management.git
 ```
 
-**Or configure Git to remember credentials:**
+**Or configure Git credential helper (store token securely on server):**
 ```bash
-# Clone
-git clone https://jerrypra0906:<TOKEN>@github.com/jerrypra0906/talent-acquisition-management.git tas
-
-# Configure Git to use token
+git clone https://github.com/<GITHUB_ORG>/talent-acquisition-management.git tas
 cd tas
 git config credential.helper store
-git config user.name "jerrypra0906"
-git config user.email "jerry.pratama.mail@gmail.com"
-
-# Test pull (will prompt for password - enter token)
+git config user.name "Your Name"
+git config user.email "your_email@example.com"
 git pull
+# Enter username and token when prompted
 ```
 
 ---
 
-## Quick Fix - Use Token Now
+## Quick Fix
 
-**On the server, run:**
+**On the server:**
 
 ```bash
-# Get your GitHub Personal Access Token ready
-# Then clone:
-git clone https://jerrypra0906:<YOUR_TOKEN>@github.com/jerrypra0906/talent-acquisition-management.git tas
-
-# Verify
+git clone https://<GITHUB_USERNAME>:<YOUR_TOKEN>@github.com/<GITHUB_ORG>/talent-acquisition-management.git tas
 cd tas
 ls -la
 ```
 
-This should work immediately!
-
+**Security notes:**
+- Use tokens with minimal scope and expiration
+- Never commit tokens to the repository
+- Rotate tokens if exposed

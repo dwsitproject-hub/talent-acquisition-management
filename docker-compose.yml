@@ -62,7 +62,7 @@ services:
       ENCRYPTION_KEY: ${ENCRYPTION_KEY:-12345678901234567890123456789012}
       FRONTEND_URL: http://localhost:4001
       CANDIDATE_PORTAL_URL: http://localhost:4002
-      CORS_ORIGIN: http://localhost:4001,http://localhost:4002,http://172.30.63.129:4001,http://172.30.63.129:4002,http://172.30.60.122:4001,http://172.30.60.122:4002
+      CORS_ORIGIN: http://localhost:4001,http://localhost:4002,http://172.30.63.129:4001,http://172.30.63.129:4002,http://your-db-host.internal:4001,http://your-db-host.internal:4002
       CORS_CREDENTIALS: true
       # Local dev convenience: avoid hitting in-memory rate limits (all requests appear from the Docker gateway IP)
       RATE_LIMIT_WINDOW_MS: 900000

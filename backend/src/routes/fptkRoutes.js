@@ -14,7 +14,7 @@ const { validationRules, validate } = require('../middleware/validator');
 router.post(
   '/',
   authenticate,
-  requireMenuCreate('/fptk', ['HIRING_MANAGER', 'TA_TEAM', 'SUPER_ADMIN']),
+  requireMenuCreate('/fptk', ['HIRING_MANAGER', 'TA_HO', 'SUPER_ADMIN']),
   validationRules.createFPTK,
   validate,
   asyncHandler(async (req, res) => {
@@ -99,7 +99,7 @@ router.get(
 router.get(
   '/',
   authenticate,
-  authorize('TA_TEAM', 'HRBP', 'SUPER_ADMIN', 'HIRING_MANAGER', 'CHRO', 'DEPARTMENT_HEAD'),
+  authorize('TA_HO', 'HRBP', 'TA_SITE', 'SUPER_ADMIN', 'HIRING_MANAGER', 'CHRO', 'DEPARTMENT_HEAD'),
   validationRules.pagination,
   validate,
   asyncHandler(async (req, res) => {
@@ -137,7 +137,7 @@ router.get(
 router.get(
   '/summary-by-position',
   authenticate,
-  authorize('TA_TEAM', 'HRBP', 'SUPER_ADMIN', 'HIRING_MANAGER', 'CHRO', 'DEPARTMENT_HEAD'),
+  authorize('TA_HO', 'HRBP', 'TA_SITE', 'SUPER_ADMIN', 'HIRING_MANAGER', 'CHRO', 'DEPARTMENT_HEAD'),
   asyncHandler(async (req, res) => {
     const result = await fptkService.getSummaryByPosition(req.user);
     res.json({
@@ -155,7 +155,7 @@ router.get(
 router.get(
   '/position-options',
   authenticate,
-  authorize('TA_TEAM', 'HRBP', 'SUPER_ADMIN', 'HIRING_MANAGER', 'CHRO', 'DEPARTMENT_HEAD'),
+  authorize('TA_HO', 'HRBP', 'TA_SITE', 'SUPER_ADMIN', 'HIRING_MANAGER', 'CHRO', 'DEPARTMENT_HEAD'),
   validationRules.pagination,
   validate,
   asyncHandler(async (req, res) => {
@@ -190,7 +190,7 @@ router.get(
 router.get(
   '/counts-by-current-status',
   authenticate,
-  authorize('TA_TEAM', 'HRBP', 'SUPER_ADMIN', 'HIRING_MANAGER', 'CHRO', 'DEPARTMENT_HEAD'),
+  authorize('TA_HO', 'HRBP', 'TA_SITE', 'SUPER_ADMIN', 'HIRING_MANAGER', 'CHRO', 'DEPARTMENT_HEAD'),
   asyncHandler(async (req, res) => {
     const filters = {
       search: req.query.search,
@@ -263,7 +263,7 @@ router.get(
 router.put(
   '/:id',
   authenticate,
-  authorize('HIRING_MANAGER', 'TA_TEAM', 'SUPER_ADMIN'),
+  authorize('HIRING_MANAGER', 'TA_HO', 'SUPER_ADMIN'),
   validationRules.uuidParam('id'),
   validate,
   asyncHandler(async (req, res) => {
@@ -337,7 +337,7 @@ router.delete(
 router.post(
   '/:id/publish',
   authenticate,
-  authorize('TA_TEAM', 'SUPER_ADMIN'),
+  authorize('TA_HO', 'SUPER_ADMIN'),
   validationRules.uuidParam('id'),
   validate,
   asyncHandler(async (req, res) => {
@@ -359,7 +359,7 @@ router.post(
 router.post(
   '/:id/unpublish',
   authenticate,
-  authorize('TA_TEAM', 'SUPER_ADMIN'),
+  authorize('TA_HO', 'SUPER_ADMIN'),
   validationRules.uuidParam('id'),
   validate,
   asyncHandler(async (req, res) => {

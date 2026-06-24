@@ -251,8 +251,8 @@ async function getAllApplications(filters, pagination, user = null) {
         { fptk: { division: userDivision } },
         { candidate: { user: { division: userDivision } } }
       ];
-    } else if (userRole === 'HRBP') {
-      // HRBP: only see candidates where Position.PT = Team.PT AND Position.Area = Team.Area AND Position.Area Detail = Team.Area Detail
+    } else if (userRole === 'HRBP' || userRole === 'TA_SITE') {
+      // HRBP / TA_SITE: only see applications where Position.PT/Area/Area Detail matches user's assignment
       // All three fields must be present and match
       if (userPt && userArea && userAreaDetail) {
         where.fptk = {
@@ -261,11 +261,11 @@ async function getAllApplications(filters, pagination, user = null) {
           areaDetail: userAreaDetail,
         };
       } else {
-        // If any field is missing, return no results (HRBP must have all three fields)
+        // If any field is missing, return no results
         where.id = '00000000-0000-0000-0000-000000000000'; // Non-existent ID to return empty results
       }
     }
-    // SUPER_ADMIN, TA_TEAM, and other roles see all applications (no additional filtering)
+    // SUPER_ADMIN, TA_HO, and other roles see all applications (no additional filtering)
   }
 
   if (filters.status) {

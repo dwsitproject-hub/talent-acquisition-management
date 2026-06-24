@@ -27,7 +27,7 @@ function formatJoinDateUtc(joinDate) {
  */
 async function resolveEmailDispatch(recipients, payload) {
   if (!recipients.length) {
-    logger.warn('[onboardingReminder] No active TA_TEAM emails; marking email leg as satisfied to avoid retry loops');
+    logger.warn('[onboardingReminder] No active TA_HO emails; marking email leg as satisfied to avoid retry loops');
     return { emailSentAt: new Date() };
   }
   const result = await emailService.sendOnboardingJoinReminderToTaTeam(payload);

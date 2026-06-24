@@ -60,18 +60,18 @@ interface SidebarProps {
 
 function getDefaultNavRoles(href: string): string[] {
   const d: Record<string, string[]> = {
-    '/team': ['SUPER_ADMIN', 'TA_TEAM'],
+    '/team': ['SUPER_ADMIN', 'TA_HO'],
     '/candidates': [
-      'SUPER_ADMIN', 'Management', 'Head of Division', 'HRBP', 'TA_TEAM',
+      'SUPER_ADMIN', 'Management', 'Head of Division', 'HRBP', 'TA_HO', 'TA_SITE',
       'HIRING_MANAGER', 'INTERVIEWER',
     ],
     '/candidates/kiv': [
-      'SUPER_ADMIN', 'Management', 'Head of Division', 'HRBP', 'TA_TEAM',
+      'SUPER_ADMIN', 'Management', 'Head of Division', 'HRBP', 'TA_HO', 'TA_SITE',
       'HIRING_MANAGER', 'INTERVIEWER',
     ],
   }
   return d[href] || [
-    'SUPER_ADMIN', 'Management', 'Head of Division', 'HRBP', 'TA_TEAM',
+    'SUPER_ADMIN', 'Management', 'Head of Division', 'HRBP', 'TA_HO', 'TA_SITE',
     'HIRING_MANAGER', 'INTERVIEWER',
   ]
 }
@@ -219,7 +219,8 @@ function mapEnumToRole(role: string): string {
     'CHRO': 'Management',
     'DEPARTMENT_HEAD': 'Head of Division',
     'HRBP': 'HRBP',
-    'TA_TEAM': 'TA_TEAM',
+      'TA_SITE': 'TA_SITE',
+    'TA_HO': 'TA_HO',
     'HIRING_MANAGER': 'HIRING_MANAGER',
     'INTERVIEWER': 'INTERVIEWER',
     'CANDIDATE': 'CANDIDATE',
@@ -235,7 +236,7 @@ export default function Sidebar({
 }: SidebarProps) {
   const pathname = usePathname()
   const { user, isAuthenticated } = useAuth()
-  const backendRole = (user as any)?.role?.name || (user as any)?.role || 'TA_TEAM'
+  const backendRole = (user as any)?.role?.name || (user as any)?.role || 'TA_HO'
   const roleName = mapEnumToRole(backendRole)
 
   const [menuAccess, setMenuAccess] = useState<Record<string, any>>({})
@@ -282,10 +283,10 @@ export default function Sidebar({
 
   const filteredMasterNavigation = masterNavigation.filter(item => {
     const defaults: Record<string, string[]> = {
-      '/masters/division': ['SUPER_ADMIN', 'TA_TEAM'],
-      '/masters/office-location': ['SUPER_ADMIN', 'TA_TEAM'],
+      '/masters/division': ['SUPER_ADMIN', 'TA_HO'],
+      '/masters/office-location': ['SUPER_ADMIN', 'TA_HO'],
     }
-    const defaultRoles = defaults[item.href] || ['SUPER_ADMIN', 'TA_TEAM']
+    const defaultRoles = defaults[item.href] || ['SUPER_ADMIN', 'TA_HO']
     return isVisible(item.href, defaultRoles)
   })
 

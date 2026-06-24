@@ -12,7 +12,7 @@ const dashboardService = require('../services/dashboardService');
 router.get(
   '/stats',
   authenticate,
-  authorize('TA_TEAM', 'HRBP', 'SUPER_ADMIN', 'CHRO', 'DEPARTMENT_HEAD', 'HIRING_MANAGER'),
+  authorize('TA_HO', 'HRBP', 'TA_SITE', 'SUPER_ADMIN', 'CHRO', 'DEPARTMENT_HEAD', 'HIRING_MANAGER'),
   asyncHandler(async (req, res) => {
     const { priority, positionStatus, area, areaDetails, periodStart, periodEnd, previousStart, previousEnd } =
       req.query;
@@ -45,7 +45,7 @@ router.get(
 router.get(
   '/metrics',
   authenticate,
-  authorize('TA_TEAM', 'HRBP', 'SUPER_ADMIN', 'CHRO', 'DEPARTMENT_HEAD', 'HIRING_MANAGER'),
+  authorize('TA_HO', 'HRBP', 'TA_SITE', 'SUPER_ADMIN', 'CHRO', 'DEPARTMENT_HEAD', 'HIRING_MANAGER'),
   asyncHandler(async (req, res) => {
     const { priority, positionStatus, area, areaDetails, periodStart, periodEnd, previousStart, previousEnd } =
       req.query;

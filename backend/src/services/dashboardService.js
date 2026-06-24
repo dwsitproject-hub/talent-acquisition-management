@@ -211,8 +211,8 @@ async function getDashboardStats(user = null, options = {}) {
           { candidate: { user: { division: userDivision } } }
         ];
         candidateWhere.user = { division: userDivision };
-      } else if (userRole === 'HRBP') {
-        // HRBP: All three fields must be present and match
+      } else if (userRole === 'HRBP' || userRole === 'TA_SITE') {
+        // HRBP / TA_SITE: All three fields must be present and match
         if (userPt && userArea && userAreaDetail) {
           fptkWhere.pt = userPt;
           fptkWhere.area = userArea;
@@ -248,7 +248,7 @@ async function getDashboardStats(user = null, options = {}) {
 
       // Scope application counts to only those belonging to priority-matched FPTKs
       if (applicationWhere.fptk) {
-        // HIRING_MANAGER (fptk has OR) or HRBP (fptk has plain fields) — AND the priority in
+        // HIRING_MANAGER (fptk has OR) or HRBP/TA_SITE (fptk has plain fields) — AND the priority in
         applicationWhere.fptk = { AND: [applicationWhere.fptk, { priority: options.priority }] };
       } else {
         // Head of Division (top-level OR) or no role scope — add fptk.priority condition

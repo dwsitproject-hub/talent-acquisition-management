@@ -1,7 +1,7 @@
-# Troubleshooting 504 Gateway Timeout on tas.energi-up.com:8080
+# Troubleshooting 504 Gateway Timeout on tas.example.com:8080
 
 ## Problem
-Getting `504 Gateway Time-out` when accessing `tas.energi-up.com:8080`. Nginx is running but cannot reach the upstream services (`frontend:3000` and `candidate-portal:3000`).
+Getting `504 Gateway Time-out` when accessing `tas.example.com:8080`. Nginx is running but cannot reach the upstream services (`frontend:3000` and `candidate-portal:3000`).
 
 **Common Scenario**: This issue often occurs after containers have been running for a while (e.g., overnight). Containers may restart due to `restart: unless-stopped` policy, but lose their service name aliases in the process.
 
@@ -241,7 +241,7 @@ After applying fixes, verify the site works:
 curl -I http://localhost:8080
 
 # Test from external (if accessible)
-curl -I http://tas.energi-up.com:8080
+curl -I http://tas.example.com:8080
 ```
 
 Expected: Should return `200 OK` or `301/302` redirect, not `504 Gateway Time-out`.

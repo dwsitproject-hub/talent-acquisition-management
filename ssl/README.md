@@ -47,6 +47,6 @@ Most `.crt` files are already in PEM format, so you can just rename them.
 After SSL is configured:
 - HTTP (port 8080) will automatically redirect to HTTPS
 - HTTPS will be available on the port specified by `HTTPS_PORT` environment variable (default: 443)
-- Access via: `https://tas.energi-up.com:<HTTPS_PORT>/`
+- Access via: `https://tas.example.com:<HTTPS_PORT>/`
 
 

@@ -70,7 +70,7 @@ This document summarizes the updates needed for existing documentation files to 
    - Graceful error handling throughout
 
 4. **Production Database Architecture**
-   - Separate production user: `tasadmin`
+   - Separate production user: `your_db_user`
    - Production database: `tas_db`
    - Setup scripts for automated provisioning
 

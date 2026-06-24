@@ -5,9 +5,9 @@
 This guide helps your deployment team deploy the application to AWS using Docker images from Docker Hub.
 
 **Docker Hub Images:**
-- `jerrypratama/tas-backend:latest`
-- `jerrypratama/tas-frontend:latest`
-- `jerrypratama/tas-candidate-portal:latest`
+- `your-dockerhub-username/tas-backend:1.0.0`
+- `your-dockerhub-username/tas-frontend:1.0.0`
+- `your-dockerhub-username/tas-candidate-portal:1.0.0`
 
 ---
 
@@ -28,8 +28,8 @@ This guide helps your deployment team deploy the application to AWS using Docker
 2. Choose **PostgreSQL 15**
 3. Configure:
    - **DB instance identifier**: `tas-db-production`
-   - **Master username**: `tasadmin`
-   - **Master password**: `tasadminkpn@2025`
+   - **Master username**: `your_db_user`
+   - **Master password**: `your_secure_db_password`
    - **Database name**: `tas_db`
    - **Instance class**: `db.t3.medium` or larger
    - **Storage**: 50GB minimum with auto-scaling
@@ -44,7 +44,7 @@ This guide helps your deployment team deploy the application to AWS using Docker
 
 In your `.env` file, update:
 ```
-DATABASE_URL=postgresql://tasadmin:tasadminkpn@2025@<RDS-ENDPOINT>:5432/tas_db?schema=public&pool_timeout=0&connection_limit=20
+DATABASE_URL=postgresql://your_db_user:your_secure_db_password@<RDS-ENDPOINT>:5432/tas_db?schema=public&pool_timeout=0&connection_limit=20
 ```
 
 Replace `<RDS-ENDPOINT>` with your actual RDS endpoint.
@@ -64,7 +64,7 @@ Replace `<RDS-ENDPOINT>` with your actual RDS endpoint.
 
 3. **Clone repository** (or copy migration files):
    ```bash
-   git clone https://github.com/jerrypra0906/talent-acquisition-management.git
+   git clone https://github.com/your-github-org/talent-acquisition-management.git
    cd talent-acquisition-management/backend
    ```
 
@@ -75,7 +75,7 @@ Replace `<RDS-ENDPOINT>` with your actual RDS endpoint.
 
 5. **Set DATABASE_URL**:
    ```bash
-   export DATABASE_URL=postgresql://tasadmin:tasadminkpn@2025@<RDS-ENDPOINT>:5432/tas_db
+   export DATABASE_URL=postgresql://your_db_user:your_secure_db_password@<RDS-ENDPOINT>:5432/tas_db
    ```
 
 6. **Run migrations**:
@@ -88,14 +88,14 @@ Replace `<RDS-ENDPOINT>` with your actual RDS endpoint.
 
 1. **Pull backend image** (or use already pulled image):
    ```bash
-   docker pull jerrypratama/tas-backend:latest
+   docker pull your-dockerhub-username/tas-backend:1.0.0
    ```
 
 2. **Run migrations in container**:
    ```bash
    docker run --rm \
-     -e DATABASE_URL=postgresql://tasadmin:tasadminkpn@2025@<RDS-ENDPOINT>:5432/tas_db \
-     jerrypratama/tas-backend:latest \
+     -e DATABASE_URL=postgresql://your_db_user:your_secure_db_password@<RDS-ENDPOINT>:5432/tas_db \
+     your-dockerhub-username/tas-backend:1.0.0 \
      sh -c "npx prisma generate && npx prisma migrate deploy"
    ```
 
@@ -108,7 +108,11 @@ Replace `<RDS-ENDPOINT>` with your actual RDS endpoint.
 1. **On the same server from Step 2**, create the production user:
    ```bash
    cd talent-acquisition-management/backend
-   export DATABASE_URL=postgresql://tasadmin:tasadminkpn@2025@<RDS-ENDPOINT>:5432/tas_db
+   export DATABASE_URL=postgresql://your_db_user:your_secure_db_password@<RDS-ENDPOINT>:5432/tas_db
+   export ADMIN_EMAIL=admin@example.com
+   export ADMIN_PASSWORD=your-secure-admin-password
+   export ADMIN_FIRST_NAME=Admin
+   export ADMIN_LAST_NAME=User
    node scripts/createProductionUser.js
    ```
 
@@ -116,18 +120,18 @@ Replace `<RDS-ENDPOINT>` with your actual RDS endpoint.
 
 ```bash
 docker run --rm \
-  -e DATABASE_URL=postgresql://tasadmin:tasadminkpn@2025@<RDS-ENDPOINT>:5432/tas_db \
-  jerrypratama/tas-backend:latest \
+  -e DATABASE_URL=postgresql://your_db_user:your_secure_db_password@<RDS-ENDPOINT>:5432/tas_db \
+  -e ADMIN_EMAIL=admin@example.com \
+  -e ADMIN_PASSWORD=your-secure-admin-password \
+  your-dockerhub-username/tas-backend:1.0.0 \
   node scripts/createProductionUser.js
 ```
 
 **Expected Output:**
 ```
 ✅ Production user created successfully!
-📋 User Credentials:
-   Name: Jerry Hakim
-   Email: jerry.hakim@energi-up.com
-   Password: DefaultPassword123!
+📋 User summary:
+   Email: admin@example.com
    Role: SUPER_ADMIN
 ```
 
@@ -155,102 +159,19 @@ If running on same server, use docker-compose (see Step 5).
 
 ### Option A: Using Docker Compose (EC2)
 
-1. **Create `docker-compose.yml` on your EC2 server**:
+Use the repository's `docker-compose.production.yml` with a server-local `.env.production` file. See `ENV_SETUP_INSTRUCTIONS.md` for required variables.
 
-```yaml
-version: '3.8'
+```bash
+# On your EC2 server
+cp docker-compose.production.yml /opt/tas/
+nano .env.production   # set DATABASE_URL, JWT_SECRET, ENCRYPTION_KEY, etc. (never commit this file)
 
-services:
-  backend:
-    image: jerrypratama/tas-backend:latest
-    container_name: tas_backend
-    restart: unless-stopped
-    ports:
-      - "4000:4000"
-    environment:
-      # Copy all variables from .env.production file here
-      NODE_ENV: production
-      PORT: 4000
-      DATABASE_URL: postgresql://tasadmin:tasadminkpn@2025@<RDS-ENDPOINT>:5432/tas_db?schema=public&pool_timeout=0&connection_limit=20
-      REDIS_URL: redis://:${REDIS_PASSWORD}@redis:6379
-      REDIS_PASSWORD: ${REDIS_PASSWORD:-your-redis-password}
-      JWT_SECRET: 29385124500de9cdb28814fe98432399bc9aead16ab4301d1f52c372974705fe
-      JWT_REFRESH_SECRET: 9b038281cc9a904f8340f249d1155a7aedb22fea074308c988c5fad7110c1c17
-      ENCRYPTION_KEY: 537b7ba9c2f2442cffa6e86356433b52
-      JWT_EXPIRES_IN: 15m
-      JWT_REFRESH_EXPIRES_IN: 7d
-      FRONTEND_URL: https://admin.kpn-tas.gamasap.com
-      CANDIDATE_PORTAL_URL: https://careers.kpn-tas.gamasap.com
-      API_BASE_URL: https://api.kpn-tas.gamasap.com
-      CORS_ORIGIN: https://admin.kpn-tas.gamasap.com,https://careers.kpn-tas.gamasap.com
-      CORS_CREDENTIALS: "true"
-      RATE_LIMIT_WINDOW_MS: 900000
-      RATE_LIMIT_MAX_REQUESTS: 100
-      RATE_LIMIT_LOGIN_MAX: 200
-      ACCOUNT_LOCKOUT_THRESHOLD: 5
-      MAX_FILE_SIZE: 10485760
-      ALLOWED_FILE_TYPES: pdf,doc,docx,jpg,jpeg,png,xls,xlsx
-      UPLOAD_DIR: ./uploads
-      LOG_LEVEL: info
-    volumes:
-      - ./backend/uploads:/app/uploads
-      - ./backend/logs:/app/logs
-    depends_on:
-      - redis
-    networks:
-      - tas_network
-
-  frontend:
-    image: jerrypratama/tas-frontend:latest
-    container_name: tas_frontend
-    restart: unless-stopped
-    ports:
-      - "4001:3000"
-    networks:
-      - tas_network
-
-  candidate-portal:
-    image: jerrypratama/tas-candidate-portal:latest
-    container_name: tas_candidate_portal
-    restart: unless-stopped
-    ports:
-      - "4002:3000"
-    networks:
-      - tas_network
-
-  redis:
-    image: redis:7-alpine
-    container_name: tas_redis
-    restart: unless-stopped
-    command: redis-server --requirepass ${REDIS_PASSWORD:-your-redis-password}
-    volumes:
-      - redis_data:/data
-    networks:
-      - tas_network
-
-volumes:
-  redis_data:
-
-networks:
-  tas_network:
-    driver: bridge
+docker compose -f docker-compose.production.yml --env-file .env.production pull
+docker compose -f docker-compose.production.yml --env-file .env.production up -d
+docker compose -f docker-compose.production.yml logs -f backend
 ```
 
-2. **Create `.env` file** (for docker-compose variables):
-   ```bash
-   REDIS_PASSWORD=your-strong-redis-password-here
-   ```
-
-3. **Pull images and start containers**:
-   ```bash
-   docker-compose pull
-   docker-compose up -d
-   ```
-
-4. **Check logs**:
-   ```bash
-   docker-compose logs -f backend
-   ```
+**Image tags:** set `IMAGE_TAG=1.0.0` (or your release version) in `.env.production`. Avoid `:latest` in production.
 
 ### Option B: Using ECS (Recommended for Production)
 
@@ -264,19 +185,20 @@ networks:
   "family": "tas-backend",
   "containerDefinitions": [{
     "name": "tas-backend",
-    "image": "jerrypratama/tas-backend:latest",
+    "image": "your-dockerhub-username/tas-backend:1.0.0",
     "portMappings": [{
       "containerPort": 4000,
       "protocol": "tcp"
     }],
     "environment": [
       {"name": "NODE_ENV", "value": "production"},
-      {"name": "PORT", "value": "4000"},
-      {"name": "DATABASE_URL", "value": "postgresql://tasadmin:tasadminkpn@2025@<RDS-ENDPOINT>:5432/tas_db?schema=public"},
-      {"name": "JWT_SECRET", "value": "29385124500de9cdb28814fe98432399bc9aead16ab4301d1f52c372974705fe"},
-      {"name": "JWT_REFRESH_SECRET", "value": "9b038281cc9a904f8340f249d1155a7aedb22fea074308c988c5fad7110c1c17"},
-      {"name": "ENCRYPTION_KEY", "value": "537b7ba9c2f2442cffa6e86356433b52"},
-      // ... add all other variables
+      {"name": "PORT", "value": "4000"}
+    ],
+    "secrets": [
+      {"name": "DATABASE_URL", "valueFrom": "arn:aws:secretsmanager:region:account:secret:tas/database-url"},
+      {"name": "JWT_SECRET", "valueFrom": "arn:aws:secretsmanager:region:account:secret:tas/jwt-secret"},
+      {"name": "JWT_REFRESH_SECRET", "valueFrom": "arn:aws:secretsmanager:region:account:secret:tas/jwt-refresh-secret"},
+      {"name": "ENCRYPTION_KEY", "valueFrom": "arn:aws:secretsmanager:region:account:secret:tas/encryption-key"}
     ],
     "logConfiguration": {
       "logDriver": "awslogs",
@@ -319,8 +241,8 @@ Open in browser: `http://<your-server-ip>:4001`
 
 1. Go to login page
 2. Use credentials:
-   - **Email**: `jerry.hakim@energi-up.com`
-   - **Password**: `DefaultPassword123!`
+   - **Email**: `admin@example.com`
+   - **Password**: `your-secure-admin-password`
 3. **IMPORTANT**: Change password immediately after first login!
 
 ---
@@ -354,9 +276,15 @@ Open in browser: `http://<your-server-ip>:4001`
 - `JWT_REFRESH_SECRET` - 64-character hex string
 - `ENCRYPTION_KEY` - Exactly 32-character hex string
 
-**Important**: The `ENCRYPTION_KEY` must be **exactly 32 characters**. The value provided in `.env.production` is:
+**Important**: The `ENCRYPTION_KEY` must be **exactly 32 characters**. Generate one on the server:
+
+```bash
+openssl rand -hex 16
 ```
-ENCRYPTION_KEY=537b7ba9c2f2442cffa6e86356433b52
+
+Example format (replace with your own generated value):
+```
+ENCRYPTION_KEY=0123456789abcdef0123456789abcdef
 ```
 
 ---
@@ -365,9 +293,10 @@ ENCRYPTION_KEY=537b7ba9c2f2442cffa6e86356433b52
 
 ### Error: "ENCRYPTION_KEY must be exactly 32 characters long"
 
-**Solution**: Ensure `ENCRYPTION_KEY` is exactly 32 characters. Use:
-```
-ENCRYPTION_KEY=537b7ba9c2f2442cffa6e86356433b52
+**Solution**: Ensure `ENCRYPTION_KEY` is exactly 32 characters. Generate a new value:
+
+```bash
+openssl rand -hex 16
 ```
 
 ### Error: ".env file not found"
@@ -382,8 +311,8 @@ ENCRYPTION_KEY=537b7ba9c2f2442cffa6e86356433b52
 **Solution**:
 1. Verify RDS endpoint is correct
 2. Check security group allows port 5432 from your application servers
-3. Verify credentials: `tasadmin` / `tasadminkpn@2025`
-4. Test connection: `psql -h <endpoint> -U tasadmin -d tas_db`
+3. Verify credentials: `your_db_user` / `your_secure_db_password`
+4. Test connection: `psql -h <endpoint> -U your_db_user -d tas_db`
 
 ### Error: "Cannot connect to Redis"
 

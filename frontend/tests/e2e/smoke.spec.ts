@@ -9,7 +9,7 @@ test.beforeEach(async ({ page }) => {
     await route.fulfill({
       status: 200,
       contentType: 'application/json',
-      body: JSON.stringify({ success: true, data: { user: { id: 'u-1', firstName: 'Test', lastName: 'User', email: 'test@example.com', role: 'TA_TEAM' } } }),
+      body: JSON.stringify({ success: true, data: { user: { id: 'u-1', firstName: 'Test', lastName: 'User', email: 'test@example.com', role: 'TA_HO' } } }),
     })
   })
   await page.goto('/')

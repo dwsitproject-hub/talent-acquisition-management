@@ -139,7 +139,9 @@ function mapRoleToEnum(role) {
     'Head of Division': 'DEPARTMENT_HEAD',
     DEPARTMENT_HEAD: 'DEPARTMENT_HEAD',
     HRBP: 'HRBP',
-    TA_TEAM: 'TA_TEAM',
+    TA_SITE: 'TA_SITE',
+    'TA Site': 'TA_SITE',
+    TA_HO: 'TA_HO',
     HIRING_MANAGER: 'HIRING_MANAGER',
     INTERVIEWER: 'INTERVIEWER',
     CANDIDATE: 'CANDIDATE',
@@ -195,7 +197,10 @@ async function validateOfficeLocation({ pt, area, areaDetail }) {
 
 async function importAdminUsers(rows) {
   const result = { total: rows.length, created: 0, failed: 0, errors: [] };
-  const defaultPassword = process.env.BULK_DEFAULT_PASSWORD || 'DefaultPassword123!';
+  const defaultPassword = process.env.BULK_DEFAULT_PASSWORD;
+  if (!defaultPassword) {
+    throw new Error('BULK_DEFAULT_PASSWORD environment variable is required for bulk admin import');
+  }
 
   for (let i = 0; i < rows.length; i += 1) {
     const rowNum = i + 2;
@@ -235,7 +240,7 @@ async function importAdminUsers(rows) {
     }
 
     const mappedRole = mapRoleToEnum(roleRaw);
-    const allowedRoles = ['SUPER_ADMIN', 'CHRO', 'DEPARTMENT_HEAD', 'HRBP', 'TA_TEAM', 'HIRING_MANAGER', 'INTERVIEWER'];
+    const allowedRoles = ['SUPER_ADMIN', 'CHRO', 'DEPARTMENT_HEAD', 'HRBP', 'TA_SITE', 'TA_HO', 'HIRING_MANAGER', 'INTERVIEWER'];
     if (!allowedRoles.includes(mappedRole)) {
       result.failed += 1;
       const msg = mappedRole === 'CANDIDATE' ? 'Role CANDIDATE is not allowed for User Management upload' : `Invalid Role "${roleRaw}"`
@@ -243,11 +248,11 @@ async function importAdminUsers(rows) {
       continue;
     }
 
-    // For HRBP role, PT/Area/Area Detail are required and must exist.
-    if (mappedRole === 'HRBP') {
+    // For HRBP and TA_SITE roles, PT/Area/Area Detail are required and must exist.
+    if (mappedRole === 'HRBP' || mappedRole === 'TA_SITE') {
       if (!pt || !area || !areaDetail) {
         result.failed += 1;
-        result.errors.push({ row: rowNum, email, message: 'HRBP requires PT, Area, and Area Detail' });
+        result.errors.push({ row: rowNum, email, message: `${mappedRole} requires PT, Area, and Area Detail` });
         continue;
       }
     }

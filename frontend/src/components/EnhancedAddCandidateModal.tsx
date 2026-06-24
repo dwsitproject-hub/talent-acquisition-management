@@ -42,6 +42,8 @@ function createInitialFormData() {
     phone: '',
     email: '',
     yearsOfExperience: '',
+    source: '',
+    sourceDetail: '',
     skills: [] as string[],
     division: [] as string[],
     positionAppliedFor: [] as string[],
@@ -791,6 +793,98 @@ export default function EnhancedAddCandidateModal({ isOpen, onClose, onSave }: E
                       }}
                     />
                   </div>
+                  <div>
+                    <label style={{ display: 'block', fontSize: '14px', fontWeight: '500', color: '#374151', marginBottom: '4px' }}>
+                      Years of Experience
+                    </label>
+                    <input
+                      type="number"
+                      value={formData.yearsOfExperience}
+                      onChange={(e) => handleInputChange('yearsOfExperience', e.target.value)}
+                      min="0"
+                      placeholder="e.g., 3"
+                      style={{
+                        width: '100%',
+                        padding: '8px 12px',
+                        border: '1px solid #D1D5DB',
+                        borderRadius: '6px',
+                        fontSize: '14px',
+                        outline: 'none'
+                      }}
+                    />
+                  </div>
+                  <div>
+                    <label style={{ display: 'block', fontSize: '14px', fontWeight: '500', color: '#374151', marginBottom: '4px' }}>
+                      Source
+                    </label>
+                    <select
+                      value={formData.source}
+                      onChange={(e) => {
+                        handleInputChange('source', e.target.value)
+                        handleInputChange('sourceDetail', '')
+                      }}
+                      style={{
+                        width: '100%',
+                        padding: '8px 12px',
+                        border: '1px solid #D1D5DB',
+                        borderRadius: '6px',
+                        fontSize: '14px',
+                        outline: 'none',
+                        backgroundColor: 'white'
+                      }}
+                    >
+                      <option value="">Select Source</option>
+                      <option value="LinkedIn">LinkedIn</option>
+                      <option value="Indeed">Indeed</option>
+                      <option value="Jobstreet">Jobstreet</option>
+                      <option value="Job Fair">Job Fair</option>
+                      <option value="Local Site">Local Site</option>
+                      <option value="Referral">Referral</option>
+                      <option value="Others">Others</option>
+                    </select>
+                  </div>
+                  {formData.source === 'Referral' && (
+                    <div>
+                      <label style={{ display: 'block', fontSize: '14px', fontWeight: '500', color: '#374151', marginBottom: '4px' }}>
+                        By Who
+                      </label>
+                      <input
+                        type="text"
+                        value={formData.sourceDetail}
+                        onChange={(e) => handleInputChange('sourceDetail', e.target.value)}
+                        placeholder="Enter referral name"
+                        style={{
+                          width: '100%',
+                          padding: '8px 12px',
+                          border: '1px solid #D1D5DB',
+                          borderRadius: '6px',
+                          fontSize: '14px',
+                          outline: 'none'
+                        }}
+                      />
+                    </div>
+                  )}
+                  {formData.source === 'Others' && (
+                    <div>
+                      <label style={{ display: 'block', fontSize: '14px', fontWeight: '500', color: '#374151', marginBottom: '4px' }}>
+                        Please specify
+                      </label>
+                      <input
+                        type="text"
+                        value={formData.sourceDetail}
+                        onChange={(e) => handleInputChange('sourceDetail', e.target.value)}
+                        placeholder="Enter source details"
+                        style={{
+                          width: '100%',
+                          padding: '8px 12px',
+                          border: '1px solid #D1D5DB',
+                          borderRadius: '6px',
+                          fontSize: '14px',
+                          outline: 'none'
+                        }}
+                      />
+                    </div>
+                  )}
                 </div>
               )}
 

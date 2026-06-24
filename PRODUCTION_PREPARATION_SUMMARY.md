@@ -17,8 +17,8 @@ This document summarizes the production preparation activities completed for the
 - **Status**: ✅ Completed
 - **Script**: `backend/scripts/setupProductionDB.js`
 - **Credentials**:
-  - Username: `tasadmin`
-  - Password: `tasadminkpn@2025`
+  - Username: `your_db_user`
+  - Password: `your_secure_db_password`
   - Database: `tas_db`
 
 ### 3. Production User Creation
@@ -26,8 +26,8 @@ This document summarizes the production preparation activities completed for the
 - **Script**: `backend/scripts/createProductionUser.js`
 - **User Details**:
   - Name: Jerry Hakim
-  - Email: jerry.hakim@energi-up.com
-  - Password: DefaultPassword123!
+  - Email: admin@example.com
+  - Password: your-secure-admin-password
   - Role: SUPER_ADMIN
 
 ### 4. Production Setup Guide

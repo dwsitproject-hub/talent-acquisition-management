@@ -56,7 +56,7 @@ describe('Security Test Suite - Penetration Testing', () => {
         password: hashedPassword,
         firstName: 'TA',
         lastName: 'User',
-        role: 'TA_TEAM',
+        role: 'TA_HO',
         isActive: true,
       },
     });

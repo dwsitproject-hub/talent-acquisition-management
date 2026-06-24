@@ -7,6 +7,7 @@ import { useRouter } from 'next/navigation'
 import Layout from '@/components/Layout/Layout'
 import { PlusIcon, MagnifyingGlassIcon, UserGroupIcon, EnvelopeIcon, PhoneIcon, BriefcaseIcon, EyeIcon, EyeSlashIcon } from '@heroicons/react/24/outline'
 import { AdminUsersAPI, MasterDivisionAPI, MasterOfficeLocationAPI, MenuAccessAPI } from '@/lib/api'
+import MultiSelectDropdown from '@/components/MultiSelectDropdown'
 
 interface TeamMember {
   id: string
@@ -47,9 +48,11 @@ const [newMember, setNewMember] = useState({
     email: '',
     phone: '',
     password: '',
-    role: 'TA_TEAM',
+    role: 'TA_HO',
     division: '',
     sectionName: '',
+    hodDivisions: [] as string[],
+    hodSections: [] as string[],
     pt: '',
     area: '',
     areaDetail: ''
@@ -62,6 +65,8 @@ const [newMember, setNewMember] = useState({
     role: '',
     division: '',
     sectionName: '',
+    hodDivisions: [] as string[],
+    hodSections: [] as string[],
     pt: '',
     area: '',
     areaDetail: '',
@@ -70,7 +75,7 @@ const [newMember, setNewMember] = useState({
   const [divisions, setDivisions] = useState<{ id: string, divisionName: string, sectionName: string }[]>([])
   const [officeLocations, setOfficeLocations] = useState<any[]>([])
   // Menu Access Management (SUPER_ADMIN only)
-const ROLE_OPTIONS = ['SUPER_ADMIN','Management','Head of Division','HRBP','TA_TEAM','HIRING_MANAGER'] as const
+const ROLE_OPTIONS = ['SUPER_ADMIN','Management','Head of Division','HRBP','TA_HO','TA_SITE','HIRING_MANAGER'] as const
 const allRoles = [...ROLE_OPTIONS]
 
 type MenuAccessConfig = {
@@ -99,7 +104,7 @@ const routes: Array<{
     label: 'Open Position',
     defaults: {
       visibleRoles: allRoles,
-      permissions: { create: ['SUPER_ADMIN','TA_TEAM','HIRING_MANAGER'], edit: ['SUPER_ADMIN','TA_TEAM','HIRING_MANAGER'] },
+      permissions: { create: ['SUPER_ADMIN','TA_HO','HIRING_MANAGER'], edit: ['SUPER_ADMIN','TA_HO','HIRING_MANAGER'] },
     },
   },
   {
@@ -122,24 +127,24 @@ const routes: Array<{
     path: '/team',
     label: 'User Management',
     defaults: {
-      visibleRoles: ['SUPER_ADMIN','TA_TEAM'],
-      permissions: { create: ['SUPER_ADMIN','TA_TEAM'], edit: ['SUPER_ADMIN','TA_TEAM'] },
+      visibleRoles: ['SUPER_ADMIN','TA_HO'],
+      permissions: { create: ['SUPER_ADMIN','TA_HO'], edit: ['SUPER_ADMIN','TA_HO'] },
     },
   },
   {
     path: '/masters/division',
     label: 'Master Division',
     defaults: {
-      visibleRoles: ['SUPER_ADMIN','Management','Head of Division','HRBP','TA_TEAM'],
-      permissions: { create: ['SUPER_ADMIN','TA_TEAM'], edit: ['SUPER_ADMIN','TA_TEAM'] },
+      visibleRoles: ['SUPER_ADMIN','Management','Head of Division','HRBP','TA_HO','TA_SITE'],
+      permissions: { create: ['SUPER_ADMIN','TA_HO'], edit: ['SUPER_ADMIN','TA_HO'] },
     },
   },
   {
     path: '/masters/office-location',
     label: 'Master Office Location',
     defaults: {
-      visibleRoles: ['SUPER_ADMIN','Management','Head of Division','HRBP','TA_TEAM'],
-      permissions: { create: ['SUPER_ADMIN','TA_TEAM'], edit: ['SUPER_ADMIN','TA_TEAM'] },
+      visibleRoles: ['SUPER_ADMIN','Management','Head of Division','HRBP','TA_HO','TA_SITE'],
+      permissions: { create: ['SUPER_ADMIN','TA_HO'], edit: ['SUPER_ADMIN','TA_HO'] },
     },
   },
   {
@@ -278,6 +283,30 @@ const handleSaveMenuAccess = async () => {
     return Array.from(set)
   }, [editMember.pt, editMember.area, officeLocations])
 
+  const uniqueDivisionOptions = useMemo(() => [...new Set(divisions.map(d => d.divisionName))], [divisions])
+
+  const newHodSectionOptions = useMemo(() => {
+    if (newMember.hodDivisions.length === 0) return []
+    const set = new Set<string>()
+    divisions.forEach((d) => {
+      if (newMember.hodDivisions.includes(d.divisionName) && d.sectionName) {
+        set.add(d.sectionName)
+      }
+    })
+    return Array.from(set)
+  }, [newMember.hodDivisions, divisions])
+
+  const editHodSectionOptions = useMemo(() => {
+    if (editMember.hodDivisions.length === 0) return []
+    const set = new Set<string>()
+    divisions.forEach((d) => {
+      if (editMember.hodDivisions.includes(d.divisionName) && d.sectionName) {
+        set.add(d.sectionName)
+      }
+    })
+    return Array.from(set)
+  }, [editMember.hodDivisions, divisions])
+
   useEffect(() => {
     if (!isLoading && !isAuthenticated) {
       router.push('/login')
@@ -394,7 +423,7 @@ const handleSaveMenuAccess = async () => {
   }
 
   // Extract role name - handle both string and object formats
-  let roleName = 'TA_TEAM'
+  let roleName = 'TA_HO'
   if (user) {
     if (typeof user.role === 'string') {
       roleName = user.role
@@ -413,19 +442,19 @@ const handleSaveMenuAccess = async () => {
   const editRoles: string[] = permissions.edit || []
   
   // Check if user can view (based on visible roles or default)
-  const canViewTeam = visibleRoles.includes(roleName) || ['SUPER_ADMIN','TA_TEAM'].includes(roleName)
+  const canViewTeam = visibleRoles.includes(roleName) || ['SUPER_ADMIN','TA_HO'].includes(roleName)
   
   // Check if user can edit (based on edit roles from menu access, or default permission)
   // If menu access has edit roles configured, use those. Otherwise, fall back to default.
   const hasEditRolesConfigured = editRoles.length > 0
   const canEditFromMenuAccess = hasEditRolesConfigured && editRoles.includes(roleName)
-  const canEditFromDefault = ['SUPER_ADMIN','TA_TEAM'].includes(roleName)
+  const canEditFromDefault = ['SUPER_ADMIN','TA_HO'].includes(roleName)
   const canEditTeam = canEditFromMenuAccess || (!hasEditRolesConfigured && canEditFromDefault)
   
   // Check if user can create (based on create roles from menu access, or default permission)
   const hasCreateRolesConfigured = createRoles.length > 0
   const canCreateFromMenuAccess = hasCreateRolesConfigured && createRoles.includes(roleName)
-  const canCreateFromDefault = ['SUPER_ADMIN','TA_TEAM'].includes(roleName)
+  const canCreateFromDefault = ['SUPER_ADMIN','TA_HO'].includes(roleName)
   const canCreateTeam = canCreateFromMenuAccess || (!hasCreateRolesConfigured && canCreateFromDefault)
   
   const canManageMenu = roleName === 'SUPER_ADMIN'
@@ -447,8 +476,10 @@ const handleSaveMenuAccess = async () => {
         return 'bg-blue-100 text-blue-800'
       case 'HRBP':
         return 'bg-green-100 text-green-800'
-      case 'TA_TEAM':
+      case 'TA_HO':
         return 'bg-indigo-100 text-indigo-800'
+      case 'TA_SITE':
+        return 'bg-cyan-100 text-cyan-800'
       case 'HIRING_MANAGER':
         return 'bg-yellow-100 text-yellow-800'
       case 'INTERVIEWER':
@@ -480,15 +511,15 @@ const handleSaveMenuAccess = async () => {
     } else if (!isEdit && 'password' in member && member.password && member.password.trim().length < 6) {
       errors.password = 'Password must be at least 6 characters'
     }
-    if (member.role === 'HRBP') {
+    if (member.role === 'HRBP' || member.role === 'TA_SITE') {
       if (!member.pt?.trim()) {
-        errors.pt = 'PT is required for HRBP role'
+        errors.pt = `PT is required for ${member.role} role`
       }
       if (!member.area?.trim()) {
-        errors.area = 'Area is required for HRBP role'
+        errors.area = `Area is required for ${member.role} role`
       }
       if (!member.areaDetail?.trim()) {
-        errors.areaDetail = 'Area Detail is required for HRBP role'
+        errors.areaDetail = `Area Detail is required for ${member.role} role`
       }
     }
     return errors
@@ -496,14 +527,17 @@ const handleSaveMenuAccess = async () => {
 
   const handleEditClick = (member: TeamMember) => {
     setEditingMember(member)
+    const isHoD = member.role === 'Head of Division'
     setEditMember({
       firstName: member.firstName,
       lastName: member.lastName,
       email: member.email,
       phone: member.phone || '',
       role: member.role,
-      division: member.division,
-      sectionName: member.sectionName || '',
+      division: isHoD ? '' : (member.division || ''),
+      sectionName: isHoD ? '' : (member.sectionName || ''),
+      hodDivisions: isHoD ? (member.division ? member.division.split('||').filter(Boolean) : []) : [],
+      hodSections: isHoD ? (member.sectionName ? member.sectionName.split('||').filter(Boolean) : []) : [],
       pt: member.pt || '',
       area: member.area || '',
       areaDetail: member.areaDetail || '',
@@ -530,14 +564,15 @@ const handleSaveMenuAccess = async () => {
     setValidationErrors({})
     
     try {
+      const isNewHoD = newMember.role === 'Head of Division'
       const created = await AdminUsersAPI.create({
         firstName: newMember.firstName.trim(),
         lastName: newMember.lastName.trim(),
         email: newMember.email.trim(),
         phone: newMember.phone.trim() || undefined,
         role: newMember.role,
-        division: newMember.division || '',
-        sectionName: newMember.sectionName || '',
+        division: isNewHoD ? newMember.hodDivisions.join('||') : (newMember.division || ''),
+        sectionName: isNewHoD ? newMember.hodSections.join('||') : (newMember.sectionName || ''),
         password: newMember.password || defaultPassword,
         pt: newMember.pt || '',
         area: newMember.area || '',
@@ -546,7 +581,7 @@ const handleSaveMenuAccess = async () => {
       // Reload team members to get fresh data
       await loadTeamMembers()
       setIsAddOpen(false)
-      setNewMember({ firstName: '', lastName: '', email: '', phone: '', password: '', role: 'TA_TEAM', division: '', sectionName: '', pt: '', area: '', areaDetail: '' })
+      setNewMember({ firstName: '', lastName: '', email: '', phone: '', password: '', role: 'TA_HO', division: '', sectionName: '', hodDivisions: [], hodSections: [], pt: '', area: '', areaDetail: '' })
       setValidationErrors({})
       setShowPassword(false)
       alert('Team member created successfully!')
@@ -569,14 +604,15 @@ const handleSaveMenuAccess = async () => {
     setValidationErrors({})
     
     try {
+      const isEditHoD = editMember.role === 'Head of Division'
       const updated = await AdminUsersAPI.update(editingMember.id, {
         firstName: editMember.firstName.trim(),
         lastName: editMember.lastName.trim(),
         email: editMember.email.trim(),
         phone: editMember.phone.trim() || undefined,
         role: editMember.role,
-        division: editMember.division || '',
-        sectionName: editMember.sectionName || '',
+        division: isEditHoD ? editMember.hodDivisions.join('||') : (editMember.division || ''),
+        sectionName: isEditHoD ? editMember.hodSections.join('||') : (editMember.sectionName || ''),
         pt: editMember.pt || '',
         area: editMember.area || '',
         areaDetail: editMember.areaDetail || '',
@@ -1000,7 +1036,7 @@ const handleSaveMenuAccess = async () => {
             setIsAddOpen(false)
             setValidationErrors({})
             setShowPassword(false)
-            setNewMember({ firstName: '', lastName: '', email: '', phone: '', password: '', role: 'TA_TEAM', division: '', sectionName: '', pt: '', area: '', areaDetail: '' })
+            setNewMember({ firstName: '', lastName: '', email: '', phone: '', password: '', role: 'TA_HO', division: '', sectionName: '', hodDivisions: [], hodSections: [], pt: '', area: '', areaDetail: '' })
           }}>
             <div className="bg-white rounded-lg shadow-xl w-full max-w-lg mx-4" onClick={(e) => e.stopPropagation()}>
               <div className="px-6 py-4 border-b flex justify-between items-center">
@@ -1009,7 +1045,7 @@ const handleSaveMenuAccess = async () => {
                   setIsAddOpen(false)
                   setValidationErrors({})
                   setShowPassword(false)
-                  setNewMember({ firstName: '', lastName: '', email: '', phone: '', password: '', role: 'TA_TEAM', division: '', sectionName: '', pt: '', area: '', areaDetail: '' })
+                  setNewMember({ firstName: '', lastName: '', email: '', phone: '', password: '', role: 'TA_HO', division: '', sectionName: '', hodDivisions: [], hodSections: [], pt: '', area: '', areaDetail: '' })
                 }}>✕</button>
               </div>
               <div className="px-6 py-4 space-y-3">
@@ -1127,7 +1163,18 @@ const handleSaveMenuAccess = async () => {
                   </div>
                   <div>
                     <label className="block text-sm text-gray-700 mb-1">Role</label>
-                    <select className="w-full border rounded-md px-3 py-2 text-sm" value={newMember.role} onChange={(e) => setNewMember({ ...newMember, role: e.target.value })}>
+                    <select
+                      className="w-full border rounded-md px-3 py-2 text-sm"
+                      value={newMember.role}
+                      onChange={(e) => {
+                        const newRole = e.target.value
+                        if (newRole === 'Head of Division') {
+                          setNewMember({ ...newMember, role: newRole, division: '', sectionName: '', hodDivisions: [], hodSections: [] })
+                        } else {
+                          setNewMember({ ...newMember, role: newRole, hodDivisions: [], hodSections: [] })
+                        }
+                      }}
+                    >
                       {ROLE_OPTIONS.map(role => (
                         <option key={role} value={role}>
                           {role.replace('_', ' ')}
@@ -1136,12 +1183,38 @@ const handleSaveMenuAccess = async () => {
                     </select>
                   </div>
                 </div>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                {newMember.role === 'Head of Division' ? (
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <MultiSelectDropdown
+                      label="Division"
+                      options={uniqueDivisionOptions}
+                      value={newMember.hodDivisions}
+                      onChange={(vals) => {
+                        const removed = newMember.hodDivisions.filter(d => !vals.includes(d))
+                        const sectionsToKeep = newMember.hodSections.filter(sec =>
+                          divisions.some(d => vals.includes(d.divisionName) && d.sectionName === sec)
+                        )
+                        setNewMember({ ...newMember, hodDivisions: vals, hodSections: removed.length ? sectionsToKeep : newMember.hodSections })
+                      }}
+                      placeholder="Select Divisions"
+                      searchPlaceholder="Search divisions..."
+                    />
+                    <MultiSelectDropdown
+                      label="Section Name"
+                      options={newHodSectionOptions}
+                      value={newMember.hodSections}
+                      onChange={(vals) => setNewMember({ ...newMember, hodSections: vals })}
+                      placeholder={newMember.hodDivisions.length === 0 ? 'Select Division first' : 'Select Sections'}
+                      searchPlaceholder="Search sections..."
+                    />
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <div>
                     <label className="block text-sm text-gray-700 mb-1">Division</label>
                     <select className="w-full border rounded-md px-3 py-2 text-sm" value={newMember.division} onChange={(e) => setNewMember({ ...newMember, division: e.target.value, sectionName: '' })}>
                       <option value="">Select Division</option>
-                      {[...new Set(divisions.map(d => d.divisionName))].map((div) => (
+                      {uniqueDivisionOptions.map((div) => (
                         <option key={div} value={div}>{div}</option>
                       ))}
                     </select>
@@ -1156,10 +1229,11 @@ const handleSaveMenuAccess = async () => {
                     </select>
                   </div>
                 </div>
+                )}
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                   <div>
                     <label className="block text-sm text-gray-700 mb-1">
-                      PT {newMember.role === 'HRBP' && <span className="text-red-500">*</span>}
+                      PT {(newMember.role === 'HRBP' || newMember.role === 'TA_SITE') && <span className="text-red-500">*</span>}
                     </label>
                     <select
                       className={`w-full border rounded-md px-3 py-2 text-sm ${validationErrors.pt ? 'border-red-500' : ''}`}
@@ -1184,7 +1258,7 @@ const handleSaveMenuAccess = async () => {
                   </div>
                   <div>
                     <label className="block text-sm text-gray-700 mb-1">
-                      Area {newMember.role === 'HRBP' && <span className="text-red-500">*</span>}
+                      Area {(newMember.role === 'HRBP' || newMember.role === 'TA_SITE') && <span className="text-red-500">*</span>}
                     </label>
                     <select
                       className={`w-full border rounded-md px-3 py-2 text-sm ${validationErrors.area ? 'border-red-500' : ''}`}
@@ -1210,7 +1284,7 @@ const handleSaveMenuAccess = async () => {
                   </div>
                   <div>
                     <label className="block text-sm text-gray-700 mb-1">
-                      Area Detail {newMember.role === 'HRBP' && <span className="text-red-500">*</span>}
+                      Area Detail {(newMember.role === 'HRBP' || newMember.role === 'TA_SITE') && <span className="text-red-500">*</span>}
                     </label>
                     <select
                       className={`w-full border rounded-md px-3 py-2 text-sm ${validationErrors.areaDetail ? 'border-red-500' : ''}`}
@@ -1243,7 +1317,7 @@ const handleSaveMenuAccess = async () => {
                     setIsAddOpen(false)
                     setValidationErrors({})
                     setShowPassword(false)
-                    setNewMember({ firstName: '', lastName: '', email: '', phone: '', password: '', role: 'TA_TEAM', division: '', sectionName: '', pt: '', area: '', areaDetail: '' })
+                    setNewMember({ firstName: '', lastName: '', email: '', phone: '', password: '', role: 'TA_HO', division: '', sectionName: '', hodDivisions: [], hodSections: [], pt: '', area: '', areaDetail: '' })
                   }}
                 >
                   Cancel
@@ -1332,7 +1406,18 @@ const handleSaveMenuAccess = async () => {
                   </div>
                   <div>
                     <label className="block text-sm text-gray-700 mb-1">Role</label>
-                    <select className="w-full border rounded-md px-3 py-2 text-sm" value={editMember.role} onChange={(e) => setEditMember({ ...editMember, role: e.target.value })}>
+                    <select
+                      className="w-full border rounded-md px-3 py-2 text-sm"
+                      value={editMember.role}
+                      onChange={(e) => {
+                        const newRole = e.target.value
+                        if (newRole === 'Head of Division') {
+                          setEditMember({ ...editMember, role: newRole, division: '', sectionName: '', hodDivisions: [], hodSections: [] })
+                        } else {
+                          setEditMember({ ...editMember, role: newRole, hodDivisions: [], hodSections: [] })
+                        }
+                      }}
+                    >
                       {ROLE_OPTIONS.map(role => (
                         <option key={role} value={role}>
                           {role.replace('_', ' ')}
@@ -1341,12 +1426,37 @@ const handleSaveMenuAccess = async () => {
                     </select>
                   </div>
                 </div>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                {editMember.role === 'Head of Division' ? (
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <MultiSelectDropdown
+                      label="Division"
+                      options={uniqueDivisionOptions}
+                      value={editMember.hodDivisions}
+                      onChange={(vals) => {
+                        const sectionsToKeep = editMember.hodSections.filter(sec =>
+                          divisions.some(d => vals.includes(d.divisionName) && d.sectionName === sec)
+                        )
+                        setEditMember({ ...editMember, hodDivisions: vals, hodSections: sectionsToKeep })
+                      }}
+                      placeholder="Select Divisions"
+                      searchPlaceholder="Search divisions..."
+                    />
+                    <MultiSelectDropdown
+                      label="Section Name"
+                      options={editHodSectionOptions}
+                      value={editMember.hodSections}
+                      onChange={(vals) => setEditMember({ ...editMember, hodSections: vals })}
+                      placeholder={editMember.hodDivisions.length === 0 ? 'Select Division first' : 'Select Sections'}
+                      searchPlaceholder="Search sections..."
+                    />
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <div>
                     <label className="block text-sm text-gray-700 mb-1">Division</label>
                     <select className="w-full border rounded-md px-3 py-2 text-sm" value={editMember.division} onChange={(e) => setEditMember({ ...editMember, division: e.target.value, sectionName: '' })}>
                       <option value="">Select Division</option>
-                      {[...new Set(divisions.map(d => d.divisionName))].map((div) => (
+                      {uniqueDivisionOptions.map((div) => (
                         <option key={div} value={div}>{div}</option>
                       ))}
                     </select>
@@ -1361,10 +1471,11 @@ const handleSaveMenuAccess = async () => {
                     </select>
                   </div>
                 </div>
+                )}
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                   <div>
                     <label className="block text-sm text-gray-700 mb-1">
-                      PT {editMember.role === 'HRBP' && <span className="text-red-500">*</span>}
+                      PT {(editMember.role === 'HRBP' || editMember.role === 'TA_SITE') && <span className="text-red-500">*</span>}
                     </label>
                     <select
                       className={`w-full border rounded-md px-3 py-2 text-sm ${validationErrors.pt ? 'border-red-500' : ''}`}
@@ -1389,7 +1500,7 @@ const handleSaveMenuAccess = async () => {
                   </div>
                   <div>
                     <label className="block text-sm text-gray-700 mb-1">
-                      Area {editMember.role === 'HRBP' && <span className="text-red-500">*</span>}
+                      Area {(editMember.role === 'HRBP' || editMember.role === 'TA_SITE') && <span className="text-red-500">*</span>}
                     </label>
                     <select
                       className={`w-full border rounded-md px-3 py-2 text-sm ${validationErrors.area ? 'border-red-500' : ''}`}
@@ -1415,7 +1526,7 @@ const handleSaveMenuAccess = async () => {
                   </div>
                   <div>
                     <label className="block text-sm text-gray-700 mb-1">
-                      Area Detail {editMember.role === 'HRBP' && <span className="text-red-500">*</span>}
+                      Area Detail {(editMember.role === 'HRBP' || editMember.role === 'TA_SITE') && <span className="text-red-500">*</span>}
                     </label>
                     <select
                       className={`w-full border rounded-md px-3 py-2 text-sm ${validationErrors.areaDetail ? 'border-red-500' : ''}`}

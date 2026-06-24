@@ -125,6 +125,8 @@ async function createCandidate(data) {
     idNumber,
     ethnicity,
     healthStatus,
+    source,
+    sourceDetail,
     ...candidateData 
   } = data;
   
@@ -254,6 +256,16 @@ async function createCandidate(data) {
       }
     }
 
+    // Handle source
+    if (source !== undefined) {
+      languagesData.source = source && String(source).trim() ? String(source).trim() : null;
+    }
+
+    // Handle sourceDetail (referral name or "others" free text)
+    if (sourceDetail !== undefined) {
+      languagesData.sourceDetail = sourceDetail && String(sourceDetail).trim() ? String(sourceDetail).trim() : null;
+    }
+
     // Handle divisions list (store all selected divisions)
     if (divisionList !== undefined || divisionsArray.length > 0) {
       languagesData.divisions = divisionsArray;
@@ -300,7 +312,7 @@ async function createCandidate(data) {
       bloodType: bloodType && String(bloodType).trim() ? String(bloodType).trim() : null,
       // Always save languages if any of the fields were provided
       // If any field is provided (even if empty), save the languages object
-      languages: (positionAppliedFor !== undefined || ethnicity !== undefined || healthStatus !== undefined || divisionList !== undefined || divisionsArray.length > 0 || yearsOfExperience !== undefined) 
+      languages: (positionAppliedFor !== undefined || ethnicity !== undefined || healthStatus !== undefined || divisionList !== undefined || divisionsArray.length > 0 || yearsOfExperience !== undefined || source !== undefined || sourceDetail !== undefined) 
         ? languagesData  // Always save languagesData if any field was provided (even if empty)
         : null,
     };
@@ -875,8 +887,8 @@ async function searchCandidates(filters, pagination, user = null) {
     } else if ((userRole === 'Head of Division' || userRole === 'DEPARTMENT_HEAD') && userDivision) {
       // Head of Division: only see candidates whose profile division matches their division
       where.user = { division: userDivision };
-    } else if (userRole === 'HRBP') {
-      // HRBP: only see candidates where Position.PT = Team.PT AND Position.Area = Team.Area AND Position.Area Detail = Team.Area Detail
+    } else if (userRole === 'HRBP' || userRole === 'TA_SITE') {
+      // HRBP / TA_SITE: only see candidates with applications to positions matching their PT/Area/Area Detail
       // All three fields must be present and match
       if (userPt && userArea && userAreaDetail) {
         where.applications = {
@@ -889,11 +901,11 @@ async function searchCandidates(filters, pagination, user = null) {
           }
         };
       } else {
-        // If any field is missing, return no results (HRBP must have all three fields)
+        // If any field is missing, return no results
         where.id = '00000000-0000-0000-0000-000000000000'; // Non-existent ID to return empty results
       }
     }
-    // SUPER_ADMIN, TA_TEAM, and other roles see all candidates (no additional filtering)
+    // SUPER_ADMIN, TA_HO, and other roles see all candidates (no additional filtering)
   }
 
   const tokenizedSearch = buildTokenizedSearch(filters, (token) => ([

@@ -134,7 +134,7 @@ router.post('/me/reference', authenticate, authorize('CANDIDATE'), asyncHandler(
 router.post(
   '/',
   authenticate,
-  authorize('TA_TEAM', 'HRBP', 'SUPER_ADMIN', 'CHRO'),
+  authorize('TA_HO', 'HRBP', 'TA_SITE', 'SUPER_ADMIN', 'CHRO'),
   asyncHandler(async (req, res) => {
     console.log('CREATE CANDIDATE - Received data:', JSON.stringify(req.body, null, 2));
     try {
@@ -170,7 +170,7 @@ router.post(
 router.get(
   '/bulk-template',
   authenticate,
-  authorize('TA_TEAM', 'HRBP', 'SUPER_ADMIN', 'CHRO'),
+  authorize('TA_HO', 'HRBP', 'TA_SITE', 'SUPER_ADMIN', 'CHRO'),
   asyncHandler(async (req, res) => {
     const format = (req.query.format || 'csv').toString();
     return sendTemplate(res, {
@@ -189,7 +189,7 @@ router.get(
 router.post(
   '/bulk-upload',
   authenticate,
-  authorize('TA_TEAM', 'HRBP', 'SUPER_ADMIN', 'CHRO'),
+  authorize('TA_HO', 'HRBP', 'TA_SITE', 'SUPER_ADMIN', 'CHRO'),
   uploadLimiter,
   asyncHandler(async (req, res) => {
     if (!req.files || !req.files.file) {
@@ -218,7 +218,7 @@ router.post(
 router.get(
   '/',
   authenticate,
-  authorize('TA_TEAM', 'HRBP', 'SUPER_ADMIN', 'CHRO', 'DEPARTMENT_HEAD', 'HIRING_MANAGER'),
+  authorize('TA_HO', 'HRBP', 'TA_SITE', 'SUPER_ADMIN', 'CHRO', 'DEPARTMENT_HEAD', 'HIRING_MANAGER'),
   validationRules.pagination,
   validate,
   asyncHandler(async (req, res) => {
@@ -252,7 +252,7 @@ router.get(
 router.put(
   '/:id',
   authenticate,
-  authorize('TA_TEAM', 'HRBP', 'SUPER_ADMIN', 'CHRO'),
+  authorize('TA_HO', 'HRBP', 'TA_SITE', 'SUPER_ADMIN', 'CHRO'),
   validationRules.uuidParam('id'),
   validate,
   asyncHandler(async (req, res) => {
@@ -277,7 +277,7 @@ router.put(
 router.delete(
   '/:id',
   authenticate,
-  authorize('TA_TEAM', 'HRBP', 'SUPER_ADMIN', 'CHRO'),
+  authorize('TA_HO', 'HRBP', 'TA_SITE', 'SUPER_ADMIN', 'CHRO'),
   validationRules.uuidParam('id'),
   validate,
   asyncHandler(async (req, res) => {
@@ -298,7 +298,7 @@ router.delete(
 router.post(
   '/:id/documents',
   authenticate,
-  authorize('TA_TEAM', 'HRBP', 'SUPER_ADMIN', 'CHRO'),
+  authorize('TA_HO', 'HRBP', 'TA_SITE', 'SUPER_ADMIN', 'CHRO'),
   uploadLimiter,
   validationRules.uuidParam('id'),
   validate,
@@ -336,7 +336,7 @@ router.post(
 router.post(
   '/:id/form-link',
   authenticate,
-  authorize('TA_TEAM', 'HRBP', 'SUPER_ADMIN', 'CHRO'),
+  authorize('TA_HO', 'HRBP', 'TA_SITE', 'SUPER_ADMIN', 'CHRO'),
   validationRules.uuidParam('id'),
   validate,
   asyncHandler(async (req, res) => {
@@ -474,7 +474,7 @@ router.put(
 router.get(
   '/:id',
   authenticate,
-  authorize('TA_TEAM', 'HRBP', 'SUPER_ADMIN', 'CHRO', 'HIRING_MANAGER', 'DEPARTMENT_HEAD'),
+  authorize('TA_HO', 'HRBP', 'TA_SITE', 'SUPER_ADMIN', 'CHRO', 'HIRING_MANAGER', 'DEPARTMENT_HEAD'),
   validationRules.uuidParam('id'),
   validate,
   asyncHandler(async (req, res) => {

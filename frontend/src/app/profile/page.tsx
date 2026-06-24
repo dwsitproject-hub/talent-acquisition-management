@@ -227,7 +227,8 @@ export default function ProfilePage() {
                         <option value="CHRO">CHRO</option>
                         <option value="DEPARTMENT_HEAD">Department Head</option>
                         <option value="HRBP">HRBP</option>
-                        <option value="TA_TEAM">TA Team</option>
+                    <option value="TA_SITE">TA_SITE</option>
+                        <option value="TA_HO">TA Team</option>
                         <option value="HIRING_MANAGER">Hiring Manager</option>
                         <option value="INTERVIEWER">Interviewer</option>
                       </select>

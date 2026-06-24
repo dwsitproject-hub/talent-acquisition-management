@@ -16,9 +16,9 @@ YELLOW='\033[1;33m'
 NC='\033[0m' # No Color
 
 # Configuration
-GITHUB_USER="jerrypra0906"
+GITHUB_USER="your-github-org"
 GITHUB_REPO="talent-acquisition-management"
-SERVER_IP="147.139.176.70"
+SERVER_IP="your.server.host"
 FRONTEND_SSH_PORT="1818"
 BACKEND_SSH_PORT="1819"
 DEPLOY_DIR="/opt/tas"
