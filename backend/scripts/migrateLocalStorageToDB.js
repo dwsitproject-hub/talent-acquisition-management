@@ -279,13 +279,13 @@ async function migrateFPTKs(data) {
   }
   console.log(`\nMigrating ${jobPostings.length} FPTKs (job postings)...`);
 
-  // Get a default user for createdBy (use first SUPER_ADMIN or TA_TEAM)
+  // Get a default user for createdBy (use first SUPER_ADMIN or TA_HO)
   // Use raw SQL to avoid Prisma client cache issues
   let defaultUserId = null;
   try {
     const result = await prisma.$queryRaw`
       SELECT id FROM users 
-      WHERE role::text IN ('SUPER_ADMIN', 'TA_TEAM')
+      WHERE role::text IN ('SUPER_ADMIN', 'TA_HO')
       LIMIT 1
     `;
     if (result && result.length > 0) {

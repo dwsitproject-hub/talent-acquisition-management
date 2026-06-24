@@ -5,15 +5,15 @@ const prisma = new PrismaClient();
 
 async function main() {
   const email = process.env.EMAIL;
-  const password = process.env.PASSWORD || 'DefaultPassword123!';
+  const password = process.env.PASSWORD;
   const role = process.env.ROLE || 'HIRING_MANAGER';
   const firstName = process.env.FIRST_NAME || 'User';
   const lastName = process.env.LAST_NAME || 'Account';
   const department = process.env.DEPARTMENT || null;
   const division = process.env.DIVISION || null;
 
-  if (!email) {
-    console.error('EMAIL env var is required');
+  if (!email || !password) {
+    console.error('EMAIL and PASSWORD env vars are required');
     process.exit(1);
   }
 

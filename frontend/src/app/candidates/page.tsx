@@ -31,7 +31,8 @@ const mapEnumToRole = (role: string): string => {
     CHRO: 'Management',
     DEPARTMENT_HEAD: 'Head of Division',
     HRBP: 'HRBP',
-    TA_TEAM: 'TA_TEAM',
+    TA_SITE: 'TA_SITE',
+    TA_HO: 'TA_HO',
     HIRING_MANAGER: 'HIRING_MANAGER',
     INTERVIEWER: 'INTERVIEWER',
     CANDIDATE: 'CANDIDATE',
@@ -341,7 +342,7 @@ export const mapApiCandidate = (candidate: any): Candidate => {
 export default function CandidatesPage() {
   const { isAuthenticated, isLoading, user } = useAuth()
   const router = useRouter()
-  const backendRole = (user as any)?.role?.name || (user as any)?.role || 'TA_TEAM'
+  const backendRole = (user as any)?.role?.name || (user as any)?.role || 'TA_HO'
   const roleName = mapEnumToRole(backendRole)
   const autoViewHandledRef = useRef(false)
   const [searchTerm, setSearchTerm] = useState('')
@@ -553,7 +554,7 @@ export default function CandidatesPage() {
 
   const cfg = menuAccess['/candidates'] || {}
   const visibleRoles: string[] = cfg.visibleRoles && cfg.visibleRoles.length ? cfg.visibleRoles : [
-    'SUPER_ADMIN','Management','Head of Division','HRBP','TA_TEAM'
+    'SUPER_ADMIN','Management','Head of Division','HRBP','TA_HO','TA_SITE'
   ]
   
   if (menuAccessLoading) {
@@ -568,10 +569,10 @@ export default function CandidatesPage() {
     router.push('/')
     return null
   }
-  const perms = cfg.permissions || { view: visibleRoles, create: ['SUPER_ADMIN','HRBP','TA_TEAM'], edit: ['SUPER_ADMIN','HRBP','TA_TEAM'] }
+  const perms = cfg.permissions || { view: visibleRoles, create: ['SUPER_ADMIN','HRBP','TA_SITE','TA_HO'], edit: ['SUPER_ADMIN','HRBP','TA_SITE','TA_HO'] }
   const canCreate = (perms.create || []).includes(roleName) || (perms.create || []).includes('*')
   const canEdit = (perms.edit || []).includes(roleName) || (perms.edit || []).includes('*')
-  const canGenerateLink = ['SUPER_ADMIN', 'TA_TEAM', 'HRBP'].includes(roleName)
+  const canGenerateLink = ['SUPER_ADMIN', 'TA_HO', 'TA_SITE', 'HRBP'].includes(roleName)
 
   interface UploadFilesPayload {
     cvFile: File | null
@@ -632,6 +633,8 @@ export default function CandidatesPage() {
         idNumber: candidateData.idNumber || null,
         ethnicity: candidateData.ethnicity || null,
         healthStatus: candidateData.healthStatus || null,
+        source: candidateData.source || null,
+        sourceDetail: candidateData.sourceDetail || null,
       }
       
       console.log('CREATE CANDIDATE - Calling CandidatesAPI.create with payload:', JSON.stringify(payload, null, 2))

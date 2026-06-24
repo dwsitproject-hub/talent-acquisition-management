@@ -1103,7 +1103,7 @@ function buildInternalFptkListWhere(filters = {}, user = null) {
       }
     } else if ((userRole === 'Head of Division' || userRole === 'DEPARTMENT_HEAD') && userDivision) {
       where.division = userDivision;
-    } else if (userRole === 'HRBP') {
+    } else if (userRole === 'HRBP' || userRole === 'TA_SITE') {
       const hrbp = buildHrbpFptkFilterFromUser(user);
       if (hrbp) {
         Object.assign(where, hrbp);
@@ -1324,7 +1324,7 @@ async function getSummaryByPosition(user = null) {
   const isScopedRole = Object.keys(fptkWhere).length > 0;
 
   if (!isScopedRole) {
-    // Unrestricted roles (SUPER_ADMIN, TA_TEAM, etc.): all queries are
+    // Unrestricted roles (SUPER_ADMIN, TA_HO, etc.): all queries are
     // independent — run them in parallel to halve round-trip latency.
     [fptks, grouped, totalGrouped, onboardingApps] = await Promise.all([
       prisma.fPTK.findMany({
@@ -1349,7 +1349,7 @@ async function getSummaryByPosition(user = null) {
       }),
     ]);
   } else {
-    // Scoped roles (HIRING_MANAGER, Head of Division, HRBP): fetch the
+    // Scoped roles (HIRING_MANAGER, Head of Division, HRBP, TA_SITE): fetch the
     // allowed FPTK IDs first, then use fptkId IN (...) for the groupBy so
     // the application query uses the composite index instead of a JOIN.
     fptks = await prisma.fPTK.findMany({

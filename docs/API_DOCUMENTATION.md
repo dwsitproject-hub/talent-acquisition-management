@@ -238,7 +238,7 @@ Refresh access token using refresh token.
 **GET** `/candidates?page=1&limit=20&search=john&skills=JavaScript,React`
 
 **Headers:** `Authorization: Bearer <token>`  
-**Access:** TA_TEAM, HRBP, SUPER_ADMIN, CHRO
+**Access:** TA_HO, HRBP, SUPER_ADMIN, CHRO
 
 **Query Parameters:**
 - `page` (integer): Page number (default: 1)
@@ -269,7 +269,7 @@ Refresh access token using refresh token.
 **POST** `/fptk`
 
 **Headers:** `Authorization: Bearer <token>`  
-**Access:** HIRING_MANAGER, TA_TEAM, SUPER_ADMIN
+**Access:** HIRING_MANAGER, TA_HO, SUPER_ADMIN
 
 **Request Body:**
 ```json
@@ -349,7 +349,7 @@ Refresh access token using refresh token.
 **GET** `/fptk?page=1&status=OPEN&department=Technology`
 
 **Headers:** `Authorization: Bearer <token>`  
-**Access:** TA_TEAM, HRBP, SUPER_ADMIN, HIRING_MANAGER, CHRO, DEPARTMENT_HEAD
+**Access:** TA_HO, HRBP, SUPER_ADMIN, HIRING_MANAGER, CHRO, DEPARTMENT_HEAD
 
 **Query Parameters:**
 - `status`: DRAFT, APPROVED, OPEN, PARTIALLY_FILLED, FILLED, CANCELLED
@@ -366,13 +366,13 @@ Refresh access token using refresh token.
 **PUT** `/fptk/:id`
 
 **Headers:** `Authorization: Bearer <token>`  
-**Access:** HIRING_MANAGER, TA_TEAM, SUPER_ADMIN
+**Access:** HIRING_MANAGER, TA_HO, SUPER_ADMIN
 
 ### 3.6 Publish FPTK
 **POST** `/fptk/:id/publish`
 
 **Headers:** `Authorization: Bearer <token>`  
-**Access:** TA_TEAM, SUPER_ADMIN
+**Access:** TA_HO, SUPER_ADMIN
 
 Makes the job position visible on the candidate portal.
 
@@ -380,7 +380,7 @@ Makes the job position visible on the candidate portal.
 **POST** `/fptk/:id/unpublish`
 
 **Headers:** `Authorization: Bearer <token>`  
-**Access:** TA_TEAM, SUPER_ADMIN
+**Access:** TA_HO, SUPER_ADMIN
 
 ---
 
@@ -455,7 +455,7 @@ Makes the job position visible on the candidate portal.
 **GET** `/applications?page=1&status=SCREENING&department=Technology`
 
 **Headers:** `Authorization: Bearer <token>`  
-**Access:** TA_TEAM, HRBP, SUPER_ADMIN, HIRING_MANAGER, CHRO, DEPARTMENT_HEAD
+**Access:** TA_HO, HRBP, SUPER_ADMIN, HIRING_MANAGER, CHRO, DEPARTMENT_HEAD
 
 **Query Parameters:**
 - `status`: Application status
@@ -500,7 +500,7 @@ Makes the job position visible on the candidate portal.
 **PUT** `/applications/:id/status`
 
 **Headers:** `Authorization: Bearer <token>`  
-**Access:** TA_TEAM, HRBP, SUPER_ADMIN
+**Access:** TA_HO, HRBP, SUPER_ADMIN
 
 **Request Body:**
 ```json
@@ -514,7 +514,7 @@ Makes the job position visible on the candidate portal.
 **POST** `/applications/:id/shortlist`
 
 **Headers:** `Authorization: Bearer <token>`  
-**Access:** TA_TEAM, SUPER_ADMIN
+**Access:** TA_HO, SUPER_ADMIN
 
 Moves application to the next stage automatically.
 
@@ -522,7 +522,7 @@ Moves application to the next stage automatically.
 **POST** `/applications/:id/reject`
 
 **Headers:** `Authorization: Bearer <token>`  
-**Access:** TA_TEAM, HRBP, SUPER_ADMIN
+**Access:** TA_HO, HRBP, SUPER_ADMIN
 
 **Request Body:**
 ```json
@@ -543,7 +543,7 @@ Candidate withdraws their own application.
 **GET** `/applications/stats/overview?fptkId=uuid&department=Technology&dateFrom=2024-01-01&dateTo=2024-01-31`
 
 **Headers:** `Authorization: Bearer <token>`  
-**Access:** TA_TEAM, HRBP, SUPER_ADMIN, CHRO
+**Access:** TA_HO, HRBP, SUPER_ADMIN, CHRO
 
 **Response (200 OK):**
 ```json

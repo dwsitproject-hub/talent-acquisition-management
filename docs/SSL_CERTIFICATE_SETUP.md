@@ -49,10 +49,10 @@ sudo apt update
 sudo apt install certbot
 
 # Generate certificate for your domain
-sudo certbot certonly --standalone -d tas.energi-up.com
+sudo certbot certonly --standalone -d tas.example.com
 
 # Certificates will be stored in:
-# /etc/letsencrypt/live/tas.energi-up.com/
+# /etc/letsencrypt/live/tas.example.com/
 #   - fullchain.pem (certificate + chain)
 #   - privkey.pem (private key)
 #   - cert.pem (certificate only)
@@ -62,8 +62,8 @@ sudo certbot certonly --standalone -d tas.energi-up.com
 **To copy Let's Encrypt certificates:**
 ```bash
 # Copy to your project directory
-sudo cp /etc/letsencrypt/live/tas.energi-up.com/fullchain.pem /opt/tas-production/ssl/
-sudo cp /etc/letsencrypt/live/tas.energi-up.com/privkey.pem /opt/tas-production/ssl/
+sudo cp /etc/letsencrypt/live/tas.example.com/fullchain.pem /opt/tas-production/ssl/
+sudo cp /etc/letsencrypt/live/tas.example.com/privkey.pem /opt/tas-production/ssl/
 
 # Set permissions
 sudo chmod 644 /opt/tas-production/ssl/fullchain.pem
@@ -81,7 +81,7 @@ For testing purposes only:
 openssl req -x509 -nodes -days 365 -newkey rsa:2048 \
   -keyout privkey.pem \
   -out fullchain.pem \
-  -subj "/CN=tas.energi-up.com"
+  -subj "/CN=tas.example.com"
 ```
 
 ---
@@ -233,18 +233,18 @@ From your local machine:
 
 ```bash
 # Transfer certificate files
-scp -P 1818 fullchain.pem root@147.139.176.70:/opt/tas-production/ssl/
-scp -P 1818 privkey.pem root@147.139.176.70:/opt/tas-production/ssl/
+scp -P 1818 fullchain.pem root@your.server.host:/opt/tas-production/ssl/
+scp -P 1818 privkey.pem root@your.server.host:/opt/tas-production/ssl/
 
 # If using a different SSH key:
-scp -i ~/.ssh/your-key.pem -P 1818 fullchain.pem root@147.139.176.70:/opt/tas-production/ssl/
+scp -i ~/.ssh/your-key.pem -P 1818 fullchain.pem root@your.server.host:/opt/tas-production/ssl/
 ```
 
 ### Method 2: Using SFTP
 
 ```bash
 # Connect via SFTP
-sftp -P 1818 root@147.139.176.70
+sftp -P 1818 root@your.server.host
 
 # Navigate to directory
 cd /opt/tas-production/ssl
@@ -276,7 +276,7 @@ nano /opt/tas-production/ssl/privkey.pem
 ### Method 4: Using WinSCP (Windows)
 
 1. Open WinSCP
-2. Connect to server: `root@147.139.176.70` on port `1818`
+2. Connect to server: `root@your.server.host` on port `1818`
 3. Navigate to `/opt/tas-production/ssl/`
 4. Drag and drop `fullchain.pem` and `privkey.pem`
 
@@ -288,7 +288,7 @@ After transferring files, verify they're correct:
 
 ```bash
 # SSH into frontend server
-ssh -p 1818 root@147.139.176.70
+ssh -p 1818 root@your.server.host
 
 # Navigate to directory
 cd /opt/tas-production/ssl
@@ -351,7 +351,7 @@ Here's a complete example assuming you received files from a commercial CA:
 
 ```bash
 # 1. SSH into frontend server
-ssh -p 1818 root@147.139.176.70
+ssh -p 1818 root@your.server.host
 
 # 2. Navigate to project directory
 cd /opt/tas-production
@@ -361,16 +361,16 @@ mkdir -p ssl
 
 # 4. If you have certificate files on your local machine, transfer them:
 # (Run this from your local machine)
-scp -P 1818 tas_energi-up_com.crt root@147.139.176.70:/tmp/
-scp -P 1818 tas_energi-up_com.key root@147.139.176.70:/tmp/
-scp -P 1818 intermediate.crt root@147.139.176.70:/tmp/
+scp -P 1818 tas_example_com.crt root@your.server.host:/tmp/
+scp -P 1818 tas_example_com.key root@your.server.host:/tmp/
+scp -P 1818 intermediate.crt root@your.server.host:/tmp/
 
 # 5. Back on the server, combine certificate and chain
 cd /opt/tas-production/ssl
-cat /tmp/tas_energi-up_com.crt /tmp/intermediate.crt > fullchain.pem
+cat /tmp/tas_example_com.crt /tmp/intermediate.crt > fullchain.pem
 
 # 6. Copy private key
-cp /tmp/tas_energi-up_com.key privkey.pem
+cp /tmp/tas_example_com.key privkey.pem
 
 # 7. Set permissions
 chmod 644 fullchain.pem
@@ -382,7 +382,7 @@ head -1 fullchain.pem
 head -1 privkey.pem
 
 # 9. Clean up temporary files
-rm /tmp/tas_energi-up_com.crt /tmp/tas_energi-up_com.key /tmp/intermediate.crt
+rm /tmp/tas_example_com.crt /tmp/tas_example_com.key /tmp/intermediate.crt
 
 # 10. Test NGINX configuration
 docker compose -f docker-compose.frontend.yml -p tas-production exec nginx nginx -t
@@ -442,14 +442,14 @@ chown root:root /opt/tas-production/ssl/privkey.pem
 
 1. **Check certificate chain is complete:**
    ```bash
-   openssl s_client -connect tas.energi-up.com:8443 -servername tas.energi-up.com
+   openssl s_client -connect tas.example.com:8443 -servername tas.example.com
    # Look for "Verify return code: 0 (ok)" - if not 0, chain is incomplete
    ```
 
 2. **Verify domain matches:**
    ```bash
    openssl x509 -in /opt/tas-production/ssl/fullchain.pem -noout -subject
-   # Should show: CN=tas.energi-up.com or similar
+   # Should show: CN=tas.example.com or similar
    ```
 
 ---

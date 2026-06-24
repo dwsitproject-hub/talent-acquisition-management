@@ -37,7 +37,8 @@ const mapEnumToRole = (role: string): string => {
     CHRO: 'Management',
     DEPARTMENT_HEAD: 'Head of Division',
     HRBP: 'HRBP',
-    TA_TEAM: 'TA_TEAM',
+    TA_SITE: 'TA_SITE',
+    TA_HO: 'TA_HO',
     HIRING_MANAGER: 'HIRING_MANAGER',
     INTERVIEWER: 'INTERVIEWER',
     CANDIDATE: 'CANDIDATE',
@@ -408,7 +409,7 @@ function FPTKPageContent() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const editIdFromUrl = searchParams.get('edit')?.trim() || null
-  const backendRole = (user as any)?.role?.name || (user as any)?.role || 'TA_TEAM'
+  const backendRole = (user as any)?.role?.name || (user as any)?.role || 'TA_HO'
   const roleName = mapEnumToRole(backendRole)
   const [fptks, setFptks] = useState<FPTK[]>([])
   const [loading, setLoading] = useState(true)
@@ -1141,7 +1142,7 @@ function FPTKPageContent() {
   }
 
   const cfg = menuAccess['/fptk'] || {}
-  const visibleRoles: string[] = cfg.visibleRoles && cfg.visibleRoles.length ? cfg.visibleRoles : ['SUPER_ADMIN','Management','Head of Division','HRBP','TA_TEAM','HIRING_MANAGER']
+  const visibleRoles: string[] = cfg.visibleRoles && cfg.visibleRoles.length ? cfg.visibleRoles : ['SUPER_ADMIN','Management','Head of Division','HRBP','TA_HO','TA_SITE','HIRING_MANAGER']
   
   if (menuAccessLoading) {
     return (
@@ -1157,7 +1158,7 @@ function FPTKPageContent() {
     router.push('/')
     return null
   }
-  const perms = cfg.permissions || { view: visibleRoles, create: ['SUPER_ADMIN','TA_TEAM','HIRING_MANAGER'], edit: ['SUPER_ADMIN','TA_TEAM','HIRING_MANAGER'] }
+  const perms = cfg.permissions || { view: visibleRoles, create: ['SUPER_ADMIN','TA_HO','HIRING_MANAGER'], edit: ['SUPER_ADMIN','TA_HO','HIRING_MANAGER'] }
   const canCreate = (perms.create || []).includes(roleName) || (perms.create || []).includes('*')
   const canEdit = (perms.edit || []).includes(roleName) || (perms.edit || []).includes('*')
   const canDelete = backendRole === 'SUPER_ADMIN'

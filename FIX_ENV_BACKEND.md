@@ -17,7 +17,7 @@ rm -f .env.backend
 # Create a new clean .env.backend file
 cat > .env.backend << 'EOF'
 # Server Configuration
-SERVER_HOST=147.139.176.70
+SERVER_HOST=your.server.host
 
 # Database Configuration
 POSTGRES_PASSWORD=CHANGE_THIS_STRONG_PASSWORD
@@ -33,10 +33,10 @@ JWT_REFRESH_SECRET=CHANGE_THIS_64_CHAR_HEX_STRING
 ENCRYPTION_KEY=CHANGE_THIS_32_CHAR_HEX_STRING
 
 # Application URLs
-FRONTEND_URL=http://147.139.176.70
-CANDIDATE_PORTAL_URL=http://147.139.176.70:4002
-CORS_ORIGIN=http://147.139.176.70,http://147.139.176.70:4001,http://147.139.176.70:4002
-API_BASE_URL=http://147.139.176.70:4000/api
+FRONTEND_URL=http://your.server.host
+CANDIDATE_PORTAL_URL=http://your.server.host:4002
+CORS_ORIGIN=http://your.server.host,http://your.server.host:4001,http://your.server.host:4002
+API_BASE_URL=http://your.server.host:4000/api
 
 # Email Configuration (Optional)
 SMTP_HOST=smtp.gmail.com
@@ -81,3 +81,4 @@ echo $POSTGRES_PASSWORD
 
 If it shows your password, it worked!
 
+**Note:** `.env.backend` must remain on the server only. Never commit it to git.

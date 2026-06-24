@@ -34,8 +34,8 @@ The system uses separate environment files for each environment:
 - Backend Server IP: `[TESTING_BACKEND_IP]` (SSH Port: `[TESTING_BACKEND_SSH_PORT]`)
 
 **Production Environment:**
-- Frontend Server IP: `147.139.176.70` (SSH Port: `1818`)
-- Backend Server IP: `147.139.176.70` (SSH Port: `1819`)
+- Frontend Server IP: `your.server.host` (SSH Port: `1818`)
+- Backend Server IP: `your.server.host` (SSH Port: `1819`)
 
 ---
 
@@ -137,7 +137,7 @@ GitHub no longer supports password authentication. You need to use either:
 
 2. **On the server, clone using the token:**
    ```bash
-   git clone -b main https://jerrypra0906:<YOUR_TOKEN>@github.com/jerrypra0906/talent-acquisition-management.git tas
+   git clone -b main https://your-github-org:<YOUR_TOKEN>@github.com/your-github-org/talent-acquisition-management.git tas
    ```
    
    Replace `<YOUR_TOKEN>` with your actual token.
@@ -175,13 +175,13 @@ GitHub no longer supports password authentication. You need to use either:
    ssh-copy-id -p <TESTING_BACKEND_SSH_PORT> root@<TESTING_BACKEND_IP>
    
    # Production environment
-   ssh-copy-id -p 1818 root@147.139.176.70
-   ssh-copy-id -p 1819 root@147.139.176.70
+   ssh-copy-id -p 1818 root@your.server.host
+   ssh-copy-id -p 1819 root@your.server.host
    ```
 
 4. **On the servers, clone using SSH:**
    ```bash
-   git clone -b main git@github.com:jerrypra0906/talent-acquisition-management.git tas
+   git clone -b main git@github.com:your-github-org/talent-acquisition-management.git tas
    ```
 
 ---
@@ -196,7 +196,7 @@ The local environment is for development on your local machine. All services run
 
 ```bash
 # Clone repository
-git clone -b main git@github.com:jerrypra0906/talent-acquisition-management.git tas
+git clone -b main git@github.com:your-github-org/talent-acquisition-management.git tas
 cd tas
 ```
 
@@ -328,10 +328,10 @@ cd /opt
 
 # Clone repository (choose one method):
 # Option A: Using Personal Access Token
-git clone -b main https://jerrypra0906:<YOUR_TOKEN>@github.com/jerrypra0906/talent-acquisition-management.git tas-testing
+git clone -b main https://your-github-org:<YOUR_TOKEN>@github.com/your-github-org/talent-acquisition-management.git tas-testing
 
 # Option B: Using SSH (if SSH keys are set up)
-git clone -b main git@github.com:jerrypra0906/talent-acquisition-management.git tas-testing
+git clone -b main git@github.com:your-github-org/talent-acquisition-management.git tas-testing
 
 cd tas-testing
 ```
@@ -470,10 +470,10 @@ cd /opt
 
 # Clone repository (same as backend server)
 # Option A: Using Personal Access Token
-git clone https://jerrypra0906:<YOUR_TOKEN>@github.com/jerrypra0906/talent-acquisition-management.git tas-testing
+git clone https://your-github-org:<YOUR_TOKEN>@github.com/your-github-org/talent-acquisition-management.git tas-testing
 
 # Option B: Using SSH
-git clone git@github.com:jerrypra0906/talent-acquisition-management.git tas-testing
+git clone git@github.com:your-github-org/talent-acquisition-management.git tas-testing
 
 cd tas-testing
 ```
@@ -686,7 +686,7 @@ Since port 80 is already in use on the frontend server, we have two options:
 **Option A: Use Alternative Port for NGINX (Recommended)**
 - Use port 8080 for HTTP and 8443 for HTTPS
 - Configure existing reverse proxy/load balancer to route to port 8080
-- Or access directly via `http://147.139.176.70:8080`
+- Or access directly via `http://your.server.host:8080`
 
 **Option B: Use Internal Networking Only**
 - Remove port 80/443 mapping from NGINX
@@ -831,13 +831,13 @@ This way, only NGINX needs ports 80/443, and all other services communicate inte
 - ⚠️ Port 5434: In use by another PostgreSQL (TAS uses 5432, no conflict)
 
 **Access URLs:**
-- Frontend: `http://tas.energi-up.com:8080` (Domain) or `http://147.139.176.70:8080` (IP)
+- Frontend: `http://tas.example.com:8080` (Domain) or `http://your.server.host:8080` (IP)
 - Backend API: `http://8.215.56.98:4000` (Backend server IP: 8.215.56.98)
-- Candidate Portal: `http://147.139.176.70:4002`
+- Candidate Portal: `http://your.server.host:4002`
 
 **⚠️ Domain Configuration:**
-- Domain name: `tas.energi-up.com`
-- Ensure DNS A record points `tas.energi-up.com` to `147.139.176.70`
+- Domain name: `tas.example.com`
+- Ensure DNS A record points `tas.example.com` to `your.server.host`
 - NGINX is configured to accept both domain and IP access
 
 ---
@@ -847,17 +847,17 @@ This way, only NGINX needs ports 80/443, and all other services communicate inte
 #### Step 1: Clone Repository
 
 ```bash
-ssh -p 1819 root@147.139.176.70
+ssh -p 1819 root@your.server.host
 
 # Navigate to deployment directory
 cd /opt
 
 # Clone repository (choose one method):
 # Option A: Using Personal Access Token
-git clone -b main https://jerrypra0906:<YOUR_TOKEN>@github.com/jerrypra0906/talent-acquisition-management.git tas-production
+git clone -b main https://your-github-org:<YOUR_TOKEN>@github.com/your-github-org/talent-acquisition-management.git tas-production
 
 # Option B: Using SSH (if SSH keys are set up)
-git clone -b main git@github.com:jerrypra0906/talent-acquisition-management.git tas-production
+git clone -b main git@github.com:your-github-org/talent-acquisition-management.git tas-production
 
 cd tas-production
 ```
@@ -883,7 +883,7 @@ nano .env.production
 
 ```env
 # Server Configuration
-SERVER_HOST=147.139.176.70
+SERVER_HOST=your.server.host
 
 # Database Configuration
 POSTGRES_PASSWORD=<Generate strong password>
@@ -906,11 +906,11 @@ ENCRYPTION_KEY=<Generate 32-char hex string>
 
 # Application URLs (Production)
 # Note: Frontend uses port 8080 due to port 80 conflict
-# Using domain name: tas.energi-up.com
-FRONTEND_URL=http://tas.energi-up.com:8080
-CANDIDATE_PORTAL_URL=http://147.139.176.70:4002
+# Using domain name: tas.example.com
+FRONTEND_URL=http://tas.example.com:8080
+CANDIDATE_PORTAL_URL=http://your.server.host:4002
 # CORS: Include both domain and IP for flexibility
-CORS_ORIGIN=http://tas.energi-up.com:8080,http://147.139.176.70:8080,http://147.139.176.70:4001,http://147.139.176.70:4002
+CORS_ORIGIN=http://tas.example.com:8080,http://your.server.host:8080,http://your.server.host:4001,http://your.server.host:4002
 API_BASE_URL=http://8.215.56.98:4000/api
 
 # Email Configuration
@@ -1052,9 +1052,9 @@ echo "JWT_SECRET is set: $([ -n "$JWT_SECRET" ] && echo 'YES' || echo 'NO')"
 # export JWT_SECRET="your_jwt_secret_here"
 # export JWT_REFRESH_SECRET="your_refresh_secret_here"
 # export ENCRYPTION_KEY="your_encryption_key_here"
-# export FRONTEND_URL="http://147.139.176.70:8080"
-# export CANDIDATE_PORTAL_URL="http://147.139.176.70:4002"
-# export CORS_ORIGIN="http://147.139.176.70:8080,http://147.139.176.70:4001,http://147.139.176.70:4002"
+# export FRONTEND_URL="http://your.server.host:8080"
+# export CANDIDATE_PORTAL_URL="http://your.server.host:4002"
+# export CORS_ORIGIN="http://your.server.host:8080,http://your.server.host:4001,http://your.server.host:4002"
 
 # ⚠️ CRITICAL: Set up DATABASE_URL with URL-encoded password first
 # This handles special characters in POSTGRES_PASSWORD (like /, @, etc.)
@@ -1495,8 +1495,8 @@ docker compose -p tas-production exec postgres psql -U tas_user -d tas_db -c "\d
 ✅ Production user created successfully!
 📋 User Credentials:
    Name: Jerry Hakim
-   Email: jerry.hakim@energi-up.com
-   Password: DefaultPassword123!
+   Email: admin@example.com
+   Password: your-secure-admin-password
    Role: SUPER_ADMIN
 ```
 
@@ -1559,7 +1559,7 @@ curl http://localhost:4000/health
 
 ```bash
 # Allow port 4000 from frontend server only
-ufw allow from 147.139.176.70 to any port 4000 proto tcp
+ufw allow from your.server.host to any port 4000 proto tcp
 
 # Enable firewall
 ufw enable
@@ -1580,18 +1580,18 @@ ufw enable
 #### Step 1: Clone Repository
 
 ```bash
-ssh -p 1818 root@147.139.176.70
+ssh -p 1818 root@your.server.host
 
 # Navigate to deployment directory
 cd /opt
 
 # Clone repository from main branch
 # Option A: Using Personal Access Token (Recommended - No SSH setup needed)
-git clone -b main https://jerrypra0906:<YOUR_TOKEN>@github.com/jerrypra0906/talent-acquisition-management.git tas-production
+git clone -b main https://your-github-org:<YOUR_TOKEN>@github.com/your-github-org/talent-acquisition-management.git tas-production
 
 # Option B: Using SSH (Requires SSH keys to be set up on this server)
 # If you get "Permission denied (publickey)" error, use Option A instead
-git clone -b main git@github.com:jerrypra0906/talent-acquisition-management.git tas-production
+git clone -b main git@github.com:your-github-org/talent-acquisition-management.git tas-production
 
 cd tas-production
 ```
@@ -1603,7 +1603,7 @@ The frontend server doesn't have SSH keys set up for GitHub. You have two option
 **Option 1: Use Personal Access Token (Easiest)**
 ```bash
 # Replace <YOUR_TOKEN> with your GitHub Personal Access Token
-git clone -b main https://jerrypra0906:<YOUR_TOKEN>@github.com/jerrypra0906/talent-acquisition-management.git tas-production
+git clone -b main https://your-github-org:<YOUR_TOKEN>@github.com/your-github-org/talent-acquisition-management.git tas-production
 ```
 
 **Option 2: Set up SSH keys on frontend server**
@@ -1623,7 +1623,7 @@ cat ~/.ssh/id_ed25519.pub
 # 4. Save
 
 # Then try cloning again
-git clone -b main git@github.com:jerrypra0906/talent-acquisition-management.git tas-production
+git clone -b main git@github.com:your-github-org/talent-acquisition-management.git tas-production
 ```
 
 #### Step 2: Create Production Environment File
@@ -1642,7 +1642,7 @@ nano .env.production
 
 ```env
 # Server Configuration
-SERVER_HOST=147.139.176.70
+SERVER_HOST=your.server.host
 
 # Port Configuration (Using alternative ports due to port 80 conflict)
 HTTP_PORT=8080
@@ -1651,13 +1651,13 @@ HTTPS_PORT=8443
 # API URL (points to NGINX on frontend server, which proxies to backend)
 # ⚠️ IMPORTANT: Use NGINX URL (port 8080) not direct backend URL (port 4000)
 # This ensures requests go through NGINX for proper routing and CORS handling
-# Using domain name: tas.energi-up.com
-NEXT_PUBLIC_API_URL=http://tas.energi-up.com:8080/api
+# Using domain name: tas.example.com
+NEXT_PUBLIC_API_URL=http://tas.example.com:8080/api
 
 # CORS (must match backend configuration - include both domain and IP for flexibility)
-CORS_ORIGIN=http://tas.energi-up.com:8080,http://147.139.176.70:8080,http://147.139.176.70:4001,http://147.139.176.70:4002
-FRONTEND_URL=http://tas.energi-up.com:8080
-CANDIDATE_PORTAL_URL=http://147.139.176.70:4002
+CORS_ORIGIN=http://tas.example.com:8080,http://your.server.host:8080,http://your.server.host:4001,http://your.server.host:4002
+FRONTEND_URL=http://tas.example.com:8080
+CANDIDATE_PORTAL_URL=http://your.server.host:4002
 ```
 
 **Alternative Configuration (if you want to use port 80 via existing reverse proxy):**
@@ -1666,7 +1666,7 @@ If you have an existing reverse proxy/load balancer that can route to internal D
 
 ```env
 # Server Configuration
-SERVER_HOST=147.139.176.70
+SERVER_HOST=your.server.host
 
 # Port Configuration (Internal only - accessed via existing reverse proxy)
 HTTP_PORT=8080
@@ -1675,15 +1675,15 @@ HTTPS_PORT=8443
 # API URL (points to NGINX on frontend server, which proxies to backend)
 # ⚠️ IMPORTANT: Use NGINX URL (port 8080) not direct backend URL (port 4000)
 # This ensures requests go through NGINX for proper routing and CORS handling
-NEXT_PUBLIC_API_URL=http://147.139.176.70:8080/api
+NEXT_PUBLIC_API_URL=http://your.server.host:8080/api
 
 # CORS (use the public URL that users will access)
-CORS_ORIGIN=http://147.139.176.70,http://147.139.176.70:4001,http://147.139.176.70:4002
-FRONTEND_URL=http://147.139.176.70
-CANDIDATE_PORTAL_URL=http://147.139.176.70:4002
+CORS_ORIGIN=http://your.server.host,http://your.server.host:4001,http://your.server.host:4002
+FRONTEND_URL=http://your.server.host
+CANDIDATE_PORTAL_URL=http://your.server.host:4002
 ```
 
-**Note:** If using alternative ports, users will access the application via `http://147.139.176.70:8080` instead of `http://147.139.176.70`
+**Note:** If using alternative ports, users will access the application via `http://your.server.host:8080` instead of `http://your.server.host`
 
 #### Step 3: Configure NGINX
 
@@ -1878,12 +1878,12 @@ ufw enable
 
 **Note**: 
 - Port 80 is already in use by another application - we're using port 8080 instead
-- Access the application via `http://147.139.176.70:8080`
+- Access the application via `http://your.server.host:8080`
 - If you have an existing reverse proxy on port 80, you can configure it to route to port 8080 internally
 
 #### Step 6: Troubleshoot Connectivity Issues
 
-If you cannot access `http://147.139.176.70:8080` from your browser, follow these diagnostic steps:
+If you cannot access `http://your.server.host:8080` from your browser, follow these diagnostic steps:
 
 **1. Test from the server itself (should work if NGINX is running):**
 
@@ -1963,7 +1963,7 @@ docker ps --filter "name=tas_nginx" --format "table {{.Names}}\t{{.Ports}}"
 
 ```bash
 # From another server that can reach the frontend server
-curl -I http://147.139.176.70:8080
+curl -I http://your.server.host:8080
 
 # If this works but browser doesn't, check:
 # - Browser proxy settings
@@ -2182,7 +2182,7 @@ If the frontend build is taking too long (>15 minutes) or appears stuck:
    docker build --target dependencies -t tas-frontend-deps ./frontend
    
    # If that works, continue with build stage
-   docker build --target build --build-arg NEXT_PUBLIC_API_URL=http://tas.energi-up.com:8080/api -t tas-frontend-build ./frontend
+   docker build --target build --build-arg NEXT_PUBLIC_API_URL=http://tas.example.com:8080/api -t tas-frontend-build ./frontend
 ```
 
 ---
@@ -2216,11 +2216,11 @@ If you want to use a domain name instead of IP address:
 
 **Step 1: Configure DNS**
 
-1. Go to your DNS provider (where `energi-up.com` is managed)
+1. Go to your DNS provider (where `example.com` is managed)
 2. Add an **A Record**:
    - **Name/Host:** `tas` (or `@` for root domain)
    - **Type:** `A`
-   - **Value/IP:** `147.139.176.70`
+   - **Value/IP:** `your.server.host`
    - **TTL:** `3600` (or default)
 
 3. Wait for DNS propagation (can take a few minutes to 48 hours)
@@ -2237,8 +2237,8 @@ nano .env.production
 Update these lines:
 ```env
 # Use domain name instead of IP
-NEXT_PUBLIC_API_URL=http://tas.energi-up.com:8080/api
-FRONTEND_URL=http://tas.energi-up.com:8080
+NEXT_PUBLIC_API_URL=http://tas.example.com:8080/api
+FRONTEND_URL=http://tas.example.com:8080
 ```
 
 **On Backend Server (ECS-DB):**
@@ -2251,8 +2251,8 @@ nano .env.production
 Update these lines:
 ```env
 # Include both domain and IP in CORS for flexibility
-FRONTEND_URL=http://tas.energi-up.com:8080
-CORS_ORIGIN=http://tas.energi-up.com:8080,http://147.139.176.70:8080,http://147.139.176.70:4001,http://147.139.176.70:4002
+FRONTEND_URL=http://tas.example.com:8080
+CORS_ORIGIN=http://tas.example.com:8080,http://your.server.host:8080,http://your.server.host:4001,http://your.server.host:4002
 ```
 
 **Step 3: Update NGINX Configuration**
@@ -2266,7 +2266,7 @@ nano nginx/nginx.network.conf
 
 Ensure `server_name` includes the domain:
 ```nginx
-server_name tas.energi-up.com 147.139.176.70;
+server_name tas.example.com your.server.host;
 ```
 
 **Step 4: Rebuild and Restart Services**
@@ -2289,7 +2289,7 @@ docker compose -p tas-production restart backend
 
 **Step 5: Verify Domain Access**
 
-1. Test domain: `http://tas.energi-up.com:8080`
+1. Test domain: `http://tas.example.com:8080`
 2. Should show the login page
 3. Try logging in
 
@@ -2309,7 +2309,7 @@ curl http://8.215.56.98:4000/health
 
 #### Test Production Frontend Server
 
-1. **Open browser:** `http://147.139.176.70:8080` (⚠️ Note: Using port 8080 due to port 80 conflict)
+1. **Open browser:** `http://your.server.host:8080` (⚠️ Note: Using port 8080 due to port 80 conflict)
 2. **Should see:** Login page
 3. **Login with:** Credentials from `createProductionUser.js` output
 
@@ -2317,7 +2317,7 @@ curl http://8.215.56.98:4000/health
 
 ```bash
 # Test API through NGINX on alternative port
-curl http://147.139.176.70:8080/api/health
+curl http://your.server.host:8080/api/health
 
 # Or test backend directly (if accessible)
 curl http://8.215.56.98:4000/health
@@ -2334,7 +2334,7 @@ curl http://8.215.56.98:4000/health
 **Solutions:**
 1. **Use Personal Access Token instead of password:**
    ```bash
-   git clone -b main https://jerrypra0906:<YOUR_TOKEN>@github.com/jerrypra0906/talent-acquisition-management.git tas
+   git clone -b main https://your-github-org:<YOUR_TOKEN>@github.com/your-github-org/talent-acquisition-management.git tas
    ```
 
 2. **Set up SSH keys** (see Prerequisites section)
@@ -2343,7 +2343,7 @@ curl http://8.215.56.98:4000/health
    ```bash
    apt install gh
    gh auth login
-   gh repo clone jerrypra0906/talent-acquisition-management tas
+   gh repo clone your-github-org/talent-acquisition-management tas
    ```
 
 ### Environment Variable Export Errors
@@ -2416,7 +2416,7 @@ echo "REDIS_PASSWORD: ${REDIS_PASSWORD:0:10}..."
    curl -v --connect-timeout 10 http://8.215.56.98:4000/health
    ```
    - If this times out or fails, check:
-     - AliCloud Security Group for backend server allows inbound port 4000 from frontend IP (`147.139.176.70`)
+     - AliCloud Security Group for backend server allows inbound port 4000 from frontend IP (`your.server.host`)
      - Backend server firewall (if enabled) allows port 4000
      - Backend container is listening on `0.0.0.0:4000` (not just `127.0.0.1:4000`)
 
@@ -2509,7 +2509,7 @@ If Step 1 failed, check the following:
    - **Protocol Type:** Select **"TCP"**
    - **Destination Port Range:** Enter `4000/4000` (or just `4000` if the interface accepts single port)
    - **Authorization Object:** 
-     - **Option 1 (Recommended - More Secure):** Enter `147.139.176.70/32` (only allows frontend server)
+     - **Option 1 (Recommended - More Secure):** Enter `your.server.host/32` (only allows frontend server)
      - **Option 2 (For Testing):** Select **"All IP Addresses"** or enter `0.0.0.0/0` (allows from anywhere)
    - **Description (Optional):** Enter `TAS Backend API from Frontend Server` or `TAS Backend Port 4000`
    - **Priority:** Leave as default (usually `1`)
@@ -2522,7 +2522,7 @@ If Step 1 failed, check the following:
    - Check that the new rule appears in the list with:
      - Protocol: `TCP`
      - Port: `4000/4000` (or `4000`)
-     - Authorization Object: `147.139.176.70/32` (or `0.0.0.0/0`)
+     - Authorization Object: `your.server.host/32` (or `0.0.0.0/0`)
 
 **Note:** If you don't see an "Add Rule" button, you might need to:
 - Click on the security group name/link to open the security group details page
@@ -2537,7 +2537,7 @@ On **backend server (ECS-DB)**:
 ufw status
 
 # If enabled, allow port 4000 from frontend server
-ufw allow from 147.139.176.70 to any port 4000 proto tcp
+ufw allow from your.server.host to any port 4000 proto tcp
 ufw reload
 ```
 
@@ -2563,7 +2563,7 @@ curl -v http://localhost:8080/api/health
 # Should return: HTTP/1.1 200 OK
 
 # Test from browser
-# Open: http://147.139.176.70:8080
+# Open: http://your.server.host:8080
 # Try to login - should work now
 ```
 
@@ -5046,7 +5046,7 @@ Keep a record of which ports are used by which applications:
 ### For Production Environment
 
 1. **Configure Domain Names**:
-   - Point production domain to `147.139.176.70`
+   - Point production domain to `your.server.host`
    - Update `SERVER_HOST` in `.env.production` files
    - Update NGINX `server_name` directives
 
@@ -5102,8 +5102,8 @@ Keep a record of which ports are used by which applications:
    
    ```bash
    # Update these in .env.production
-   FRONTEND_URL=https://tas.energi-up.com:8443
-   CORS_ORIGIN=https://tas.energi-up.com:8443,https://147.139.176.70:8443
+   FRONTEND_URL=https://tas.example.com:8443
+   CORS_ORIGIN=https://tas.example.com:8443,https://your.server.host:8443
    ```
    
    **Step 5: Restart NGINX Container**
@@ -5125,10 +5125,10 @@ Keep a record of which ports are used by which applications:
    
    ```bash
    # Test HTTPS endpoint
-   curl -k https://tas.energi-up.com:8443/health
+   curl -k https://tas.example.com:8443/health
    
    # Check SSL certificate
-   openssl s_client -connect tas.energi-up.com:8443 -servername tas.energi-up.com
+   openssl s_client -connect tas.example.com:8443 -servername tas.example.com
    ```
    
    **Troubleshooting SSL Issues:**
@@ -5199,7 +5199,7 @@ Keep a record of which ports are used by which applications:
       - Navigate to **Elastic Compute Service (ECS)** → **Instances**
    
    2. **Find your frontend server (ECS-App)**
-      - IP: `147.139.176.70`
+      - IP: `your.server.host`
       - Click on the instance name
    
    3. **Open Security Groups:**
@@ -5278,17 +5278,17 @@ Keep a record of which ports are used by which applications:
       
       **Option A: From VPC page:**
       - On the VPC details page, click **Resource Management** tab (or look for **Subnets** section)
-      - Find the subnet where your ECS instance (147.139.176.70) is located
+      - Find the subnet where your ECS instance (your.server.host) is located
       - Note the Network ACL ID/Name attached to that subnet
       
       **Option B: Direct navigation:**
       - Go to **VPC** → **Subnets**
-      - Filter by your VPC ID or search for subnet containing IP `147.139.176.70`
+      - Filter by your VPC ID or search for subnet containing IP `your.server.host`
       - Click on the subnet to see details
       - Note the Network ACL ID/Name attached to that subnet
       
       **Option C: From ECS instance:**
-      - Go to **ECS** → **Instances** → Your instance (147.139.176.70)
+      - Go to **ECS** → **Instances** → Your instance (your.server.host)
       - Check **Network** or **Network Interface** section
       - Find the subnet ID/name
       - Then go to **VPC** → **Subnets** → Find that subnet
@@ -5393,7 +5393,7 @@ Keep a record of which ports are used by which applications:
    
    3. **Check if ECS has Public IP vs EIP:**
       - Verify the instance has a public IP or Elastic IP
-      - Check if the IP `147.139.176.70` is directly assigned or goes through NAT
+      - Check if the IP `your.server.host` is directly assigned or goes through NAT
    
    **15. Test with Different External Sources:**
    
@@ -5465,7 +5465,7 @@ Keep a record of which ports are used by which applications:
 |---------|-------|---------|------------|
 | **Environment File** | `.env.local` | `.env.testing` | `.env.production` |
 | **Database** | Local Docker | AliCloud Server | AliCloud Server |
-| **Frontend** | `localhost:3000` | `<TESTING_FRONTEND_IP>` | `147.139.176.70` |
+| **Frontend** | `localhost:3000` | `<TESTING_FRONTEND_IP>` | `your.server.host` |
 | **Backend** | `localhost:4000` | `<TESTING_BACKEND_IP>:4000` | `8.215.56.98:4000` |
 | **SSL/HTTPS** | Not required | Optional | Required |
 | **Secrets** | Development values | Testing secrets | Production secrets |

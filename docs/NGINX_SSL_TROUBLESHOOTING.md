@@ -33,7 +33,7 @@ If you haven't placed SSL certificates yet, temporarily disable HTTPS:
    # HTTP Server
    server {
        listen 80;
-       server_name tas.energi-up.com 147.139.176.70;
+       server_name tas.example.com your.server.host;
 
        # TEMPORARILY DISABLED HTTPS REDIRECT
        # return 301 https://$host:8443$request_uri;

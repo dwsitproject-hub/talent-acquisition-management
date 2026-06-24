@@ -127,7 +127,7 @@ export default function MasterDivisionPage() {
   }
 
   // Access control
-  const roleName = (user as any)?.role?.name || (user as any)?.role || 'TA_TEAM'
+  const roleName = (user as any)?.role?.name || (user as any)?.role || 'TA_HO'
   const menuAccess = (() => { 
     if (typeof window === 'undefined') return {}
     try { 
@@ -137,12 +137,12 @@ export default function MasterDivisionPage() {
     } 
   })()
   const cfg = menuAccess['/masters/division'] || {}
-  const visibleRoles: string[] = cfg.visibleRoles && cfg.visibleRoles.length ? cfg.visibleRoles : ['SUPER_ADMIN','TA_TEAM']
+  const visibleRoles: string[] = cfg.visibleRoles && cfg.visibleRoles.length ? cfg.visibleRoles : ['SUPER_ADMIN','TA_HO']
   if (!visibleRoles.includes(roleName)) {
     router.push('/')
     return null
   }
-  const perms = cfg.permissions || { view: visibleRoles, create: ['SUPER_ADMIN','TA_TEAM'], edit: ['SUPER_ADMIN','TA_TEAM'] }
+  const perms = cfg.permissions || { view: visibleRoles, create: ['SUPER_ADMIN','TA_HO'], edit: ['SUPER_ADMIN','TA_HO'] }
   const canCreate = (perms.create || []).includes(roleName) || (perms.create || []).includes('*')
   const canEdit = (perms.edit || []).includes(roleName) || (perms.edit || []).includes('*')
 

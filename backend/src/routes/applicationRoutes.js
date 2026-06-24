@@ -70,7 +70,7 @@ router.get(
 router.get(
   '/',
   authenticate,
-  authorize('TA_TEAM', 'HRBP', 'SUPER_ADMIN', 'HIRING_MANAGER', 'CHRO', 'DEPARTMENT_HEAD'),
+  authorize('TA_HO', 'HRBP', 'TA_SITE', 'SUPER_ADMIN', 'HIRING_MANAGER', 'CHRO', 'DEPARTMENT_HEAD'),
   validationRules.pagination,
   validate,
   asyncHandler(async (req, res) => {
@@ -138,7 +138,7 @@ router.get(
 router.put(
   '/:id/status',
   authenticate,
-  authorize('TA_TEAM', 'HRBP', 'SUPER_ADMIN'),
+  authorize('TA_HO', 'HRBP', 'TA_SITE', 'SUPER_ADMIN'),
   validationRules.uuidParam('id'),
   validate,
   asyncHandler(async (req, res) => {
@@ -166,7 +166,7 @@ router.put(
 router.post(
   '/:id/shortlist',
   authenticate,
-  authorize('TA_TEAM', 'SUPER_ADMIN'),
+  authorize('TA_HO', 'SUPER_ADMIN'),
   validationRules.uuidParam('id'),
   validate,
   asyncHandler(async (req, res) => {
@@ -188,7 +188,7 @@ router.post(
 router.post(
   '/:id/reject',
   authenticate,
-  authorize('TA_TEAM', 'HRBP', 'SUPER_ADMIN'),
+  authorize('TA_HO', 'HRBP', 'TA_SITE', 'SUPER_ADMIN'),
   validationRules.uuidParam('id'),
   validate,
   asyncHandler(async (req, res) => {
@@ -234,7 +234,7 @@ router.post(
 router.get(
   '/stats/overview',
   authenticate,
-  authorize('TA_TEAM', 'HRBP', 'SUPER_ADMIN', 'CHRO'),
+  authorize('TA_HO', 'HRBP', 'TA_SITE', 'SUPER_ADMIN', 'CHRO'),
   asyncHandler(async (req, res) => {
     const filters = {
       fptkId: req.query.fptkId,

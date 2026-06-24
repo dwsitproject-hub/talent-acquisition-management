@@ -1,8 +1,13 @@
 version: '3.8'
 
+# Copy to your server and create .env.production with all secrets (see ENV_SETUP_INSTRUCTIONS.md).
+# Required .env.production variables: DATABASE_URL, JWT_SECRET, JWT_REFRESH_SECRET,
+# ENCRYPTION_KEY, REDIS_PASSWORD, DOCKERHUB_USERNAME, IMAGE_TAG, FRONTEND_URL,
+# CANDIDATE_PORTAL_URL, API_BASE_URL, CORS_ORIGIN
+
 services:
   backend:
-    image: jerrypratama/tas-backend:latest
+    image: ${DOCKERHUB_USERNAME:-your-dockerhub-username}/tas-backend:${IMAGE_TAG:-1.0.0}
     container_name: tas_backend
     restart: unless-stopped
     ports:
@@ -12,39 +17,37 @@ services:
       NODE_ENV: production
       PORT: 4000
       LOG_LEVEL: info
-      
-      # URLs - UPDATE WITH YOUR DOMAINS
-      FRONTEND_URL: https://admin.kpn-tas.gamasap.com
-      CANDIDATE_PORTAL_URL: https://careers.kpn-tas.gamasap.com
-      API_BASE_URL: https://api.kpn-tas.gamasap.com
-      
-      # Database - UPDATE WITH YOUR RDS ENDPOINT
-      # Format: postgresql://username:password@endpoint:port/database?params
-      # Example: postgresql://tasadmin:tasadminkpn@2025@tas-db-prod.abc123.us-east-1.rds.amazonaws.com:5432/tas_db?schema=public&pool_timeout=0&connection_limit=20
-      # Replace the endpoint (172.30.60.122 or use your RDS endpoint from AWS Console → RDS → Databases → Your DB → Endpoint)
-      DATABASE_URL: postgresql://tasadmin:tasadminkpn@2025@172.30.60.122:5432/tas_db?schema=public&pool_timeout=0&connection_limit=20
-      
-      # Redis - UPDATE IF USING ELASTICACHE (else leave as is for Docker Redis)
+
+      # URLs - set in .env.production
+      FRONTEND_URL: ${FRONTEND_URL:-https://admin.example.com}
+      CANDIDATE_PORTAL_URL: ${CANDIDATE_PORTAL_URL:-https://careers.example.com}
+      API_BASE_URL: ${API_BASE_URL:-https://api.example.com}
+
+      # Database - set DATABASE_URL in .env.production (never commit real values)
+      # Format: postgresql://<DB_USER>:<DB_PASSWORD>@<DB_HOST>:5432/tas_db?schema=public&pool_timeout=0&connection_limit=20
+      DATABASE_URL: ${DATABASE_URL}
+
+      # Redis
       REDIS_URL: redis://:${REDIS_PASSWORD}@redis:6379
       REDIS_PASSWORD: ${REDIS_PASSWORD:-your-redis-password-here}
-      
-      # JWT & Encryption - GENERATED SECRETS (DO NOT CHANGE)
-      JWT_SECRET: 29385124500de9cdb28814fe98432399bc9aead16ab4301d1f52c372974705fe
-      JWT_REFRESH_SECRET: 9b038281cc9a904f8340f249d1155a7aedb22fea074308c988c5fad7110c1c17
-      ENCRYPTION_KEY: 537b7ba9c2f2442cffa6e86356433b52
+
+      # JWT & Encryption - generate and set in .env.production only
+      JWT_SECRET: ${JWT_SECRET}
+      JWT_REFRESH_SECRET: ${JWT_REFRESH_SECRET}
+      ENCRYPTION_KEY: ${ENCRYPTION_KEY}
       JWT_EXPIRES_IN: 15m
       JWT_REFRESH_EXPIRES_IN: 7d
-      
+
       # CORS
-      CORS_ORIGIN: https://admin.kpn-tas.gamasap.com,https://careers.kpn-tas.gamasap.com
+      CORS_ORIGIN: ${CORS_ORIGIN:-https://admin.example.com,https://careers.example.com}
       CORS_CREDENTIALS: "true"
-      
+
       # Security / Rate Limits
       RATE_LIMIT_WINDOW_MS: 900000
       RATE_LIMIT_MAX_REQUESTS: 100
       RATE_LIMIT_LOGIN_MAX: 200
       ACCOUNT_LOCKOUT_THRESHOLD: 5
-      
+
       # File Uploads
       MAX_FILE_SIZE: 10485760
       ALLOWED_FILE_TYPES: pdf,doc,docx,jpg,jpeg,png,xls,xlsx
@@ -64,7 +67,7 @@ services:
       start_period: 40s
 
   frontend:
-    image: jerrypratama/tas-frontend:latest
+    image: ${DOCKERHUB_USERNAME:-your-dockerhub-username}/tas-frontend:${IMAGE_TAG:-1.0.0}
     container_name: tas_frontend
     restart: unless-stopped
     ports:
@@ -75,7 +78,7 @@ services:
       - tas_network
 
   candidate-portal:
-    image: jerrypratama/tas-candidate-portal:latest
+    image: ${DOCKERHUB_USERNAME:-your-dockerhub-username}/tas-candidate-portal:${IMAGE_TAG:-1.0.0}
     container_name: tas_candidate_portal
     restart: unless-stopped
     ports:
@@ -107,4 +110,3 @@ volumes:
 networks:
   tas_network:
     driver: bridge
-

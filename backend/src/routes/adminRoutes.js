@@ -8,28 +8,28 @@ const menuAccessController = require('../controllers/menuAccessController');
 router.use(authenticate);
 
 // List users
-router.get('/users', authorize('SUPER_ADMIN', 'HRBP', 'TA_TEAM'), adminUserController.listUsers);
+router.get('/users', authorize('SUPER_ADMIN', 'HRBP', 'TA_SITE', 'TA_HO'), adminUserController.listUsers);
 
 // Download bulk upload template
-router.get('/users/bulk-template', authorize('SUPER_ADMIN', 'TA_TEAM'), adminUserController.bulkTemplate);
+router.get('/users/bulk-template', authorize('SUPER_ADMIN', 'TA_HO'), adminUserController.bulkTemplate);
 
 // Bulk upload users (CSV/XLSX)
-router.post('/users/bulk-upload', authorize('SUPER_ADMIN', 'TA_TEAM'), adminUserController.bulkUpload);
+router.post('/users/bulk-upload', authorize('SUPER_ADMIN', 'TA_HO'), adminUserController.bulkUpload);
 
 // Create user
-router.post('/users', authorize('SUPER_ADMIN', 'TA_TEAM'), adminUserController.createUser);
+router.post('/users', authorize('SUPER_ADMIN', 'TA_HO'), adminUserController.createUser);
 
 // Update user
-router.put('/users/:id', authorize('SUPER_ADMIN', 'TA_TEAM'), adminUserController.updateUser);
+router.put('/users/:id', authorize('SUPER_ADMIN', 'TA_HO'), adminUserController.updateUser);
 
 // Activate/Deactivate
-router.patch('/users/:id/status', authorize('SUPER_ADMIN', 'TA_TEAM'), adminUserController.updateStatus);
+router.patch('/users/:id/status', authorize('SUPER_ADMIN', 'TA_HO'), adminUserController.updateStatus);
 
 // Reset password
 router.post('/users/:id/reset-password', authorize('SUPER_ADMIN'), adminUserController.resetPassword);
 
 // Menu Access Management (SUPER_ADMIN only)
-router.get('/menu-access', authorize('SUPER_ADMIN', 'TA_TEAM'), menuAccessController.getMenuAccess);
+router.get('/menu-access', authorize('SUPER_ADMIN', 'TA_HO'), menuAccessController.getMenuAccess);
 router.put('/menu-access', authorize('SUPER_ADMIN'), menuAccessController.updateMenuAccess);
 
 module.exports = router;

@@ -58,8 +58,8 @@ git push origin SIT
 git remote -v
 
 # Should show:
-# origin  https://github.com/jerrypra0906/talent-acquisition-management.git (fetch)
-# origin  https://github.com/jerrypra0906/talent-acquisition-management.git (push)
+# origin  https://github.com/your-github-org/talent-acquisition-management.git (fetch)
+# origin  https://github.com/your-github-org/talent-acquisition-management.git (push)
 ```
 
 ### Complete Setup (If Starting Fresh)

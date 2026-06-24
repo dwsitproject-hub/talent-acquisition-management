@@ -16,7 +16,8 @@ const mapEnumToRole = (role: string): string => {
     CHRO: 'Management',
     DEPARTMENT_HEAD: 'Head of Division',
     HRBP: 'HRBP',
-    TA_TEAM: 'TA_TEAM',
+    TA_SITE: 'TA_SITE',
+    TA_HO: 'TA_HO',
     HIRING_MANAGER: 'HIRING_MANAGER',
     INTERVIEWER: 'INTERVIEWER',
     CANDIDATE: 'CANDIDATE',
@@ -38,7 +39,7 @@ type KivRow = {
 export default function KivPage() {
   const { isAuthenticated, isLoading, user } = useAuth()
   const router = useRouter()
-  const backendRole = (user as any)?.role?.name || (user as any)?.role || 'TA_TEAM'
+  const backendRole = (user as any)?.role?.name || (user as any)?.role || 'TA_HO'
   const roleName = mapEnumToRole(backendRole)
 
   const [rows, setRows] = useState<KivRow[]>([])
@@ -157,7 +158,8 @@ export default function KivPage() {
           'Management',
           'Head of Division',
           'HRBP',
-          'TA_TEAM',
+          'TA_HO',
+          'TA_SITE',
           'HIRING_MANAGER',
           'INTERVIEWER',
         ]

@@ -1,15 +1,22 @@
 /**
  * Production User Creation Script
- * 
- * Creates the initial production user:
- * - First Name: Jerry
- * - Last Name: Hakim
- * - Email: jerry.hakim@energi-up.com
- * - Password: DefaultPassword123!
- * - Role: SUPER_ADMIN
- * 
+ *
+ * Creates the initial SUPER_ADMIN user from environment variables.
+ * Never hardcode credentials in this file.
+ *
+ * Required env vars:
+ *   DATABASE_URL - application database connection string
+ *   ADMIN_EMAIL - admin user email
+ *   ADMIN_PASSWORD - initial password (user should change on first login)
+ *
+ * Optional:
+ *   ADMIN_FIRST_NAME (default: Admin)
+ *   ADMIN_LAST_NAME (default: User)
+ *
  * Usage:
- *   DATABASE_URL=postgresql://tasadmin:tasadminkpn@2025@localhost:5432/tas_db node createProductionUser.js
+ *   ADMIN_EMAIL=admin@example.com ADMIN_PASSWORD=your-secure-password \
+ *   DATABASE_URL=postgresql://your_db_user:your_secure_db_password@localhost:5432/tas_db \
+ *   node createProductionUser.js
  */
 
 const bcrypt = require('bcryptjs');
@@ -19,17 +26,25 @@ const prisma = new PrismaClient();
 
 async function createProductionUser() {
   try {
+    const email = process.env.ADMIN_EMAIL;
+    const password = process.env.ADMIN_PASSWORD;
+    const firstName = process.env.ADMIN_FIRST_NAME || 'Admin';
+    const lastName = process.env.ADMIN_LAST_NAME || 'User';
+
+    if (!email || !password) {
+      throw new Error('ADMIN_EMAIL and ADMIN_PASSWORD environment variables are required');
+    }
+
     console.log('🚀 Creating production user...\n');
 
     const userData = {
-      email: 'jerry.hakim@energi-up.com',
-      password: 'DefaultPassword123!',
-      firstName: 'Jerry',
-      lastName: 'Hakim',
+      email,
+      password,
+      firstName,
+      lastName,
       role: 'SUPER_ADMIN',
     };
 
-    // Check if user already exists
     const existing = await prisma.user.findUnique({
       where: { email: userData.email },
     });
@@ -42,34 +57,32 @@ async function createProductionUser() {
       return;
     }
 
-    // Hash password
     console.log('🔐 Hashing password...');
     const hashedPassword = await bcrypt.hash(userData.password, 12);
 
-    // Create user using raw SQL to avoid enum issues
     console.log('➕ Creating user in database...');
     const now = new Date();
     const result = await prisma.$queryRawUnsafe(`
       INSERT INTO users (
-        id, 
-        email, 
-        password, 
-        "firstName", 
-        "lastName", 
-        "phoneNumber", 
-        role, 
-        department, 
-        division, 
-        pt, 
-        area, 
+        id,
+        email,
+        password,
+        "firstName",
+        "lastName",
+        "phoneNumber",
+        role,
+        department,
+        division,
+        pt,
+        area,
         "areaDetail",
-        "isActive", 
-        "isEmailVerified", 
-        "emailVerifiedAt", 
-        "lastLoginAt", 
-        "failedLoginCount", 
-        "lockedUntil", 
-        "createdAt", 
+        "isActive",
+        "isEmailVerified",
+        "emailVerifiedAt",
+        "lastLoginAt",
+        "failedLoginCount",
+        "lockedUntil",
+        "createdAt",
         "updatedAt"
       )
       VALUES (
@@ -108,15 +121,14 @@ async function createProductionUser() {
     const newUser = result[0];
 
     console.log('\n✅ Production user created successfully!');
-    console.log('\n📋 User Credentials:');
+    console.log('\n📋 User summary:');
     console.log(`   Name: ${userData.firstName} ${userData.lastName}`);
     console.log(`   Email: ${userData.email}`);
-    console.log(`   Password: ${userData.password}`);
     console.log(`   Role: ${userData.role}`);
     console.log(`   User ID: ${newUser.id}`);
     console.log('\n⚠️  Security Note:');
-    console.log('   Please change the password after first login!');
-    console.log('   The default password should not be used in production.');
+    console.log('   Change the password after first login.');
+    console.log('   Do not reuse this password elsewhere.');
 
   } catch (error) {
     console.error('\n❌ Error creating production user:', error);
@@ -129,6 +141,4 @@ async function createProductionUser() {
   }
 }
 
-// Run the script
 createProductionUser();
-

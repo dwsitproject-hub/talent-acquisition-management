@@ -13,16 +13,16 @@ This guide provides step-by-step instructions for setting up the production envi
 
 ## Production Database Credentials
 
-- **Username**: `tasadmin`
-- **Password**: `tasadminkpn@2025`
+- **Username**: `your_db_user`
+- **Password**: `your_secure_db_password`
 - **Database**: `tas_db`
 
 ## Production User Credentials
 
 - **First Name**: Jerry
 - **Last Name**: Hakim
-- **Email**: jerry.hakim@energi-up.com
-- **Password**: DefaultPassword123!
+- **Email**: admin@example.com
+- **Password**: your-secure-admin-password
 - **Role**: SUPER_ADMIN
 
 ---
@@ -51,8 +51,8 @@ Alternatively, use AWS RDS for PostgreSQL:
    - Engine: PostgreSQL 15
    - Instance class: db.t3.medium or larger
    - Storage: 20GB minimum
-   - Master username: `tasadmin`
-   - Master password: `tasadminkpn@2025`
+   - Master username: `your_db_user`
+   - Master password: `your_secure_db_password`
    - Database name: `tas_db`
    - VPC: Same as EC2 instance
    - Security group: Allow access from EC2 instance
@@ -129,7 +129,7 @@ FRONTEND_URL=https://admin.yourdomain.com
 CANDIDATE_PORTAL_URL=https://careers.yourdomain.com
 
 # Database (if using RDS, use RDS endpoint)
-DATABASE_URL=postgresql://tasadmin:tasadminkpn@2025@your-rds-endpoint:5432/tas_db?schema=public&pool_timeout=0&connection_limit=20
+DATABASE_URL=postgresql://your_db_user:your_secure_db_password@your-rds-endpoint:5432/tas_db?schema=public&pool_timeout=0&connection_limit=20
 
 # Redis (if using ElastiCache, use ElastiCache endpoint)
 REDIS_URL=redis://:your-redis-password@your-elasticache-endpoint:6379
@@ -205,7 +205,9 @@ DATABASE_URL=postgresql://postgres:postgres_password@localhost:5432/postgres nod
 cd /opt/tas/backend
 
 # Run database setup script (connect to RDS)
-DATABASE_URL=postgresql://postgres:postgres_password@your-rds-endpoint:5432/postgres node scripts/setupProductionDB.js
+PROD_DB_USER=your_db_user PROD_DB_PASSWORD=your_secure_db_password \
+DATABASE_URL=postgresql://postgres:postgres_password@your-rds-endpoint:5432/postgres \
+node scripts/setupProductionDB.js
 ```
 
 ### 3.4 Run Database Migrations
@@ -214,7 +216,7 @@ DATABASE_URL=postgresql://postgres:postgres_password@your-rds-endpoint:5432/post
 cd /opt/tas/backend
 
 # Set production database URL
-export DATABASE_URL=postgresql://tasadmin:tasadminkpn@2025@your-db-host:5432/tas_db
+export DATABASE_URL=postgresql://your_db_user:your_secure_db_password@your-db-host:5432/tas_db
 
 # Generate Prisma client
 npx prisma generate
@@ -228,8 +230,10 @@ npx prisma migrate deploy
 ```bash
 cd /opt/tas/backend
 
-# Set production database URL
-export DATABASE_URL=postgresql://tasadmin:tasadminkpn@2025@your-db-host:5432/tas_db
+# Set production database URL and admin credentials
+export DATABASE_URL=postgresql://your_db_user:your_secure_db_password@your-db-host:5432/tas_db
+export ADMIN_EMAIL=admin@example.com
+export ADMIN_PASSWORD=your-secure-admin-password
 
 # Create production user
 node scripts/createProductionUser.js
@@ -412,7 +416,7 @@ BACKUP_FILE="$BACKUP_DIR/tas_db_$DATE.sql"
 
 mkdir -p $BACKUP_DIR
 
-pg_dump -h your-db-host -U tasadmin -d tas_db > $BACKUP_FILE
+pg_dump -h your-db-host -U your_db_user -d tas_db > $BACKUP_FILE
 
 # Compress backup
 gzip $BACKUP_FILE
@@ -437,8 +441,8 @@ crontab -e
 
 1. Navigate to: `https://admin.yourdomain.com`
 2. Login with:
-   - Email: `jerry.hakim@energi-up.com`
-   - Password: `DefaultPassword123!`
+   - Email: `admin@example.com`
+   - Password: `your-secure-admin-password`
 3. **IMPORTANT**: Change password immediately after first login
 
 ---
@@ -466,7 +470,7 @@ crontab -e
 
 ```bash
 # Test database connection
-psql -h your-db-host -U tasadmin -d tas_db
+psql -h your-db-host -U your_db_user -d tas_db
 
 # Check database logs
 docker-compose logs postgres

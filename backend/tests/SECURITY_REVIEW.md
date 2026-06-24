@@ -66,7 +66,7 @@ This document provides a comprehensive security review of the Talent Acquisition
 - AES-256 encryption for PII (nationalId)
 - Sensitive data encrypted at rest
 - Database connection encryption
-- Production database credentials secured (separate user: tasadmin)
+- Production database credentials secured (separate user: your_db_user)
 - Role-based data filtering (prevents unauthorized data access)
 - SSR-safe implementation (prevents data leakage during SSR)
 
@@ -127,8 +127,8 @@ This document provides a comprehensive security review of the Talent Acquisition
    - **Risk Level**: Low
 
 2. **Database Security**:
-   - ✅ Strong production password: `tasadminkpn@2025`
-   - ✅ Separate production user: `tasadmin`
+   - ✅ Strong production password: `your_secure_db_password`
+   - ✅ Separate production user: `your_db_user`
    - ⚠️ SSL/TLS: Configure in production (RDS or connection string)
    - ✅ Network access: Restricted to application servers
    - ✅ Backups: Script provided in PRODUCTION_SETUP.md
@@ -296,7 +296,7 @@ See `SECURITY_TEST_RESULTS.md` for detailed test execution results.
 ## 11. Production Security Checklist
 
 ### Pre-Deployment
-- [x] Database credentials secured (tasadmin user)
+- [x] Database credentials secured (your_db_user user)
 - [x] Production user created with secure password
 - [x] Environment variables configured
 - [x] SSL/TLS configured (when deployed)

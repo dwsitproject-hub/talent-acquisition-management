@@ -17,3 +17,22 @@ backend/.env*
 database/
 nginx/ssl/
 backend/scripts/testNotificationSeed.js
+
+# Sensitive data exports
+*.export.json
+backend/data/localStorage-export.json
+backend/data/*-export.json
+
+# Private operational runbooks (store locally, never commit)
+private-runbook/
+docs/Update Deployment.md
+
+# SSH and server deployment docs (maintain copies in private-runbook/ only)
+SSH_KEY_SETUP_STEPS.md
+TROUBLESHOOT_SSH_KEY.md
+FIX_SSH_CONFIG.md
+FIX_SSH_KEY_MATCH.md
+REGENERATE_SSH_KEY.md
+
+# Build artifacts
+candidate-portal/.next/

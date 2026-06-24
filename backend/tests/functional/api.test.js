@@ -223,7 +223,7 @@ describe('Functional Test Suite - Talent Acquisition System', () => {
           password: hashedPassword,
           firstName: 'TA',
           lastName: 'User',
-          role: 'TA_TEAM',
+          role: 'TA_HO',
           isActive: true,
         },
       });

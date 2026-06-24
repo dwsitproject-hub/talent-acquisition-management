@@ -75,7 +75,7 @@ The system automates and manages the complete talent acquisition lifecycle, prov
 | **Management (CHRO)** | Chief Human Resources Officer | View-only access to all data, dashboards, analytics |
 | **Head of Division (DEPARTMENT_HEAD)** | Department leader | View positions/candidates for own division, approve offers |
 | **HRBP** | HR Business Partner | View positions/candidates by PT/Area/Area Detail, compliance review |
-| **TA_TEAM** | Talent Acquisition specialists | Full pipeline management, sourcing, screening, interviews |
+| **TA_HO** | Talent Acquisition specialists | Full pipeline management, sourcing, screening, interviews |
 | **HIRING_MANAGER** | Requesting manager | Create FPTK, view own positions/applications |
 | **INTERVIEWER** | Technical/functional interviewer | View assigned interviews, submit feedback |
 | **CANDIDATE** | Job applicant | Apply for jobs, upload documents, track application |
@@ -463,7 +463,7 @@ The system automates and manages the complete talent acquisition lifecycle, prov
 
 ### 8.1 Production Environment
 
-- **Database**: PostgreSQL with credentials (tasadmin/tasadminkpn@2025)
+- **Database**: PostgreSQL with credentials (your_db_user/your_secure_db_password)
 - **Application**: Docker containers
 - **Network**: Private network with load balancer
 - **SSL/TLS**: HTTPS with valid certificates

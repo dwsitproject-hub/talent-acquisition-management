@@ -175,15 +175,15 @@ npm test -- tests/security
 ```bash
 # Backend
 cd backend
-docker buildx build --platform linux/arm64 -t your-dockerhub-username/tas-backend:latest --push .
+docker buildx build --platform linux/arm64 -t your-dockerhub-username/tas-backend:1.0.0 --push .
 
 # Frontend
 cd frontend
-docker buildx build --platform linux/arm64 -t your-dockerhub-username/tas-frontend:latest --push .
+docker buildx build --platform linux/arm64 -t your-dockerhub-username/tas-frontend:1.0.0 --push .
 
 # Candidate Portal
 cd candidate-portal
-docker buildx build --platform linux/arm64 -t your-dockerhub-username/tas-candidate-portal:latest --push .
+docker buildx build --platform linux/arm64 -t your-dockerhub-username/tas-candidate-portal:1.0.0 --push .
 ```
 
 ## Next Steps

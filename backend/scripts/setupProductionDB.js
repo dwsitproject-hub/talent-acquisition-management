@@ -1,17 +1,24 @@
 /**
  * Production Database Setup Script
- * 
- * This script sets up the production database with the specified credentials:
- * - Username: tasadmin
- * - Password: tasadminkpn@2025
- * - Database: tas_db
- * 
+ *
+ * Creates the application database user and database using admin credentials.
+ * Set credentials via environment variables (never hardcode in this file).
+ *
+ * Required env vars:
+ *   DATABASE_URL - admin connection (e.g. postgresql://postgres:<password>@localhost:5432/postgres)
+ *   PROD_DB_USER - application database username to create
+ *   PROD_DB_PASSWORD - application database password to create
+ *
+ * Optional:
+ *   PROD_DB_NAME - database name (default: tas_db)
+ *
  * Usage:
- *   DATABASE_URL=postgresql://postgres:postgres_password@localhost:5432/postgres node setupProductionDB.js
+ *   PROD_DB_USER=your_db_user PROD_DB_PASSWORD=your_secure_db_password \
+ *   DATABASE_URL=postgresql://postgres:admin_password@localhost:5432/postgres \
+ *   node setupProductionDB.js
  */
 
 const { PrismaClient } = require('@prisma/client');
-const { execSync } = require('child_process');
 
 const prisma = new PrismaClient();
 
@@ -19,16 +26,21 @@ async function setupProductionDatabase() {
   try {
     console.log('🚀 Starting production database setup...\n');
 
-    // Get the database URL from environment
     const databaseUrl = process.env.DATABASE_URL;
     if (!databaseUrl) {
       throw new Error('DATABASE_URL environment variable is required');
     }
 
-    // Parse the database URL to get connection details
+    const prodUser = process.env.PROD_DB_USER;
+    const prodPassword = process.env.PROD_DB_PASSWORD;
+    const prodDatabase = process.env.PROD_DB_NAME || 'tas_db';
+
+    if (!prodUser || !prodPassword) {
+      throw new Error('PROD_DB_USER and PROD_DB_PASSWORD environment variables are required');
+    }
+
     const url = new URL(databaseUrl.replace('postgresql://', 'http://'));
     const adminUser = url.username || 'postgres';
-    const adminPassword = url.password || '';
     const host = url.hostname || 'localhost';
     const port = url.port || '5432';
     const adminDb = url.pathname.slice(1) || 'postgres';
@@ -37,12 +49,6 @@ async function setupProductionDatabase() {
     console.log(`👤 Admin user: ${adminUser}`);
     console.log(`🗄️  Admin database: ${adminDb}\n`);
 
-    // Production credentials
-    const prodUser = 'tasadmin';
-    const prodPassword = 'tasadminkpn@2025';
-    const prodDatabase = 'tas_db';
-
-    // Check if user already exists
     console.log('🔍 Checking if production user exists...');
     const userExists = await prisma.$queryRawUnsafe(`
       SELECT 1 FROM pg_user WHERE usename = $1
@@ -58,7 +64,6 @@ async function setupProductionDatabase() {
       console.log(`✅ User '${prodUser}' created successfully`);
     }
 
-    // Check if database already exists
     console.log('\n🔍 Checking if production database exists...');
     const dbExists = await prisma.$queryRawUnsafe(`
       SELECT 1 FROM pg_database WHERE datname = $1
@@ -74,16 +79,14 @@ async function setupProductionDatabase() {
       console.log(`✅ Database '${prodDatabase}' created successfully`);
     }
 
-    // Grant privileges
     console.log('\n🔐 Granting privileges...');
     await prisma.$executeRawUnsafe(`
       GRANT ALL PRIVILEGES ON DATABASE ${prodDatabase} TO ${prodUser};
     `);
     console.log('✅ Privileges granted');
 
-    // Connect to the new database to set schema privileges
     console.log('\n🔗 Connecting to production database to set schema privileges...');
-    const prodDbUrl = `postgresql://${prodUser}:${prodPassword}@${host}:${port}/${prodDatabase}`;
+    const prodDbUrl = `postgresql://${prodUser}:${encodeURIComponent(prodPassword)}@${host}:${port}/${prodDatabase}`;
     const prodPrisma = new PrismaClient({
       datasources: {
         db: {
@@ -96,7 +99,6 @@ async function setupProductionDatabase() {
       await prodPrisma.$connect();
       console.log('✅ Connected to production database');
 
-      // Grant schema privileges
       await prodPrisma.$executeRawUnsafe(`
         GRANT ALL ON SCHEMA public TO ${prodUser};
         ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON TABLES TO ${prodUser};
@@ -110,11 +112,10 @@ async function setupProductionDatabase() {
     }
 
     console.log('\n✅ Production database setup completed successfully!');
-    console.log('\n📋 Production Database Credentials:');
+    console.log('\n📋 Summary:');
     console.log(`   Username: ${prodUser}`);
-    console.log(`   Password: ${prodPassword}`);
     console.log(`   Database: ${prodDatabase}`);
-    console.log(`   Connection URL: postgresql://${prodUser}:${prodPassword}@${host}:${port}/${prodDatabase}`);
+    console.log(`   Host: ${host}:${port}`);
     console.log('\n⚠️  Next steps:');
     console.log('   1. Update DATABASE_URL in your production .env file');
     console.log('   2. Run database migrations: npx prisma migrate deploy');
@@ -128,6 +129,4 @@ async function setupProductionDatabase() {
   }
 }
 
-// Run the setup
 setupProductionDatabase();
-

@@ -10,7 +10,8 @@ function mapRoleToEnum(role) {
     'Management': 'CHRO', // Assuming Management maps to CHRO
     'Head of Division': 'DEPARTMENT_HEAD',
     'HRBP': 'HRBP',
-    'TA_TEAM': 'TA_TEAM',
+    'TA_HO': 'TA_HO',
+    'TA_SITE': 'TA_SITE',
     'HIRING_MANAGER': 'HIRING_MANAGER',
     'INTERVIEWER': 'INTERVIEWER',
     'CANDIDATE': 'CANDIDATE',
@@ -29,7 +30,8 @@ function mapEnumToRole(role) {
     'CHRO': 'Management',
     'DEPARTMENT_HEAD': 'Head of Division',
     'HRBP': 'HRBP',
-    'TA_TEAM': 'TA_TEAM',
+    'TA_HO': 'TA_HO',
+    'TA_SITE': 'TA_SITE',
     'HIRING_MANAGER': 'HIRING_MANAGER',
     'INTERVIEWER': 'INTERVIEWER',
     'CANDIDATE': 'CANDIDATE',
@@ -94,7 +96,10 @@ async function createUser(data) {
     areaDetail,
   } = data;
 
-  const hashed = await bcrypt.hash(password || 'DefaultPassword123!', 12);
+  if (!password) {
+    throw new Error('Password is required when creating a user');
+  }
+  const hashed = await bcrypt.hash(password, 12);
   
   // Map role to enum value
   const mappedRole = mapRoleToEnum(role);
@@ -191,7 +196,10 @@ async function updateStatus(id, isActive) {
 }
 
 async function resetPassword(id, newPassword) {
-  const hashed = await bcrypt.hash(newPassword || 'DefaultPassword123!', 12);
+  if (!newPassword) {
+    throw new Error('New password is required');
+  }
+  const hashed = await bcrypt.hash(newPassword, 12);
   await prisma.user.update({
     where: { id },
     data: { password: hashed, failedLoginCount: 0, lockedUntil: null },
