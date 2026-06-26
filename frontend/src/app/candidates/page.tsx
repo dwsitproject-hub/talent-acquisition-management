@@ -1193,9 +1193,6 @@ export default function CandidatesPage() {
                         Status
                       </th>
                       <th scope="col" className="px-3 py-3.5 text-left text-sm font-semibold text-gray-900">
-                        Source
-                      </th>
-                      <th scope="col" className="px-3 py-3.5 text-left text-sm font-semibold text-gray-900">
                         Applied
                       </th>
                       <th scope="col" className="relative py-3.5 pl-3 pr-4 sm:pr-6">
@@ -1287,9 +1284,6 @@ export default function CandidatesPage() {
                           <span className={`inline-flex rounded-full px-2 py-1 text-xs font-semibold ${statusColors[candidate.status]}`}>
                             {candidate.status.replace('_', ' ')}
                           </span>
-                        </td>
-                        <td className="whitespace-nowrap px-3 py-4 text-sm text-gray-500">
-                          {candidate.source}
                         </td>
                         <td className="whitespace-nowrap px-3 py-4 text-sm text-gray-500">
                           {new Date(candidate.createdAt).toLocaleDateString()}
