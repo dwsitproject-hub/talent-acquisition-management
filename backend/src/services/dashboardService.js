@@ -1,5 +1,7 @@
 const prisma = require('../config/database');
 const logger = require('../utils/logger');
+const { buildHrbpFptkFilterFromUser, buildHrbpApplicationFptkFilterFromUser } = require('../utils/hrbpScope');
+const { isDepartmentHeadRole, buildHodFptkFilterFromUser, buildHodApplicationScopeFromUser, buildHodCandidateScopeFromUser } = require('../utils/hodScope');
 
 function buildHiringManagerScopeFromUser(user = null) {
   if (!user) return null;
@@ -184,10 +186,6 @@ async function getDashboardStats(user = null, options = {}) {
 
     if (user) {
       const userRole = user.role;
-      const userDivision = user.division;
-      const userPt = user.pt;
-      const userArea = user.area;
-      const userAreaDetail = user.areaDetail;
 
       if (userRole === 'HIRING_MANAGER') {
         const hmScope = buildHiringManagerScopeFromUser(user);
@@ -204,38 +202,39 @@ async function getDashboardStats(user = null, options = {}) {
           applicationWhere.id = '00000000-0000-0000-0000-000000000000';
           candidateWhere.id = '00000000-0000-0000-0000-000000000000';
         }
-      } else if ((userRole === 'Head of Division' || userRole === 'DEPARTMENT_HEAD') && userDivision) {
-        fptkWhere.division = userDivision;
-        applicationWhere.OR = [
-          { fptk: { division: userDivision } },
-          { candidate: { user: { division: userDivision } } }
-        ];
-        candidateWhere.user = { division: userDivision };
+      } else if (isDepartmentHeadRole(userRole)) {
+        const hodFptk = buildHodFptkFilterFromUser(user);
+        const hodApplications = buildHodApplicationScopeFromUser(user);
+        const hodCandidates = buildHodCandidateScopeFromUser(user);
+        if (hodFptk) {
+          Object.assign(fptkWhere, hodFptk);
+        } else {
+          fptkWhere.id = '00000000-0000-0000-0000-000000000000';
+        }
+        if (hodApplications) {
+          Object.assign(applicationWhere, hodApplications);
+        } else {
+          applicationWhere.id = '00000000-0000-0000-0000-000000000000';
+        }
+        if (hodCandidates) {
+          Object.assign(candidateWhere, hodCandidates);
+        } else {
+          candidateWhere.id = '00000000-0000-0000-0000-000000000000';
+        }
       } else if (userRole === 'HRBP' || userRole === 'TA_SITE') {
-        // HRBP / TA_SITE: All three fields must be present and match
-        if (userPt && userArea && userAreaDetail) {
-          fptkWhere.pt = userPt;
-          fptkWhere.area = userArea;
-          fptkWhere.areaDetail = userAreaDetail;
-          
-          applicationWhere.fptk = {
-            pt: userPt,
-            area: userArea,
-            areaDetail: userAreaDetail,
-          };
-          
+        const hrbpFptk = buildHrbpFptkFilterFromUser(user);
+        const hrbpApplications = buildHrbpApplicationFptkFilterFromUser(user);
+        if (hrbpFptk) {
+          Object.assign(fptkWhere, hrbpFptk);
+        } else {
+          fptkWhere.id = '00000000-0000-0000-0000-000000000000';
+        }
+        if (hrbpApplications) {
+          Object.assign(applicationWhere, hrbpApplications);
           candidateWhere.applications = {
-            some: {
-              fptk: {
-                pt: userPt,
-                area: userArea,
-                areaDetail: userAreaDetail,
-              },
-            },
+            some: hrbpApplications,
           };
         } else {
-          // If any field is missing, return no results
-          fptkWhere.id = '00000000-0000-0000-0000-000000000000';
           applicationWhere.id = '00000000-0000-0000-0000-000000000000';
           candidateWhere.id = '00000000-0000-0000-0000-000000000000';
         }

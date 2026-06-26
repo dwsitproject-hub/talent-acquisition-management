@@ -1,6 +1,8 @@
 const bcrypt = require('bcryptjs');
 const prisma = require('../config/database');
 const logger = require('../utils/logger');
+const { serializeHrbpFields } = require('../utils/hrbpScope');
+const { serializeHodFields } = require('../utils/hodScope');
 
 // Map frontend role names to backend enum values
 function mapRoleToEnum(role) {
@@ -104,6 +106,9 @@ async function createUser(data) {
   // Map role to enum value
   const mappedRole = mapRoleToEnum(role);
   logger.info(`Creating user with role: "${role}" -> mapped to: "${mappedRole}"`);
+
+  const hodFields = serializeHodFields({ division, sectionName });
+  const hrbpFields = serializeHrbpFields({ pt, area, areaDetail, role: mappedRole });
   
   // Use Prisma client to avoid enum type name mismatch issues
   // Prisma handles enum mapping correctly
@@ -115,11 +120,11 @@ async function createUser(data) {
       lastName,
       phoneNumber: phone || null,
       role: mappedRole, // Prisma will map enum correctly
-      division: division || null,
-      department: sectionName || null,
-      pt: pt || null,
-      area: area || null,
-      areaDetail: areaDetail || null,
+      division: hodFields.division,
+      department: hodFields.department,
+      pt: hrbpFields.pt,
+      area: hrbpFields.area,
+      areaDetail: hrbpFields.areaDetail,
       isActive: true,
       isEmailVerified: true,
       emailVerifiedAt: new Date(),
@@ -141,6 +146,14 @@ async function updateUser(id, data) {
     return String(value).trim() || null;
   };
   
+  const hodFields = serializeHodFields({ division: data.division, sectionName: data.sectionName });
+  const hrbpFields = serializeHrbpFields({
+    pt: data.pt,
+    area: data.area,
+    areaDetail: data.areaDetail,
+    role: mappedRole,
+  });
+
   // Use Prisma client to avoid enum type name mismatch issues
   // Prisma handles enum mapping correctly
   const updateData = {
@@ -149,11 +162,11 @@ async function updateUser(id, data) {
     email: data.email,
     phoneNumber: toNullIfEmpty(data.phone),
     role: mappedRole, // Prisma will map enum correctly
-    division: toNullIfEmpty(data.division),
-    department: toNullIfEmpty(data.sectionName),
-    pt: toNullIfEmpty(data.pt),
-    area: toNullIfEmpty(data.area),
-    areaDetail: toNullIfEmpty(data.areaDetail),
+    division: hodFields.division,
+    department: hodFields.department,
+    pt: hrbpFields.pt,
+    area: hrbpFields.area,
+    areaDetail: hrbpFields.areaDetail,
   };
   
   logger.info(`Updating user ${id} with data:`, {

@@ -3,6 +3,8 @@ const logger = require('../utils/logger');
 const { buildTokenizedSearch } = require('../utils/search');
 const { withActiveCandidateOnApplication } = require('../utils/candidateVisibility');
 const { assertCandidateCanApplyToPosition } = require('../utils/candidateApplicationLock');
+const { buildHrbpApplicationFptkFilterFromUser } = require('../utils/hrbpScope');
+const { isDepartmentHeadRole, buildHodApplicationScopeFromUser } = require('../utils/hodScope');
 
 function buildHiringManagerScopeFromUser(user = null) {
   if (!user) return null;
@@ -232,10 +234,6 @@ async function getAllApplications(filters, pagination, user = null) {
   // Role-based filtering
   if (user) {
     const userRole = user.role;
-    const userDivision = user.division;
-    const userPt = user.pt;
-    const userArea = user.area;
-    const userAreaDetail = user.areaDetail;
 
     if (userRole === 'HIRING_MANAGER') {
       // HIRING_MANAGER: only see candidates where Position.Hiring Manager = Team.First Name
@@ -245,24 +243,19 @@ async function getAllApplications(filters, pagination, user = null) {
       } else {
         where.id = '00000000-0000-0000-0000-000000000000';
       }
-    } else if ((userRole === 'Head of Division' || userRole === 'DEPARTMENT_HEAD') && userDivision) {
-      // Head of Division: only see candidates where Position.Division = Team.Division or Candidates.Division = Team.Division
-      where.OR = [
-        { fptk: { division: userDivision } },
-        { candidate: { user: { division: userDivision } } }
-      ];
-    } else if (userRole === 'HRBP' || userRole === 'TA_SITE') {
-      // HRBP / TA_SITE: only see applications where Position.PT/Area/Area Detail matches user's assignment
-      // All three fields must be present and match
-      if (userPt && userArea && userAreaDetail) {
-        where.fptk = {
-          pt: userPt,
-          area: userArea,
-          areaDetail: userAreaDetail,
-        };
+    } else if (isDepartmentHeadRole(userRole)) {
+      const hodScope = buildHodApplicationScopeFromUser(user);
+      if (hodScope) {
+        Object.assign(where, hodScope);
       } else {
-        // If any field is missing, return no results
-        where.id = '00000000-0000-0000-0000-000000000000'; // Non-existent ID to return empty results
+        where.id = '00000000-0000-0000-0000-000000000000';
+      }
+    } else if (userRole === 'HRBP' || userRole === 'TA_SITE') {
+      const hrbpScope = buildHrbpApplicationFptkFilterFromUser(user);
+      if (hrbpScope) {
+        Object.assign(where, hrbpScope);
+      } else {
+        where.id = '00000000-0000-0000-0000-000000000000';
       }
     }
     // SUPER_ADMIN, TA_HO, and other roles see all applications (no additional filtering)

@@ -1,4 +1,5 @@
 import { FPTKAPI } from '@/lib/api'
+import { isFptkOpenByCurrentStatus } from '@/utils/fptkPositionStatus'
 
 export type PositionOption = {
   id: string
@@ -11,12 +12,44 @@ export type PositionOption = {
 
 const EXCLUDED_PICKER_STATUSES = new Set(['ON BOARDING', 'FILLED', 'CANCELLED', 'EXPIRED'])
 
-/** Statuses eligible for the candidate position picker (aligned with edit modal rules). */
+/** Statuses eligible for the candidate position picker (open + not post-hire terminal). */
 export function isSelectableFptkStatus(status?: string | null): boolean {
   const normalized = (status || '').toUpperCase().trim()
-  if (!normalized) return true
-  if (normalized === 'ON BOARDING') return false
-  return !EXCLUDED_PICKER_STATUSES.has(normalized)
+  if (normalized && EXCLUDED_PICKER_STATUSES.has(normalized)) return false
+  return isFptkOpenByCurrentStatus(status)
+}
+
+export function normalizeDivisionName(name?: string | null): string {
+  return (name || '').trim().toLowerCase()
+}
+
+/** Open positions matching any selected division (OR). Empty when no division selected. */
+export function filterPositionOptionsByDivisions(
+  options: PositionOption[],
+  selectedDivisions: string[]
+): PositionOption[] {
+  const normalizedDivisions = selectedDivisions
+    .map(normalizeDivisionName)
+    .filter(Boolean)
+  if (normalizedDivisions.length === 0) return []
+
+  return options.filter((opt) => {
+    const optDivision = normalizeDivisionName(opt.division)
+    const divisionMatch = normalizedDivisions.includes(optDivision)
+    return divisionMatch && isSelectableFptkStatus(opt.currentStatus)
+  })
+}
+
+/** Keep only titles that remain valid for the current division selection. */
+export function prunePositionAppliedFor(
+  titles: string[],
+  options: PositionOption[],
+  selectedDivisions: string[]
+): string[] {
+  const validTitles = new Set(
+    filterPositionOptionsByDivisions(options, selectedDivisions).map((opt) => opt.title)
+  )
+  return titles.filter((title) => validTitles.has(title))
 }
 
 export function mapRowToPositionOption(row: {

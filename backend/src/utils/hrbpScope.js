@@ -4,6 +4,18 @@
  */
 
 const SEP = '||';
+const TA_SITE_FIXED_AREA = 'Site';
+
+function isTaSiteRole(role) {
+  return role === 'TA_SITE';
+}
+
+function resolveAreasForUser(user) {
+  if (isTaSiteRole(user?.role)) {
+    return [TA_SITE_FIXED_AREA];
+  }
+  return parseMulti(user?.area);
+}
 
 function parseMulti(value) {
   if (value == null || value === '') return [];
@@ -25,7 +37,7 @@ function hasHrbpTriple(pts, areas, details) {
  */
 function buildHrbpFptkFilterFromUser(user) {
   const pts = parseMulti(user?.pt);
-  const areas = parseMulti(user?.area);
+  const areas = resolveAreasForUser(user);
   const details = parseMulti(user?.areaDetail);
   if (!hasHrbpTriple(pts, areas, details)) {
     return null;
@@ -47,17 +59,38 @@ function packField(v) {
   return s || null;
 }
 
-function serializeHrbpFields({ pt, area, areaDetail }) {
+function serializeHrbpFields({ pt, area, areaDetail, role }) {
+  const resolvedArea = isTaSiteRole(role) ? TA_SITE_FIXED_AREA : area;
   return {
     pt: packField(pt),
-    area: packField(area),
+    area: packField(resolvedArea),
     areaDetail: packField(areaDetail),
   };
 }
 
+function inFilter(values) {
+  if (!values || values.length === 0) return undefined;
+  return values.length === 1 ? values[0] : { in: values };
+}
+
+/**
+ * Prisma where fragment for applications/candidates scoped to HRBP or TA_SITE user.
+ * @returns {object|null} { fptk: { pt, area, areaDetail } } or null
+ */
+function buildHrbpApplicationFptkFilterFromUser(user) {
+  const filter = buildHrbpFptkFilterFromUser(user);
+  if (!filter) return null;
+  return { fptk: filter };
+}
+
 module.exports = {
   SEP,
+  TA_SITE_FIXED_AREA,
+  isTaSiteRole,
   parseMulti,
+  inFilter,
+  packField,
   buildHrbpFptkFilterFromUser,
+  buildHrbpApplicationFptkFilterFromUser,
   serializeHrbpFields,
 };

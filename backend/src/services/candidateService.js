@@ -8,6 +8,8 @@ const {
   withActiveCandidate,
 } = require('../utils/candidateVisibility');
 const { enrichCandidatesWithApplicationLock, enrichCandidateWithApplicationLock } = require('../utils/candidateApplicationLock');
+const { buildHrbpApplicationFptkFilterFromUser } = require('../utils/hrbpScope');
+const { isDepartmentHeadRole, buildHodCandidateScopeFromUser } = require('../utils/hodScope');
 
 function buildHiringManagerScopeFromUser(user = null) {
   if (!user) return null;
@@ -866,10 +868,6 @@ async function searchCandidates(filters, pagination, user = null) {
   // Role-based filtering
   if (user) {
     const userRole = user.role;
-    const userDivision = user.division;
-    const userPt = user.pt;
-    const userArea = user.area;
-    const userAreaDetail = user.areaDetail;
 
     if (userRole === 'HIRING_MANAGER') {
       // HIRING_MANAGER: only see candidates where Position.Hiring Manager = Team.First Name
@@ -884,25 +882,21 @@ async function searchCandidates(filters, pagination, user = null) {
       } else {
         where.id = '00000000-0000-0000-0000-000000000000';
       }
-    } else if ((userRole === 'Head of Division' || userRole === 'DEPARTMENT_HEAD') && userDivision) {
-      // Head of Division: only see candidates whose profile division matches their division
-      where.user = { division: userDivision };
+    } else if (isDepartmentHeadRole(userRole)) {
+      const hodScope = buildHodCandidateScopeFromUser(user);
+      if (hodScope) {
+        Object.assign(where, hodScope);
+      } else {
+        where.id = '00000000-0000-0000-0000-000000000000';
+      }
     } else if (userRole === 'HRBP' || userRole === 'TA_SITE') {
-      // HRBP / TA_SITE: only see candidates with applications to positions matching their PT/Area/Area Detail
-      // All three fields must be present and match
-      if (userPt && userArea && userAreaDetail) {
+      const hrbpScope = buildHrbpApplicationFptkFilterFromUser(user);
+      if (hrbpScope) {
         where.applications = {
-          some: {
-            fptk: {
-              pt: userPt,
-              area: userArea,
-              areaDetail: userAreaDetail,
-            }
-          }
+          some: hrbpScope,
         };
       } else {
-        // If any field is missing, return no results
-        where.id = '00000000-0000-0000-0000-000000000000'; // Non-existent ID to return empty results
+        where.id = '00000000-0000-0000-0000-000000000000';
       }
     }
     // SUPER_ADMIN, TA_HO, and other roles see all candidates (no additional filtering)

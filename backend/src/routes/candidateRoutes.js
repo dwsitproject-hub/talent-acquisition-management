@@ -10,6 +10,8 @@ const documentService = require('../services/documentService');
 const candidateFormTokenService = require('../services/candidateFormTokenService');
 const { parseSpreadsheet, sendTemplate } = require('../utils/spreadsheet');
 const bulkImportService = require('../services/bulkImportService');
+const { buildHrbpApplicationFptkFilterFromUser } = require('../utils/hrbpScope');
+const { isDepartmentHeadRole, buildHodCandidateScopeFromUser } = require('../utils/hodScope');
 
 function buildHiringManagerFptkScope(user = {}) {
   const firstName = String(user.firstName || '').trim();
@@ -479,19 +481,38 @@ router.get(
   validate,
   asyncHandler(async (req, res) => {
     const userRole = req.user.role;
-    if (userRole === 'DEPARTMENT_HEAD' || userRole === 'Head of Division') {
+    if (isDepartmentHeadRole(userRole)) {
+      const hodScope = buildHodCandidateScopeFromUser(req.user);
       const allowed = await prisma.candidate.findFirst({
         where: {
           id: req.params.id,
           isDeleted: false,
-          user: { division: req.user.division || '' },
+          ...(hodScope || { id: '00000000-0000-0000-0000-000000000000' }),
         },
         select: { id: true },
       });
       if (!allowed) {
         return res.status(403).json({
           success: false,
-          message: 'You can only access candidates in your division',
+          message: 'You can only access candidates in your assigned division and section',
+        });
+      }
+    } else if (userRole === 'HRBP' || userRole === 'TA_SITE') {
+      const hrbpScope = buildHrbpApplicationFptkFilterFromUser(req.user);
+      const allowed = await prisma.candidate.findFirst({
+        where: {
+          id: req.params.id,
+          isDeleted: false,
+          applications: {
+            some: hrbpScope || { fptk: { id: '00000000-0000-0000-0000-000000000000' } },
+          },
+        },
+        select: { id: true },
+      });
+      if (!allowed) {
+        return res.status(403).json({
+          success: false,
+          message: 'You can only access candidates linked to your assigned PT and area',
         });
       }
     } else if (userRole === 'HIRING_MANAGER') {

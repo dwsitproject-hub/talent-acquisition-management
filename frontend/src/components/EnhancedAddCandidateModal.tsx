@@ -1,10 +1,10 @@
 'use client'
 
-import { useState, useRef, useEffect } from 'react'
+import { useState, useRef, useEffect, useMemo } from 'react'
 import { useModalEscape } from '@/hooks/useModalEscape'
 import { XMarkIcon, CloudArrowUpIcon, XCircleIcon } from '@heroicons/react/24/outline'
 import { MasterDivisionAPI } from '@/lib/api'
-import { loadSelectablePositionOptions, type PositionOption } from '@/lib/fptkPositionOptions'
+import { loadSelectablePositionOptions, filterPositionOptionsByDivisions, prunePositionAppliedFor, type PositionOption } from '@/lib/fptkPositionOptions'
 import PositionAppliedForField, { type PositionPickerMeta } from '@/components/PositionAppliedForField'
 import { compressFile, formatFileSize } from '@/utils/fileCompression'
 
@@ -64,6 +64,34 @@ export default function EnhancedAddCandidateModal({ isOpen, onClose, onSave }: E
   const [loadingDivisions, setLoadingDivisions] = useState(false)
   const [loadingPositions, setLoadingPositions] = useState(false)
   const [fileErrors, setFileErrors] = useState<{ [key: string]: string }>({})
+
+  const uniqueDivisionNames = useMemo(
+    () =>
+      [...new Set(
+        divisions
+          .map((d) => d?.divisionName?.trim())
+          .filter((name): name is string => !!name)
+      )].sort((a, b) => a.localeCompare(b)),
+    [divisions]
+  )
+
+  const positionOptionsForPicker = useMemo(
+    () => filterPositionOptionsByDivisions(activeJobPostings, formData.division),
+    [activeJobPostings, formData.division]
+  )
+
+  const filteredPickerMeta = useMemo(
+    () =>
+      positionPickerMeta
+        ? {
+            ...positionPickerMeta,
+            selectableCount: positionOptionsForPicker.length,
+          }
+        : null,
+    [positionOptionsForPicker, positionPickerMeta]
+  )
+
+  const divisionSelected = formData.division.length > 0
   const [isCompressing, setIsCompressing] = useState(false)
 
   const cvInputRef = useRef<HTMLInputElement>(null)
@@ -165,12 +193,21 @@ export default function EnhancedAddCandidateModal({ isOpen, onClose, onSave }: E
   }
 
   const handleToggleDivision = (divisionName: string) => {
-    setFormData(prev => ({
-      ...prev,
-      division: prev.division.includes(divisionName)
-        ? prev.division.filter(d => d !== divisionName)
+    setFormData((prev) => {
+      const nextDivision = prev.division.includes(divisionName)
+        ? prev.division.filter((d) => d !== divisionName)
         : [...prev.division, divisionName]
-    }))
+
+      return {
+        ...prev,
+        division: nextDivision,
+        positionAppliedFor: prunePositionAppliedFor(
+          prev.positionAppliedFor,
+          activeJobPostings,
+          nextDivision
+        ),
+      }
+    })
   }
 
   const handleFileUpload = async (file: File, type: 'cv' | 'additional') => {
@@ -442,12 +479,12 @@ export default function EnhancedAddCandidateModal({ isOpen, onClose, onSave }: E
                         <option value="">
                           {loadingDivisions ? 'Loading divisions...' : 'Add Division'}
                         </option>
-                        {!loadingDivisions && divisions && divisions.length > 0 ? (
-                          divisions
-                            .filter(div => div && div.divisionName && !formData.division.includes(div.divisionName))
-                            .map((division) => (
-                              <option key={division.id || division.divisionName} value={division.divisionName}>
-                                {division.divisionName}
+                        {!loadingDivisions && uniqueDivisionNames.length > 0 ? (
+                          uniqueDivisionNames
+                            .filter((name) => !formData.division.includes(name))
+                            .map((divisionName) => (
+                              <option key={divisionName} value={divisionName}>
+                                {divisionName}
                               </option>
                             ))
                         ) : !loadingDivisions ? (
@@ -458,9 +495,11 @@ export default function EnhancedAddCandidateModal({ isOpen, onClose, onSave }: E
                   </div>
                   <PositionAppliedForField
                     selected={formData.positionAppliedFor}
-                    options={activeJobPostings}
+                    options={positionOptionsForPicker}
                     loading={loadingPositions}
-                    meta={positionPickerMeta}
+                    meta={filteredPickerMeta}
+                    divisionSelected={divisionSelected}
+                    disabled={!divisionSelected}
                     onChange={(positionAppliedFor) =>
                       setFormData((prev) => ({ ...prev, positionAppliedFor }))
                     }
