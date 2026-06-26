@@ -4,7 +4,7 @@ import { useState, useEffect, useMemo, useRef } from 'react'
 import { useModalEscape } from '@/hooks/useModalEscape'
 import { XMarkIcon } from '@heroicons/react/24/outline'
 import { FPTK } from '@/types'
-import { MasterOfficeLocationAPI, MasterDivisionAPI, CandidatesAPI, AdminUsersAPI } from '@/lib/api'
+import { MasterOfficeLocationAPI, MasterDivisionAPI, CandidatesAPI, AdminUsersAPI, ApplicationsAPI } from '@/lib/api'
 import ApplicationHistoryModal from './ApplicationHistoryModal'
 import { fetchApplicationsForFptk } from '@/utils/mapFptkApplication'
 import { useAuth } from '@/contexts/AuthContext'
@@ -24,6 +24,7 @@ import {
   extractCandidateLockFields,
   getCandidateLockMessage,
 } from '@/utils/candidateApplicationLock'
+import { mapApplicationStatusToUi, mapUiStatusToApplicationStatus } from '@/utils/applicationStatusUi'
 
 interface EditJobPostingModalProps {
   isOpen: boolean
@@ -35,6 +36,8 @@ interface EditJobPostingModalProps {
   overlayZIndex?: number
   /** Optional back affordance (e.g. return to candidate profile) */
   headerBackLabel?: string
+  /** When true, position fields are read-only and candidate status saves immediately via API (TA Site). */
+  candidateStatusOnly?: boolean
 }
 
 export default function EditJobPostingModal({ 
@@ -45,6 +48,7 @@ export default function EditJobPostingModal({
   onCandidateStatusUpdate,
   overlayZIndex = 1000,
   headerBackLabel,
+  candidateStatusOnly = false,
 }: EditJobPostingModalProps) {
   const { user } = useAuth()
   const userRole = (user as any)?.role?.name || (user as any)?.role || ''
@@ -82,6 +86,7 @@ export default function EditJobPostingModal({
   const [pendingStatusChange, setPendingStatusChange] = useState<{ candidateId: string; newStatus: string } | null>(null)
   const [statusChangeReason, setStatusChangeReason] = useState('')
   const [statusChangeBlacklist, setStatusChangeBlacklist] = useState(false)
+  const [statusSaving, setStatusSaving] = useState(false)
   const [suggestedCandidates, setSuggestedCandidates] = useState<any[]>([])
   const [allCandidates, setAllCandidates] = useState<any[]>([])
   const [showCandidatePicker, setShowCandidatePicker] = useState(false)
@@ -102,76 +107,7 @@ export default function EditJobPostingModal({
   const interviewerInputRefs = useRef<Record<string, HTMLInputElement | null>>({})
   const fptkFileInputRef = useRef<HTMLInputElement>(null)
 
-  const mapAppliedStatusLabel = (status?: string) => {
-    if (!status) return 'Applied'
-    const normalized = status.toString().toUpperCase()
-    const lookup: Record<string, string> = {
-      DRAFT: 'Applied',
-      SUBMITTED: 'Applied',
-      SCREENING: 'Shortlisted',
-      PSYCHOMETRIC_TEST: 'Under Review',
-      TECHNICAL_TEST: 'Assessment',
-      INTERVIEW_SCHEDULED: 'Interview Scheduled',
-      INTERVIEW_COMPLETED: 'Interviewed',
-      DOCUMENT_VERIFICATION: 'Document Verification',
-      OFFER_PROPOSED: 'Offering Creation',
-      OFFER_APPROVED: 'Pending Feedback',
-      OFFER_SENT: 'Offer Sent',
-      OFFER_ACCEPTED: 'Offer Accepted',
-      OFFER_REJECTED: 'Offer Rejected',
-      MEDICAL_CHECKUP_SCHEDULED: 'Medical Checkup Scheduled',
-      MEDICAL_CHECKUP_COMPLETED: 'MCU',
-      CONTRACT_SENT: 'Contract Sent',
-      CONTRACT_SIGNED: 'Contract Signed',
-      ONBOARDING: 'On Boarding',
-      HIRED: 'Hired',
-      REJECTED: 'Rejected (Failed Interview / Assessment)',
-      WITHDRAWN: 'Withdrawn',
-      KEEP_IN_VIEW: 'Keep In View',
-    }
-    if (lookup[normalized]) return lookup[normalized]
-    return normalized
-      .toLowerCase()
-      .split('_')
-      .map(part => part.charAt(0).toUpperCase() + part.slice(1))
-      .join(' ')
-  }
-
-  const mapAppliedStatusToBackend = (status?: string) => {
-    const raw = (status || '').toString().trim()
-    if (!raw) return 'SUBMITTED'
-    const upper = raw.toUpperCase()
-    // If already enum, keep it
-    if (/^[A-Z0-9_]+$/.test(upper)) return upper
-
-    const normalized = raw.toLowerCase()
-    const lookup: Record<string, string> = {
-      'applied': 'SUBMITTED',
-      'under review': 'SCREENING',
-      'shortlisted': 'SCREENING',
-      'interview scheduled': 'INTERVIEW_SCHEDULED',
-      'interviewed': 'INTERVIEW_COMPLETED',
-      'assessment': 'TECHNICAL_TEST',
-      'offering creation': 'OFFER_PROPOSED',
-      'pending feedback': 'OFFER_APPROVED',
-      'document verification': 'DOCUMENT_VERIFICATION',
-      'offer sent': 'OFFER_SENT',
-      'offer accepted': 'OFFER_ACCEPTED',
-      'offer rejected': 'OFFER_REJECTED',
-      'mcu': 'MEDICAL_CHECKUP_COMPLETED',
-      'medical checkup scheduled': 'MEDICAL_CHECKUP_SCHEDULED',
-      'medical checkup completed': 'MEDICAL_CHECKUP_COMPLETED',
-      'contract sent': 'CONTRACT_SENT',
-      'contract signed': 'CONTRACT_SIGNED',
-      'on boarding': 'ONBOARDING',
-      'hired': 'HIRED',
-      'rejected (failed interview / assessment)': 'REJECTED',
-      'rejected': 'REJECTED',
-      'withdrawn': 'WITHDRAWN',
-      'keep in view': 'KEEP_IN_VIEW',
-    }
-    return lookup[normalized] || 'SUBMITTED'
-  }
+  const mapAppliedStatusLabel = (status?: string) => mapApplicationStatusToUi(status)
 
   const mergeAppliedCandidateData = (candidate: any, candidateInfo?: any) => {
     const baseInfo = candidateInfo || {}
@@ -232,6 +168,7 @@ export default function EditJobPostingModal({
       yearsOfExperience: experience,
       division: candidate.division || baseInfo.division || baseInfo.user?.division || null,
       jobPostingId: jobPosting?.id || candidate.jobPostingId || baseInfo.jobPostingId,
+      applicationId: candidate.applicationId || baseInfo.applicationId || null,
       interviews: candidate.interviews || baseInfo.interviews || [],
     }
   }
@@ -896,6 +833,7 @@ export default function EditJobPostingModal({
   }
 
   const handleStatusChange = (newStatus: string) => {
+    if (candidateStatusOnly) return
     // Validation: Check if moving to certain statuses is allowed
     // Legacy rule removed: simplified Current Status values.
 
@@ -920,16 +858,38 @@ export default function EditJobPostingModal({
     })
   }
 
-  const applyStatusChange = (candidateId: string, newStatus: string, reason: string, blacklisted: boolean) => {
-    setAppliedCandidates(prev => {
-      const target = prev.find(
-        c => c.id === candidateId || c.candidateId === candidateId
-      )
-      const oldStatus = target ? target.status : undefined
+  const applyStatusChange = async (candidateId: string, newStatus: string, reason: string, blacklisted: boolean) => {
+    const target = appliedCandidates.find(
+      c => c.id === candidateId || c.candidateId === candidateId
+    )
+    const oldStatus = target ? target.status : undefined
 
+    if (candidateStatusOnly) {
+      const applicationId = target?.applicationId
+      if (!applicationId) {
+        alert('Unable to update status: application record not found for this candidate.')
+        return
+      }
+      try {
+        setStatusSaving(true)
+        await ApplicationsAPI.updateStatus(applicationId, {
+          status: mapUiStatusToApplicationStatus(newStatus),
+          reason: reason || undefined,
+          ...(blacklisted ? { blacklisted: true, blacklistReason: reason || undefined } : {}),
+        })
+      } catch (error: any) {
+        console.error('Failed to update application status:', error)
+        alert(error.response?.data?.message || error.message || 'Failed to update candidate status.')
+        return
+      } finally {
+        setStatusSaving(false)
+      }
+    }
+
+    setAppliedCandidates(prev => {
       const updateData: any = {
         status: newStatus,
-        backendStatus: mapAppliedStatusToBackend(newStatus),
+        backendStatus: mapUiStatusToApplicationStatus(newStatus),
       }
       const normalized = (newStatus || '').toString().trim().toLowerCase()
       if (normalized.startsWith('rejected')) {
@@ -951,7 +911,6 @@ export default function EditJobPostingModal({
         updateData.blacklistReason = reason || null
       }
 
-      // When status changes to "Interviewed", ensure there's at least one interview entry
       if (newStatus === 'Interviewed' && (!target?.interviews || target.interviews.length === 0)) {
         updateData.interviews = [{ interviewer: '', date: '', time: '', results: '' }]
       }
@@ -982,7 +941,8 @@ export default function EditJobPostingModal({
     }
   }
 
-  const handleCandidateStatusChange = (candidateId: string, newStatus: string) => {
+  const handleCandidateStatusChange = async (candidateId: string, newStatus: string) => {
+    if (statusSaving) return
     const normalized = (newStatus || '').toString().trim().toLowerCase()
     const needsReason = normalized.startsWith('rejected') || normalized === 'withdrawn'
 
@@ -993,12 +953,17 @@ export default function EditJobPostingModal({
       return
     }
 
-    applyStatusChange(candidateId, newStatus, '', false)
+    await applyStatusChange(candidateId, newStatus, '', false)
   }
 
-  const handleConfirmStatusChange = () => {
-    if (!pendingStatusChange) return
-    applyStatusChange(pendingStatusChange.candidateId, pendingStatusChange.newStatus, statusChangeReason, statusChangeBlacklist)
+  const handleConfirmStatusChange = async () => {
+    if (!pendingStatusChange || statusSaving) return
+    await applyStatusChange(
+      pendingStatusChange.candidateId,
+      pendingStatusChange.newStatus,
+      statusChangeReason,
+      statusChangeBlacklist
+    )
     setPendingStatusChange(null)
     setStatusChangeReason('')
     setStatusChangeBlacklist(false)
@@ -1011,6 +976,7 @@ export default function EditJobPostingModal({
   }
 
   const handleCandidateJoinDateChange = (candidateId: string, dateValue: string) => {
+    if (candidateStatusOnly) return
     setAppliedCandidates(prev =>
       prev.map(candidate => {
         const matches =
@@ -1091,6 +1057,7 @@ export default function EditJobPostingModal({
   }
 
   const handleAddSkill = () => {
+    if (candidateStatusOnly) return
     if (newSkill.trim() && !formData.skills.includes(newSkill.trim())) {
       setFormData(prev => ({
         ...prev,
@@ -1101,6 +1068,7 @@ export default function EditJobPostingModal({
   }
 
   const handleRemoveSkill = (skillToRemove: string) => {
+    if (candidateStatusOnly) return
     setFormData(prev => ({
       ...prev,
       skills: prev.skills.filter(skill => skill !== skillToRemove)
@@ -1108,6 +1076,7 @@ export default function EditJobPostingModal({
   }
 
   const handleFptkFileUpload = async (file: File) => {
+    if (candidateStatusOnly) return
     const MAX_SIZE = 2 * 1024 * 1024 // 2MB
     setIsCompressingFptk(true)
     setFptkFileError('')
@@ -1156,6 +1125,7 @@ export default function EditJobPostingModal({
   }
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
+    if (candidateStatusOnly) return
     const { name, value } = e.target
     
     // Capture FPTK Receive Date when statusFktk changes to "Received"
@@ -1199,6 +1169,10 @@ export default function EditJobPostingModal({
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
+
+    if (candidateStatusOnly) {
+      return
+    }
 
     // Prevent submission if editing is disabled
     if (isEditingDisabled) {
@@ -1293,11 +1267,12 @@ export default function EditJobPostingModal({
 
   // Editing lock removed: "Current Status" values were simplified.
   const isEditingDisabled = false
+  const isPositionEditDisabled = candidateStatusOnly || isEditingDisabled
 
   // Helper function to get disabled state and style for form elements
   const getFormElementProps = () => ({
-    disabled: isEditingDisabled,
-    style: isEditingDisabled ? {
+    disabled: isPositionEditDisabled,
+    style: isPositionEditDisabled ? {
       backgroundColor: '#f3f4f6',
       cursor: 'not-allowed',
       opacity: 0.6
@@ -1370,8 +1345,13 @@ export default function EditJobPostingModal({
               color: '#111827',
               margin: 0
             }}>
-              Edit Position - {jobPosting.title}
+              {candidateStatusOnly ? 'Update Candidate Status' : 'Edit Position'} - {jobPosting.title}
             </h2>
+            {candidateStatusOnly && (
+              <p style={{ fontSize: '13px', color: '#6b7280', margin: 0 }}>
+                You can update applied candidate status only. Position details are read-only.
+              </p>
+            )}
           </div>
           <button
             onClick={onClose}
@@ -1404,6 +1384,15 @@ export default function EditJobPostingModal({
             </div>
           )}
           <form onSubmit={handleSubmit}>
+            <fieldset
+              disabled={candidateStatusOnly}
+              style={{
+                border: 'none',
+                padding: 0,
+                margin: 0,
+                minWidth: 0,
+              }}
+            >
             {/* Job Posting Information */}
             <div style={{ marginBottom: '24px' }}>
               <h3 style={{ fontSize: '16px', fontWeight: '600', color: '#374151', marginBottom: '12px' }}>
@@ -1688,7 +1677,7 @@ export default function EditJobPostingModal({
                         handleFptkFileUpload(file)
                       }
                     }}
-                    disabled={isEditingDisabled}
+                    disabled={isPositionEditDisabled}
                     style={{ display: 'none' }}
                   />
                   <div style={{
@@ -1696,11 +1685,11 @@ export default function EditJobPostingModal({
                     borderRadius: '6px',
                     padding: '16px',
                     textAlign: 'center',
-                    backgroundColor: isEditingDisabled ? '#f3f4f6' : '#f9fafb',
-                    cursor: (isCompressingFptk || isEditingDisabled) ? 'not-allowed' : 'pointer',
-                    opacity: (isCompressingFptk || isEditingDisabled) ? 0.6 : 1
+                    backgroundColor: isPositionEditDisabled ? '#f3f4f6' : '#f9fafb',
+                    cursor: (isCompressingFptk || isPositionEditDisabled) ? 'not-allowed' : 'pointer',
+                    opacity: (isCompressingFptk || isPositionEditDisabled) ? 0.6 : 1
                   }}
-                  onClick={() => !isCompressingFptk && !isEditingDisabled && fptkFileInputRef.current?.click()}
+                  onClick={() => !isCompressingFptk && !isPositionEditDisabled && fptkFileInputRef.current?.click()}
                   >
                     {isCompressingFptk ? (
                       <div>
@@ -1713,7 +1702,7 @@ export default function EditJobPostingModal({
                         <p style={{ fontSize: '12px', color: '#6b7280', marginTop: '4px' }}>
                           {formatFileSize(fptkFile.size)}
                         </p>
-                        {!isEditingDisabled && (
+                        {!isPositionEditDisabled && (
                           <button
                             type="button"
                             onClick={(e) => {
@@ -2005,16 +1994,16 @@ export default function EditJobPostingModal({
                 <select
                   value={formData.status}
                   onChange={(e) => handleStatusChange(e.target.value)}
-                  disabled={isEditingDisabled}
+                  disabled={isPositionEditDisabled}
                   style={{
                     width: '100%',
                     padding: '8px 12px',
                     border: '1px solid #d1d5db',
                     borderRadius: '6px',
                     fontSize: '14px',
-                    backgroundColor: isEditingDisabled ? '#f3f4f6' : 'white',
-                    cursor: isEditingDisabled ? 'not-allowed' : 'pointer',
-                    opacity: isEditingDisabled ? 0.6 : 1
+                    backgroundColor: isPositionEditDisabled ? '#f3f4f6' : 'white',
+                    cursor: isPositionEditDisabled ? 'not-allowed' : 'pointer',
+                    opacity: isPositionEditDisabled ? 0.6 : 1
                   }}
                 >
                   <option value="Open">Open</option>
@@ -2163,6 +2152,7 @@ export default function EditJobPostingModal({
                 </button>
               </div>
             </div>
+            </fieldset>
 
             {/* Applied Candidates */}
             <div style={{ marginBottom: '24px' }}>
@@ -2216,6 +2206,7 @@ export default function EditJobPostingModal({
                           </label>
                           <select
                             value={candidate.status}
+                            disabled={statusSaving}
                             onChange={(e) =>
                               handleCandidateStatusChange(
                                 candidate.id || candidate.candidateId,
@@ -2305,27 +2296,44 @@ export default function EditJobPostingModal({
                               >
                                 Join Date
                               </label>
-                              <input
-                                type="date"
-                                value={
-                                  candidate.joinDate
-                                    ? String(candidate.joinDate).slice(0, 10)
-                                    : ''
-                                }
-                                onChange={e =>
-                                  handleCandidateJoinDateChange(
-                                    candidate.id || candidate.candidateId,
-                                    e.target.value
-                                  )
-                                }
-                                style={{
-                                  padding: '6px 8px',
-                                  border: '1px solid #d1d5db',
-                                  borderRadius: '4px',
-                                  fontSize: '12px',
-                                  backgroundColor: 'white',
-                                }}
-                              />
+                              {candidateStatusOnly ? (
+                                <div
+                                  style={{
+                                    padding: '6px 8px',
+                                    border: '1px solid #e5e7eb',
+                                    borderRadius: '4px',
+                                    fontSize: '12px',
+                                    backgroundColor: '#f3f4f6',
+                                    color: '#374151',
+                                  }}
+                                >
+                                  {candidate.joinDate
+                                    ? formatDate(String(candidate.joinDate).slice(0, 10))
+                                    : '—'}
+                                </div>
+                              ) : (
+                                <input
+                                  type="date"
+                                  value={
+                                    candidate.joinDate
+                                      ? String(candidate.joinDate).slice(0, 10)
+                                      : ''
+                                  }
+                                  onChange={e =>
+                                    handleCandidateJoinDateChange(
+                                      candidate.id || candidate.candidateId,
+                                      e.target.value
+                                    )
+                                  }
+                                  style={{
+                                    padding: '6px 8px',
+                                    border: '1px solid #d1d5db',
+                                    borderRadius: '4px',
+                                    fontSize: '12px',
+                                    backgroundColor: 'white',
+                                  }}
+                                />
+                              )}
                             </div>
                           ) : null}
                         </div>
@@ -2360,8 +2368,10 @@ export default function EditJobPostingModal({
                         ]
                         
                         const shouldShowInterviewSection = 
+                          !candidateStatusOnly && (
                           interviewStatuses.includes(status) || 
                           (postInterviewStatuses.includes(status) && hasFilledInterviews)
+                          )
                         
                         const candidateKey = candidate.id || candidate.candidateId || ''
                         const isExpanded = expandedInterviewSections.has(candidateKey)
@@ -2788,7 +2798,8 @@ export default function EditJobPostingModal({
                 )}
               </div>
 
-              {/* Suggested Candidates */}
+              {!candidateStatusOnly && (
+              <>
               <div style={{ marginBottom: '20px' }}>
                 <h4 style={{ fontSize: '14px', fontWeight: '500', color: '#374151', marginBottom: '8px' }}>
                   Suggested Candidates ({suggestedCandidates.length})
@@ -2983,6 +2994,9 @@ export default function EditJobPostingModal({
                   )
                 })()}
               </div>
+              </>
+              )}
+
             </div>
 
             {/* Footer */}
@@ -3007,8 +3021,9 @@ export default function EditJobPostingModal({
                   cursor: 'pointer'
                 }}
               >
-                Cancel
+                {candidateStatusOnly ? 'Close' : 'Cancel'}
               </button>
+              {!candidateStatusOnly && (
               <button
                 type="submit"
                 disabled={isEditingDisabled}
@@ -3026,6 +3041,12 @@ export default function EditJobPostingModal({
               >
                 Save Changes
               </button>
+              )}
+              {candidateStatusOnly && statusSaving && (
+                <span style={{ fontSize: '13px', color: '#6b7280', alignSelf: 'center' }}>
+                  Saving…
+                </span>
+              )}
             </div>
           </form>
         </div>

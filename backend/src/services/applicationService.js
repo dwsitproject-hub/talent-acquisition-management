@@ -5,6 +5,62 @@ const { withActiveCandidateOnApplication } = require('../utils/candidateVisibili
 const { assertCandidateCanApplyToPosition } = require('../utils/candidateApplicationLock');
 const { buildHrbpApplicationFptkFilterFromUser } = require('../utils/hrbpScope');
 const { isDepartmentHeadRole, buildHodApplicationScopeFromUser } = require('../utils/hodScope');
+const { mapUiStatusToApplicationStatus } = require('../utils/applicationStatus');
+
+function forbidden(message) {
+  const err = new Error(message || 'Insufficient permissions');
+  err.statusCode = 403;
+  return err;
+}
+
+async function assertUserCanAccessApplication(user, applicationId) {
+  if (!user) {
+    throw forbidden('Unauthorized');
+  }
+
+  const role = user.role;
+  if (['SUPER_ADMIN', 'TA_HO'].includes(role)) {
+    return;
+  }
+
+  if (role === 'HRBP' || role === 'TA_SITE') {
+    const scope = buildHrbpApplicationFptkFilterFromUser(user);
+    if (!scope) {
+      throw forbidden('Missing PT/Area scope for this user');
+    }
+    const allowed = await prisma.application.findFirst({
+      where: {
+        id: applicationId,
+        ...scope,
+      },
+      select: { id: true },
+    });
+    if (!allowed) {
+      throw forbidden('You can only update applications within your assigned scope');
+    }
+    return;
+  }
+
+  if (isDepartmentHeadRole(role)) {
+    const scope = buildHodApplicationScopeFromUser(user);
+    if (!scope) {
+      throw forbidden('Missing division scope for this user');
+    }
+    const allowed = await prisma.application.findFirst({
+      where: {
+        id: applicationId,
+        ...scope,
+      },
+      select: { id: true },
+    });
+    if (!allowed) {
+      throw forbidden('You can only update applications within your assigned division');
+    }
+    return;
+  }
+
+  throw forbidden('Insufficient permissions');
+}
 
 function buildHiringManagerScopeFromUser(user = null) {
   if (!user) return null;
@@ -379,7 +435,12 @@ async function getAllApplications(filters, pagination, user = null) {
 /**
  * Update application status
  */
-async function updateApplicationStatus(applicationId, newStatus, userId, reason = null) {
+async function updateApplicationStatus(applicationId, newStatus, userId, reason = null, options = {}) {
+  const user = options.user || null;
+  if (user) {
+    await assertUserCanAccessApplication(user, applicationId);
+  }
+
   const application = await prisma.application.findUnique({
     where: { id: applicationId },
   });
@@ -389,6 +450,8 @@ async function updateApplicationStatus(applicationId, newStatus, userId, reason 
   }
 
   const oldStatus = application.status;
+
+  newStatus = mapUiStatusToApplicationStatus(newStatus, oldStatus);
 
   // Determine stage based on status
   const stageMapping = {
@@ -476,6 +539,18 @@ async function updateApplicationStatus(applicationId, newStatus, userId, reason 
       reason,
     },
   });
+
+  if (options.blacklisted === true || options.blacklisted === false) {
+    await prisma.candidate.update({
+      where: { id: application.candidateId },
+      data: {
+        blacklisted: options.blacklisted,
+        blacklistReason: options.blacklisted
+          ? (options.blacklistReason || reason || null)
+          : null,
+      },
+    });
+  }
 
   logger.info(`Application ${applicationId} status updated: ${oldStatus} -> ${newStatus}`);
 

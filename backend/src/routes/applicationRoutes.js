@@ -142,12 +142,17 @@ router.put(
   validationRules.uuidParam('id'),
   validate,
   asyncHandler(async (req, res) => {
-    const { status, reason } = req.body;
+    const { status, reason, blacklisted, blacklistReason } = req.body;
     const application = await applicationService.updateApplicationStatus(
       req.params.id,
       status,
       req.user.id,
-      reason
+      reason,
+      {
+        user: req.user,
+        blacklisted: blacklisted === true ? true : blacklisted === false ? false : undefined,
+        blacklistReason,
+      }
     );
     
     res.json({

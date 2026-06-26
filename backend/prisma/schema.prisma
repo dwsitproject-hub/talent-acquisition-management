@@ -244,6 +244,10 @@ model Candidate {
   linkedinUrl       String?
   portfolioUrl      String?
   formDataDiri      Json?
+
+  // Sourcing (TA-entered; formerly stored in languages JSON)
+  source            String?
+  sourceDetail      String?
   
   // AI Scoring
   overallScore      Float?    @default(0)

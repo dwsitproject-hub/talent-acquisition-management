@@ -73,6 +73,26 @@ function parseLanguagesJson(languages) {
   return null;
 }
 
+function normalizeOptionalString(value) {
+  return value && String(value).trim() ? String(value).trim() : null;
+}
+
+function stripLegacySourceFromLanguages(languagesData) {
+  if (!languagesData || typeof languagesData !== 'object') return;
+  delete languagesData.source;
+  delete languagesData.sourceDetail;
+}
+
+function resolveCandidateSourceFields(candidate, languages) {
+  const columnSource = normalizeOptionalString(candidate.source);
+  const columnDetail = normalizeOptionalString(candidate.sourceDetail);
+  const legacySource = languages ? normalizeOptionalString(languages.source) : null;
+  const legacyDetail = languages ? normalizeOptionalString(languages.sourceDetail) : null;
+
+  candidate.source = columnSource || legacySource || null;
+  candidate.sourceDetail = columnDetail || legacyDetail || null;
+}
+
 function enrichCandidateFromLanguages(candidate) {
   const languages = parseLanguagesJson(candidate.languages);
   if (!languages || typeof languages !== 'object') {
@@ -81,6 +101,7 @@ function enrichCandidateFromLanguages(candidate) {
     candidate.healthStatus = null;
     candidate.divisionList = [];
     candidate.yearsOfExperience = null;
+    resolveCandidateSourceFields(candidate, null);
     return candidate;
   }
 
@@ -100,6 +121,7 @@ function enrichCandidateFromLanguages(candidate) {
   }
   candidate.languages.divisions = divisionsArray;
   candidate.divisionList = divisionsArray;
+  resolveCandidateSourceFields(candidate, languages);
 
   return candidate;
 }
@@ -258,15 +280,10 @@ async function createCandidate(data) {
       }
     }
 
-    // Handle source
-    if (source !== undefined) {
-      languagesData.source = source && String(source).trim() ? String(source).trim() : null;
-    }
-
-    // Handle sourceDetail (referral name or "others" free text)
-    if (sourceDetail !== undefined) {
-      languagesData.sourceDetail = sourceDetail && String(sourceDetail).trim() ? String(sourceDetail).trim() : null;
-    }
+    // Handle source — stored on candidate columns, not languages JSON
+    const normalizedSource = source !== undefined ? normalizeOptionalString(source) : undefined;
+    const normalizedSourceDetail =
+      sourceDetail !== undefined ? normalizeOptionalString(sourceDetail) : undefined;
 
     // Handle divisions list (store all selected divisions)
     if (divisionList !== undefined || divisionsArray.length > 0) {
@@ -314,9 +331,11 @@ async function createCandidate(data) {
       bloodType: bloodType && String(bloodType).trim() ? String(bloodType).trim() : null,
       // Always save languages if any of the fields were provided
       // If any field is provided (even if empty), save the languages object
-      languages: (positionAppliedFor !== undefined || ethnicity !== undefined || healthStatus !== undefined || divisionList !== undefined || divisionsArray.length > 0 || yearsOfExperience !== undefined || source !== undefined || sourceDetail !== undefined) 
+      languages: (positionAppliedFor !== undefined || ethnicity !== undefined || healthStatus !== undefined || divisionList !== undefined || divisionsArray.length > 0 || yearsOfExperience !== undefined)
         ? languagesData  // Always save languagesData if any field was provided (even if empty)
         : null,
+      ...(normalizedSource !== undefined ? { source: normalizedSource } : {}),
+      ...(normalizedSourceDetail !== undefined ? { sourceDetail: normalizedSourceDetail } : {}),
     };
     
     logger.info(`Candidate createData:`, JSON.stringify({
@@ -536,6 +555,8 @@ async function updateCandidate(candidateId, data) {
     ethnicity,
     healthStatus,
     yearsOfExperience,
+    source,
+    sourceDetail,
     ...candidateData
   } = data;
 
@@ -664,6 +685,8 @@ async function updateCandidate(candidateId, data) {
     applyYearsOfExperienceToLanguages(languagesData, yearsOfExperience);
   }
 
+  stripLegacySourceFromLanguages(languagesData);
+
   // Handle drivingLicense - convert string to array if needed
   let drivingLicenseArray = undefined;
   if (candidateData.drivingLicense !== undefined) {
@@ -724,10 +747,24 @@ async function updateCandidate(candidateId, data) {
   if (encryptedNationalId !== undefined) {
     updateData.nationalId = encryptedNationalId;
   }
+
+  if (source !== undefined) {
+    updateData.source = normalizeOptionalString(source);
+  }
+
+  if (sourceDetail !== undefined) {
+    updateData.sourceDetail = normalizeOptionalString(sourceDetail);
+  }
   
   // Always update languages if any of these fields are provided
   // Note: positionAppliedFor, ethnicity, and healthStatus are extracted at the top, so check them
-  if (positionAppliedFor !== undefined || ethnicity !== undefined || healthStatus !== undefined || divisionList !== undefined || yearsOfExperience !== undefined) {
+  if (
+    positionAppliedFor !== undefined ||
+    ethnicity !== undefined ||
+    healthStatus !== undefined ||
+    divisionList !== undefined ||
+    yearsOfExperience !== undefined
+  ) {
     // Ensure languagesData has at least the fields we're updating
     // If languagesData is empty object but we have data, make sure we save it
     if (Object.keys(languagesData).length === 0) {
@@ -978,7 +1015,7 @@ async function searchCandidates(filters, pagination, user = null) {
   ]);
 
   // Parse languages JSON for each candidate
-  const candidatesWithParsedData = candidates.map(candidate => {
+  const candidatesWithParsedData = candidates.map((candidate) => {
     // Decrypt nationalId if present
     if (candidate.nationalId) {
       try {
@@ -988,40 +1025,7 @@ async function searchCandidates(filters, pagination, user = null) {
       }
     }
 
-    // Parse languages JSON to extract additional fields
-    if (candidate.languages) {
-      if (typeof candidate.languages === 'string') {
-        try {
-          candidate.languages = JSON.parse(candidate.languages);
-        } catch (e) {
-          candidate.languages = null;
-        }
-      }
-      if (candidate.languages && typeof candidate.languages === 'object') {
-        candidate.positionAppliedFor = candidate.languages.positionAppliedFor || [];
-        candidate.ethnicity = candidate.languages.ethnicity || null;
-        candidate.healthStatus = candidate.languages.healthStatus || null;
-        candidate.yearsOfExperience = parseYearsOfExperience(candidate.languages.yearsOfExperience);
-
-        const divisionsValue = candidate.languages.divisions;
-        let divisionsArray = [];
-        if (Array.isArray(divisionsValue)) {
-          divisionsArray = divisionsValue.map(item => String(item).trim()).filter(item => item.length > 0);
-        } else if (divisionsValue !== undefined && divisionsValue !== null) {
-          const trimmed = String(divisionsValue).trim();
-          divisionsArray = trimmed ? [trimmed] : [];
-        }
-        candidate.languages.divisions = divisionsArray;
-        candidate.divisionList = divisionsArray;
-      }
-    } else {
-      candidate.positionAppliedFor = [];
-      candidate.ethnicity = null;
-      candidate.healthStatus = null;
-      candidate.divisionList = [];
-      candidate.yearsOfExperience = null;
-    }
-
+    enrichCandidateFromLanguages(candidate);
     return candidate;
   });
 
