@@ -17,6 +17,8 @@ interface PositionAppliedForFieldProps {
   meta?: PositionPickerMeta | null
   onChange: (titles: string[]) => void
   disabled?: boolean
+  /** When false, picker prompts user to select a division first. */
+  divisionSelected?: boolean
 }
 
 function matchesQuery(option: PositionOption, query: string): boolean {
@@ -42,6 +44,7 @@ export default function PositionAppliedForField({
   meta,
   onChange,
   disabled = false,
+  divisionSelected = true,
 }: PositionAppliedForFieldProps) {
   const [query, setQuery] = useState('')
 
@@ -61,8 +64,12 @@ export default function PositionAppliedForField({
     onChange(selected.filter((t) => t !== title))
   }
 
+  const pickerDisabled = disabled || loading || !divisionSelected
+
   const helperText = (() => {
     if (loading) return 'Loading positions…'
+    if (!divisionSelected) return 'Select a division first to see open positions'
+    if (options.length === 0) return 'No open positions for selected division(s)'
     if (meta) {
       const parts = [`${meta.selectableCount} position${meta.selectableCount === 1 ? '' : 's'} available`]
       if (meta.excludedByStatusCount > 0) {
@@ -70,10 +77,20 @@ export default function PositionAppliedForField({
       }
       return parts.join(' · ')
     }
-    if (options.length > 0) {
-      return `${options.length} position${options.length === 1 ? '' : 's'} available`
-    }
-    return 'No open positions available'
+    return `${options.length} position${options.length === 1 ? '' : 's'} available`
+  })()
+
+  const emptyOptionsMessage = (() => {
+    if (loading) return 'Loading…'
+    if (!divisionSelected) return 'Select a division first'
+    if (query.trim()) return 'No matching positions'
+    return 'No open positions for selected division(s)'
+  })()
+
+  const inputPlaceholder = (() => {
+    if (loading) return 'Loading positions…'
+    if (!divisionSelected) return 'Select a division first'
+    return 'Search position to add…'
   })()
 
   return (
@@ -151,13 +168,13 @@ export default function PositionAppliedForField({
           onChange={(option: PositionOption | null) => {
             if (option?.title) handleAdd(option.title)
           }}
-          disabled={disabled || loading}
+          disabled={pickerDisabled}
         >
           <ComboboxInput
             className="w-full"
             displayValue={() => query}
             onChange={(e) => setQuery(e.target.value)}
-            placeholder={loading ? 'Loading positions…' : 'Search position to add…'}
+            placeholder={inputPlaceholder}
             style={{
               width: '100%',
               padding: '8px 12px',
@@ -165,7 +182,7 @@ export default function PositionAppliedForField({
               borderRadius: '6px',
               fontSize: '14px',
               outline: 'none',
-              opacity: loading || disabled ? 0.6 : 1,
+              opacity: pickerDisabled ? 0.6 : 1,
             }}
             autoComplete="off"
           />
@@ -191,7 +208,7 @@ export default function PositionAppliedForField({
                   color: '#6B7280',
                 }}
               >
-                {loading ? 'Loading…' : query.trim() ? 'No matching positions' : 'No positions to add'}
+                {emptyOptionsMessage}
               </div>
             ) : (
               availableOptions.map((opt) => (

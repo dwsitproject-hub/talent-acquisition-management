@@ -1,11 +1,11 @@
 'use client'
 
-import { useState, useRef, useEffect } from 'react'
+import { useState, useRef, useEffect, useMemo } from 'react'
 import { useModalEscape } from '@/hooks/useModalEscape'
 import { XMarkIcon, CloudArrowUpIcon, DocumentArrowUpIcon, XCircleIcon } from '@heroicons/react/24/outline'
 import { Candidate } from '@/types'
 import { MasterDivisionAPI } from '@/lib/api'
-import { loadSelectablePositionOptions, type PositionOption } from '@/lib/fptkPositionOptions'
+import { loadSelectablePositionOptions, filterPositionOptionsByDivisions, prunePositionAppliedFor, type PositionOption } from '@/lib/fptkPositionOptions'
 import PositionAppliedForField, { type PositionPickerMeta } from '@/components/PositionAppliedForField'
 import { compressFile, formatFileSize } from '@/utils/fileCompression'
 
@@ -68,6 +68,34 @@ export default function EditCandidateModal({ isOpen, onClose, onSave, candidate 
   const [positionPickerMeta, setPositionPickerMeta] = useState<PositionPickerMeta | null>(null)
   const [loadingPositions, setLoadingPositions] = useState(false)
   const [divisions, setDivisions] = useState<any[]>([])
+
+  const uniqueDivisionNames = useMemo(
+    () =>
+      [...new Set(
+        divisions
+          .map((d) => d?.divisionName?.trim())
+          .filter((name): name is string => !!name)
+      )].sort((a, b) => a.localeCompare(b)),
+    [divisions]
+  )
+
+  const positionOptionsForPicker = useMemo(
+    () => filterPositionOptionsByDivisions(activeJobPostings, formData.division),
+    [activeJobPostings, formData.division]
+  )
+
+  const filteredPickerMeta = useMemo(
+    () =>
+      positionPickerMeta
+        ? {
+            ...positionPickerMeta,
+            selectableCount: positionOptionsForPicker.length,
+          }
+        : null,
+    [positionOptionsForPicker, positionPickerMeta]
+  )
+
+  const divisionSelected = formData.division.length > 0
 
   const cvInputRef = useRef<HTMLInputElement>(null)
   const formInputRef = useRef<HTMLInputElement>(null)
@@ -236,12 +264,21 @@ export default function EditCandidateModal({ isOpen, onClose, onSave, candidate 
   }
 
   const handleToggleDivision = (divisionName: string) => {
-    setFormData(prev => ({
-      ...prev,
-      division: prev.division.includes(divisionName)
-        ? prev.division.filter(d => d !== divisionName)
+    setFormData((prev) => {
+      const nextDivision = prev.division.includes(divisionName)
+        ? prev.division.filter((d) => d !== divisionName)
         : [...prev.division, divisionName]
-    }))
+
+      return {
+        ...prev,
+        division: nextDivision,
+        positionAppliedFor: prunePositionAppliedFor(
+          prev.positionAppliedFor,
+          activeJobPostings,
+          nextDivision
+        ),
+      }
+    })
   }
 
   const handleFileUpload = async (file: File, type: 'cv' | 'form' | 'additional') => {
@@ -546,29 +583,27 @@ export default function EditCandidateModal({ isOpen, onClose, onSave, candidate 
                           }}
                         >
                           <option value="">Add Division</option>
-                          {(() => {
-                            console.log('[EditCandidateModal] Rendering dropdown - divisions:', divisions)
-                            console.log('[EditCandidateModal] Divisions length:', divisions?.length)
-                            if (divisions && divisions.length > 0) {
-                              const filtered = divisions.filter(div => div && div.divisionName && !formData.division.includes(div.divisionName))
-                              console.log('[EditCandidateModal] Filtered divisions:', filtered)
-                              return filtered.map((division) => (
-                                <option key={division.id || division.divisionName} value={division.divisionName}>
-                                  {division.divisionName}
+                          {uniqueDivisionNames.length > 0 ? (
+                            uniqueDivisionNames
+                              .filter((name) => !formData.division.includes(name))
+                              .map((divisionName) => (
+                                <option key={divisionName} value={divisionName}>
+                                  {divisionName}
                                 </option>
                               ))
-                            } else {
-                              return <option value="" disabled>No divisions available (count: {divisions?.length || 0})</option>
-                            }
-                          })()}
+                          ) : (
+                            <option value="" disabled>No divisions available (count: {divisions?.length || 0})</option>
+                          )}
                         </select>
                       </div>
                     </div>
                     <PositionAppliedForField
                       selected={formData.positionAppliedFor}
-                      options={activeJobPostings}
+                      options={positionOptionsForPicker}
                       loading={loadingPositions}
-                      meta={positionPickerMeta}
+                      meta={filteredPickerMeta}
+                      divisionSelected={divisionSelected}
+                      disabled={!divisionSelected}
                       onChange={(positionAppliedFor) =>
                         setFormData((prev) => ({ ...prev, positionAppliedFor }))
                       }

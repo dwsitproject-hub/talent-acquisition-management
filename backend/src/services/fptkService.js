@@ -1,7 +1,8 @@
 const prisma = require('../config/database');
 const { $Enums } = require('@prisma/client');
 const logger = require('../utils/logger');
-const { buildHrbpFptkFilterFromUser } = require('../utils/hrbpScope');
+const { buildHrbpFptkFilterFromUser, buildHrbpApplicationFptkFilterFromUser } = require('../utils/hrbpScope');
+const { isDepartmentHeadRole, buildHodFptkFilterFromUser } = require('../utils/hodScope');
 const { buildTokenizedSearch } = require('../utils/search');
 const masterOfficeLocationService = require('./masterOfficeLocationService');
 const masterDivisionService = require('./masterDivisionService');
@@ -1092,7 +1093,6 @@ function buildInternalFptkListWhere(filters = {}, user = null) {
 
   if (user) {
     const userRole = user.role;
-    const userDivision = user.division;
     if (userRole === 'HIRING_MANAGER') {
       const hmWhere = buildHiringManagerWhereFromUser(user);
       if (hmWhere) {
@@ -1101,8 +1101,13 @@ function buildInternalFptkListWhere(filters = {}, user = null) {
         // Hiring manager without an identifier should see nothing.
         where.id = '00000000-0000-0000-0000-000000000000';
       }
-    } else if ((userRole === 'Head of Division' || userRole === 'DEPARTMENT_HEAD') && userDivision) {
-      where.division = userDivision;
+    } else if (isDepartmentHeadRole(userRole)) {
+      const hod = buildHodFptkFilterFromUser(user);
+      if (hod) {
+        Object.assign(where, hod);
+      } else {
+        where.id = '00000000-0000-0000-0000-000000000000';
+      }
     } else if (userRole === 'HRBP' || userRole === 'TA_SITE') {
       const hrbp = buildHrbpFptkFilterFromUser(user);
       if (hrbp) {

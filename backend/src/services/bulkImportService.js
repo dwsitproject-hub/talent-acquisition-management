@@ -4,6 +4,8 @@ const masterDivisionService = require('./masterDivisionService');
 const masterOfficeLocationService = require('./masterOfficeLocationService');
 const bcrypt = require('bcryptjs');
 const prisma = require('../config/database');
+const { parseMulti, serializeHrbpFields, TA_SITE_FIXED_AREA } = require('../utils/hrbpScope');
+const { serializeHodFields } = require('../utils/hodScope');
 
 function splitName(fullName) {
   const name = String(fullName || '').trim();
@@ -195,6 +197,48 @@ async function validateOfficeLocation({ pt, area, areaDetail }) {
   return { ok: false, message: 'Provide PT only, PT+Area, or PT+Area+Area Detail' };
 }
 
+async function validateOfficeLocationLists({ pt, area, areaDetail }) {
+  const pts = parseMulti(pt);
+  const areas = parseMulti(area);
+  const details = parseMulti(areaDetail);
+
+  if (pts.length === 0 || areas.length === 0 || details.length === 0) {
+    return { ok: false, message: 'Requires at least one PT, Area, and Area Detail' };
+  }
+
+  for (const ptStr of pts) {
+    const exists = await prisma.masterOfficeLocation.findFirst({
+      where: { pt: ptStr },
+      select: { id: true },
+    });
+    if (!exists) {
+      return { ok: false, message: `PT "${ptStr}" not found in Master Office Location` };
+    }
+  }
+
+  for (const areaStr of areas) {
+    const exists = await prisma.masterOfficeLocation.findFirst({
+      where: { area: areaStr },
+      select: { id: true },
+    });
+    if (!exists) {
+      return { ok: false, message: `Area "${areaStr}" not found in Master Office Location` };
+    }
+  }
+
+  for (const detailStr of details) {
+    const exists = await prisma.masterOfficeLocation.findFirst({
+      where: { areaDetail: detailStr },
+      select: { id: true },
+    });
+    if (!exists) {
+      return { ok: false, message: `Area Detail "${detailStr}" not found in Master Office Location` };
+    }
+  }
+
+  return { ok: true };
+}
+
 async function importAdminUsers(rows) {
   const result = { total: rows.length, created: 0, failed: 0, errors: [] };
   const defaultPassword = process.env.BULK_DEFAULT_PASSWORD;
@@ -248,17 +292,36 @@ async function importAdminUsers(rows) {
       continue;
     }
 
-    // For HRBP and TA_SITE roles, PT/Area/Area Detail are required and must exist.
-    if (mappedRole === 'HRBP' || mappedRole === 'TA_SITE') {
+    // HRBP requires PT/Area/Area Detail. TA_SITE requires PT and Area Detail (Area defaults to Site).
+    if (mappedRole === 'HRBP') {
       if (!pt || !area || !areaDetail) {
         result.failed += 1;
-        result.errors.push({ row: rowNum, email, message: `${mappedRole} requires PT, Area, and Area Detail` });
+        result.errors.push({ row: rowNum, email, message: 'HRBP requires PT, Area, and Area Detail' });
+        continue;
+      }
+    }
+    if (mappedRole === 'TA_SITE') {
+      if (!pt || !areaDetail) {
+        result.failed += 1;
+        result.errors.push({ row: rowNum, email, message: 'TA_SITE requires PT and Area Detail' });
+        continue;
+      }
+    }
+
+    const effectiveArea = mappedRole === 'TA_SITE' ? (area || TA_SITE_FIXED_AREA) : area;
+
+    if (mappedRole === 'DEPARTMENT_HEAD') {
+      if (!division || !sectionName) {
+        result.failed += 1;
+        result.errors.push({ row: rowNum, email, message: 'Head of Division requires Division and Section Name' });
         continue;
       }
     }
 
     try {
-      const officeValidation = await validateOfficeLocation({ pt, area, areaDetail });
+      const officeValidation = (mappedRole === 'HRBP' || mappedRole === 'TA_SITE')
+        ? await validateOfficeLocationLists({ pt, area: effectiveArea, areaDetail })
+        : await validateOfficeLocation({ pt, area: effectiveArea, areaDetail });
       if (!officeValidation.ok) {
         result.failed += 1;
         result.errors.push({ row: rowNum, email, message: officeValidation.message });
@@ -273,6 +336,8 @@ async function importAdminUsers(rows) {
       }
 
       const hashed = await bcrypt.hash(password || defaultPassword, 12);
+      const hodFields = serializeHodFields({ division, sectionName });
+      const hrbpFields = serializeHrbpFields({ pt, area: effectiveArea, areaDetail, role: mappedRole });
       await prisma.user.create({
         data: {
           email,
@@ -281,11 +346,11 @@ async function importAdminUsers(rows) {
           lastName,
           phoneNumber: phoneNumber || null,
           role: mappedRole,
-          division: division || null,
-          department: sectionName || null,
-          pt: pt || null,
-          area: area || null,
-          areaDetail: areaDetail || null,
+          division: hodFields.division,
+          department: hodFields.department,
+          pt: hrbpFields.pt,
+          area: hrbpFields.area,
+          areaDetail: hrbpFields.areaDetail,
           isActive: true,
           isEmailVerified: true,
           emailVerifiedAt: new Date(),
