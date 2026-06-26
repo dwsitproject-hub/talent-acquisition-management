@@ -41,6 +41,7 @@ export interface Candidate {
   applicationInfo: ApplicationInfo
   status: CandidateStatus
   source: string
+  sourceDetail?: string
   notes?: string
   files?: CandidateFile[]
   // Additional fields for UI

@@ -11,6 +11,12 @@ import { getApplicationStatusPillClass, mapApplicationStatusToUi } from '@/utils
 import PositionEditOverlay from '@/components/PositionEditOverlay'
 import { usePositionEditOverlay } from '@/hooks/usePositionEditOverlay'
 import ApplicationHistoryModal from '@/components/ApplicationHistoryModal'
+import {
+  formatCandidateSourceDetailLabel,
+  formatCandidateSourceLabel,
+  getCandidateSourceFields,
+  shouldShowCandidateSourceDetail,
+} from '@/utils/candidateSource'
 
 /** Collapse whitespace and unify dash variants so profile "Position applied for" matches FPTK titles */
 function normalizeTitleForMatch(s: string): string {
@@ -331,6 +337,7 @@ export default function ViewCandidateModal({ isOpen, onClose, candidate }: ViewC
               const currentAddress = (candidate as any).currentAddress || f.currentAddress || candidate.contactInfo.address || 'Not specified'
               const permanentAddress = (candidate as any).permanentAddress || f.permanentAddress || 'Not specified'
               const nationality = candidate.personalInfo.nationality || 'Not specified'
+              const { source, sourceDetail } = getCandidateSourceFields(candidate)
 
               return (
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px' }}>
@@ -471,6 +478,19 @@ export default function ViewCandidateModal({ isOpen, onClose, candidate }: ViewC
                       </div>
                       <div>
                         <span style={{ fontSize: '12px', fontWeight: '500', color: '#6B7280', textTransform: 'uppercase' }}>
+                          Source
+                        </span>
+                        <div style={{ fontSize: '14px', color: '#111827' }}>
+                          {formatCandidateSourceLabel(source)}
+                        </div>
+                        {shouldShowCandidateSourceDetail(source, sourceDetail) && (
+                          <div style={{ fontSize: '12px', color: '#6B7280', marginTop: '4px' }}>
+                            {formatCandidateSourceDetailLabel(source)}: {sourceDetail}
+                          </div>
+                        )}
+                      </div>
+                      <div>
+                        <span style={{ fontSize: '12px', fontWeight: '500', color: '#6B7280', textTransform: 'uppercase' }}>
                           Skills
                         </span>
                         <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', marginTop: '6px' }}>
@@ -524,7 +544,10 @@ export default function ViewCandidateModal({ isOpen, onClose, candidate }: ViewC
 
             
 
-            {activeTab === 'application' && (
+            {activeTab === 'application' && (() => {
+              const { source, sourceDetail } = getCandidateSourceFields(candidate)
+
+              return (
               <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
                 <div>
                   <h4 style={{ fontSize: '16px', fontWeight: '600', color: '#374151', marginBottom: '12px' }}>
@@ -544,8 +567,13 @@ export default function ViewCandidateModal({ isOpen, onClose, candidate }: ViewC
                         Source
                       </span>
                       <div style={{ fontSize: '14px', color: '#111827' }}>
-                        {candidate.applicationInfo?.source || candidate.source || 'Not specified'}
+                        {formatCandidateSourceLabel(source)}
                       </div>
+                      {shouldShowCandidateSourceDetail(source, sourceDetail) && (
+                        <div style={{ fontSize: '12px', color: '#6B7280', marginTop: '4px' }}>
+                          {formatCandidateSourceDetailLabel(source)}: {sourceDetail}
+                        </div>
+                      )}
                     </div>
                     <div>
                       <span style={{ fontSize: '12px', fontWeight: '500', color: '#6B7280', textTransform: 'uppercase' }}>
@@ -576,7 +604,8 @@ export default function ViewCandidateModal({ isOpen, onClose, candidate }: ViewC
                   </div>
                 </div>
               </div>
-            )}
+              )
+            })()}
 
             {activeTab === 'jobpostings' && (
               <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
@@ -1198,25 +1227,28 @@ export default function ViewCandidateModal({ isOpen, onClose, candidate }: ViewC
                             <div style={{ fontSize: '14px', color: '#111827' }}>{formData.availableStartDate || '-'}</div>
                           </div>
                           <div>
-                            <span style={{ fontSize: '12px', fontWeight: '500', color: '#6B7280' }}>Source (Knowing us from)</span>
+                            <span style={{ fontSize: '12px', fontWeight: '500', color: '#6B7280' }}>Source</span>
                             <div style={{ fontSize: '14px', color: '#111827' }}>
-                              {(() => {
-                                const source = formData.source || ''
-                                if (!source) return '-'
-                                const sourceMap: { [key: string]: string } = {
-                                  'SOCIAL_MEDIA': 'Social Media',
-                                  'LINKEDIN': 'LinkedIn',
-                                  'JOBSTREET': 'Jobstreet',
-                                  'REFERENCE': 'Reference'
-                                }
-                                return sourceMap[source] || source
-                              })()}
+                              {formatCandidateSourceLabel(
+                                getCandidateSourceFields({ ...candidate, languages: formData }).source ||
+                                  formData.source ||
+                                  ''
+                              )}
                             </div>
-                            {(formData.source === 'SOCIAL_MEDIA' || formData.source === 'REFERENCE') && formData.sourceDetail && (
-                              <div style={{ fontSize: '12px', color: '#6B7280', marginTop: '4px' }}>
-                                {formData.source === 'SOCIAL_MEDIA' ? 'Social Media Detail' : 'Reference Name'}: {formData.sourceDetail}
-                              </div>
-                            )}
+                            {(() => {
+                              const { source, sourceDetail } = getCandidateSourceFields({
+                                ...candidate,
+                                languages: formData,
+                              } as Record<string, unknown>)
+                              const resolvedSource = source || formData.source || ''
+                              const resolvedDetail = sourceDetail || formData.sourceDetail || ''
+                              if (!shouldShowCandidateSourceDetail(resolvedSource, resolvedDetail)) return null
+                              return (
+                                <div style={{ fontSize: '12px', color: '#6B7280', marginTop: '4px' }}>
+                                  {formatCandidateSourceDetailLabel(resolvedSource)}: {resolvedDetail}
+                                </div>
+                              )
+                            })()}
                           </div>
                         </div>
                       </div>

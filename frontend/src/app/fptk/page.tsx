@@ -27,6 +27,7 @@ import {
 } from '@/utils/fptkExcelParser'
 import { FPTKAPI, MasterOfficeLocationAPI, MenuAccessAPI } from '@/lib/api'
 import MultiSelectDropdown from '@/components/MultiSelectDropdown'
+import { mapUiStatusToApplicationStatus } from '@/utils/applicationStatusUi'
 
 const DEFAULT_CURRENT_STATUS = 'Pending FKTK'
 
@@ -327,39 +328,6 @@ export const mapApiFptk = (fptk: any): FPTK => {
 const mapAppliedCandidatesForPayload = (candidates?: any[]) => {
   if (!Array.isArray(candidates)) return []
 
-  const mapUiStatusToBackend = (status?: string) => {
-    const raw = (status || '').toString().trim()
-    if (!raw) return 'SUBMITTED'
-    const upper = raw.toUpperCase()
-    if (/^[A-Z0-9_]+$/.test(upper)) return upper
-    const lookup: Record<string, string> = {
-      'applied': 'SUBMITTED',
-      'under review': 'SCREENING',
-      'shortlisted': 'SCREENING',
-      'interview scheduled': 'INTERVIEW_SCHEDULED',
-      'interviewed': 'INTERVIEW_COMPLETED',
-      'assessment': 'TECHNICAL_TEST',
-      'offering creation': 'OFFER_PROPOSED',
-      'pending feedback': 'OFFER_APPROVED',
-      'document verification': 'DOCUMENT_VERIFICATION',
-      'offer sent': 'OFFER_SENT',
-      'offer accepted': 'OFFER_ACCEPTED',
-      'offer rejected': 'OFFER_REJECTED',
-      'mcu': 'MEDICAL_CHECKUP_COMPLETED',
-      'medical checkup scheduled': 'MEDICAL_CHECKUP_SCHEDULED',
-      'medical checkup completed': 'MEDICAL_CHECKUP_COMPLETED',
-      'contract sent': 'CONTRACT_SENT',
-      'contract signed': 'CONTRACT_SIGNED',
-      'on boarding': 'ONBOARDING',
-      'hired': 'HIRED',
-      'rejected (failed interview / assessment)': 'REJECTED',
-      'rejected': 'REJECTED',
-      'withdrawn': 'WITHDRAWN',
-      'keep in view': 'KEEP_IN_VIEW',
-    }
-    return lookup[raw.toLowerCase()] || 'SUBMITTED'
-  }
-
   return candidates
     .map((candidate: any) => {
       if (!candidate) return null
@@ -373,7 +341,7 @@ const mapAppliedCandidatesForPayload = (candidates?: any[]) => {
         candidateId: candidate.candidateId || candidate.id,
         fullName: candidate.fullName || candidate.name,
         email: candidate.email,
-        status: mapUiStatusToBackend(candidate.status || statusFromEnum),
+        status: mapUiStatusToApplicationStatus(candidate.status || statusFromEnum),
         appliedDate: candidate.appliedDate || candidate.appliedAt || new Date().toISOString(),
         source: candidate.source,
         // Include interview data if it exists
@@ -917,10 +885,9 @@ function FPTKPageContent() {
     }
   }
 
-  const handleCandidateStatusUpdate = (jobPostingId: string, candidateId: string, newStatus: string) => {
-    // This would typically update the candidate's status in the backend
-    // For now, we'll just log the update
-    console.log(`Updating candidate ${candidateId} status to ${newStatus} for job posting ${jobPostingId}`)
+  const handleCandidateStatusUpdate = (_jobPostingId: string, _candidateId: string, _newStatus: string) => {
+    void refreshStatusCounts()
+    void loadFPTKs({ silent: true })
   }
 
   const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -1161,6 +1128,8 @@ function FPTKPageContent() {
   const perms = cfg.permissions || { view: visibleRoles, create: ['SUPER_ADMIN','TA_HO','HIRING_MANAGER'], edit: ['SUPER_ADMIN','TA_HO','HIRING_MANAGER'] }
   const canCreate = (perms.create || []).includes(roleName) || (perms.create || []).includes('*')
   const canEdit = (perms.edit || []).includes(roleName) || (perms.edit || []).includes('*')
+  const canEditCandidateStatusOnly = roleName === 'TA_SITE' && !canEdit
+  const canOpenPositionEdit = canEdit || canEditCandidateStatusOnly
   const canDelete = backendRole === 'SUPER_ADMIN'
 
   const filteredFptks = fptks
@@ -1535,12 +1504,12 @@ function FPTKPageContent() {
                         View
                       </button>
                       <button 
-                        disabled={!canEdit}
-                        onClick={() => canEdit && handleEditJobPosting(fptk)}
-                        className={`text-sm font-medium flex items-center ${canEdit ? 'text-gray-400 hover:text-gray-600' : 'text-gray-300 cursor-not-allowed'}`}
+                        disabled={!canOpenPositionEdit}
+                        onClick={() => canOpenPositionEdit && handleEditJobPosting(fptk)}
+                        className={`text-sm font-medium flex items-center ${canOpenPositionEdit ? 'text-gray-400 hover:text-gray-600' : 'text-gray-300 cursor-not-allowed'}`}
                       >
                         <PencilIcon className="h-4 w-4 mr-1" />
-                        Edit
+                        {canEditCandidateStatusOnly ? 'Update Status' : 'Edit'}
                       </button>
                       <button 
                         onClick={() => handleCopyJobPosting(fptk)}
@@ -1630,6 +1599,7 @@ function FPTKPageContent() {
           jobPosting={selectedJobPosting}
           onSave={handleUpdateJobPosting}
           onCandidateStatusUpdate={handleCandidateStatusUpdate}
+          candidateStatusOnly={canEditCandidateStatusOnly}
         />
 
         {/* Upload Results Modal */}

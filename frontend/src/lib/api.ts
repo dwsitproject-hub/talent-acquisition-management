@@ -552,6 +552,13 @@ export const ApplicationsAPI = {
     const res = await api.get(`/applications/${id}`)
     return res.data.data
   },
+  async updateStatus(
+    id: string,
+    payload: { status: string; reason?: string; blacklisted?: boolean; blacklistReason?: string }
+  ) {
+    const res = await api.put(`/applications/${id}/status`, payload)
+    return res.data.data
+  },
 }
 
 // Dashboard APIs

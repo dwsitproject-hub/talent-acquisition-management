@@ -8,6 +8,7 @@ import { MasterDivisionAPI } from '@/lib/api'
 import { loadSelectablePositionOptions, filterPositionOptionsByDivisions, prunePositionAppliedFor, type PositionOption } from '@/lib/fptkPositionOptions'
 import PositionAppliedForField, { type PositionPickerMeta } from '@/components/PositionAppliedForField'
 import { compressFile, formatFileSize } from '@/utils/fileCompression'
+import { getCandidateSourceFields } from '@/utils/candidateSource'
 
 interface FileSelection {
   cvFile: File | null
@@ -48,6 +49,8 @@ export default function EditCandidateModal({ isOpen, onClose, onSave, candidate 
     
     // Professional Information
     yearsOfExperience: '',
+    source: '',
+    sourceDetail: '',
     skills: [] as string[],
     division: [] as string[],
     positionAppliedFor: [] as string[],
@@ -188,6 +191,8 @@ export default function EditCandidateModal({ isOpen, onClose, onSave, candidate 
         ? (candidate as any).positionAppliedFor 
         : ((candidate as any).positionAppliedFor ? [(candidate as any).positionAppliedFor] : [])
 
+      const { source, sourceDetail } = getCandidateSourceFields(candidate)
+
       // Get drivingLicense - convert array to string if needed
       let drivingLicenseValue = ''
       if ((candidate as any).drivingLicense) {
@@ -219,6 +224,8 @@ export default function EditCandidateModal({ isOpen, onClose, onSave, candidate 
         phone: candidate.contactInfo.phone || '',
         email: candidate.contactInfo.email,
         yearsOfExperience: (candidate as any).yearsOfExperience?.toString() || candidate.professionalInfo.experience?.toString() || '',
+        source,
+        sourceDetail,
         skills: (candidate as any).skills || candidate.professionalInfo.skills || [],
         division: division,
         positionAppliedFor: positionAppliedFor,
@@ -957,6 +964,78 @@ export default function EditCandidateModal({ isOpen, onClose, onSave, candidate 
                         }}
                       />
                     </div>
+                    <div>
+                      <label style={{ display: 'block', fontSize: '14px', fontWeight: '500', color: '#374151', marginBottom: '4px' }}>
+                        Source
+                      </label>
+                      <select
+                        value={formData.source}
+                        onChange={(e) => {
+                          handleInputChange('source', e.target.value)
+                          handleInputChange('sourceDetail', '')
+                        }}
+                        style={{
+                          width: '100%',
+                          padding: '8px 12px',
+                          border: '1px solid #D1D5DB',
+                          borderRadius: '6px',
+                          fontSize: '14px',
+                          outline: 'none',
+                          backgroundColor: 'white'
+                        }}
+                      >
+                        <option value="">Select Source</option>
+                        <option value="LinkedIn">LinkedIn</option>
+                        <option value="Indeed">Indeed</option>
+                        <option value="Jobstreet">Jobstreet</option>
+                        <option value="Job Fair">Job Fair</option>
+                        <option value="Local Site">Local Site</option>
+                        <option value="Referral">Referral</option>
+                        <option value="Others">Others</option>
+                      </select>
+                    </div>
+                    {formData.source === 'Referral' && (
+                      <div>
+                        <label style={{ display: 'block', fontSize: '14px', fontWeight: '500', color: '#374151', marginBottom: '4px' }}>
+                          By Who
+                        </label>
+                        <input
+                          type="text"
+                          value={formData.sourceDetail}
+                          onChange={(e) => handleInputChange('sourceDetail', e.target.value)}
+                          placeholder="Enter referral name"
+                          style={{
+                            width: '100%',
+                            padding: '8px 12px',
+                            border: '1px solid #D1D5DB',
+                            borderRadius: '6px',
+                            fontSize: '14px',
+                            outline: 'none'
+                          }}
+                        />
+                      </div>
+                    )}
+                    {formData.source === 'Others' && (
+                      <div>
+                        <label style={{ display: 'block', fontSize: '14px', fontWeight: '500', color: '#374151', marginBottom: '4px' }}>
+                          Please specify
+                        </label>
+                        <input
+                          type="text"
+                          value={formData.sourceDetail}
+                          onChange={(e) => handleInputChange('sourceDetail', e.target.value)}
+                          placeholder="Enter source details"
+                          style={{
+                            width: '100%',
+                            padding: '8px 12px',
+                            border: '1px solid #D1D5DB',
+                            borderRadius: '6px',
+                            fontSize: '14px',
+                            outline: 'none'
+                          }}
+                        />
+                      </div>
+                    )}
                     {/* Skills */}
                     <div style={{ gridColumn: '1 / -1' }}>
                       <label style={{ display: 'block', fontSize: '14px', fontWeight: '500', color: '#374151', marginBottom: '4px' }}>

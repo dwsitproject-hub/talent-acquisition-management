@@ -23,6 +23,7 @@ import { matchesTokenizedSearch } from '@/utils/search'
 import { CandidatesAPI, MenuAccessAPI } from '@/lib/api'
 import BulkUploadModal from '@/components/BulkUploadModal'
 import { getCandidateDivisions, getCandidateYearsOfExperience, getCandidateSkills, parseLanguagesData } from '@/utils/candidateProfileShape'
+import { getCandidateSourceFields } from '@/utils/candidateSource'
 
 const mapEnumToRole = (role: string): string => {
   if (!role) return role
@@ -235,6 +236,7 @@ export const mapApiCandidate = (candidate: any): Candidate => {
   const positionAppliedFor = parsePositionAppliedFor(candidate, languagesData)
   const divisionList = getCandidateDivisions(candidate)
   const primaryDivision = divisionList.length > 0 ? divisionList[0] : (candidate.user?.division || null)
+  const { source: candidateSource, sourceDetail: candidateSourceDetail } = getCandidateSourceFields(candidate)
 
   const formFullName = formDataDiri?.fullName?.trim() || ''
   const [formFirstName, ...formLastParts] = formFullName ? formFullName.split(' ') : ['']
@@ -300,12 +302,11 @@ export const mapApiCandidate = (candidate: any): Candidate => {
     },
     applicationInfo: {
       appliedDate: candidate.createdAt || new Date().toISOString(),
-      source: candidate.source || 'manual',
+      source: candidateSource || candidate.source || 'manual',
       status: candidate.status || 'new',
       notes: candidate.notes || '',
     },
     status: candidate.status || 'new',
-    source: candidate.source || 'manual',
     notes: candidate.notes || '',
     isLockedForOtherPositions: Boolean(candidate.isLockedForOtherPositions),
     lockReason: candidate.lockReason ?? null,
@@ -335,6 +336,8 @@ export const mapApiCandidate = (candidate: any): Candidate => {
       if (raw === undefined || raw === null || String(raw).trim() === '') return ''
       return String(yearsOfExperienceValue)
     })(),
+    source: candidateSource,
+    sourceDetail: candidateSourceDetail,
     languages: languagesData ?? (typeof candidate.languages === 'object' ? candidate.languages : null),
   }
 }
@@ -569,7 +572,7 @@ export default function CandidatesPage() {
     router.push('/')
     return null
   }
-  const perms = cfg.permissions || { view: visibleRoles, create: ['SUPER_ADMIN','HRBP','TA_SITE','TA_HO'], edit: ['SUPER_ADMIN','HRBP','TA_SITE','TA_HO'] }
+  const perms = cfg.permissions || { view: visibleRoles, create: ['SUPER_ADMIN','HRBP','TA_HO'], edit: ['SUPER_ADMIN','HRBP','TA_HO'] }
   const canCreate = (perms.create || []).includes(roleName) || (perms.create || []).includes('*')
   const canEdit = (perms.edit || []).includes(roleName) || (perms.edit || []).includes('*')
   const canGenerateLink = ['SUPER_ADMIN', 'TA_HO', 'TA_SITE', 'HRBP'].includes(roleName)
@@ -836,6 +839,8 @@ export default function CandidatesPage() {
         idNumber: candidateData.idNumber || null,
         ethnicity: candidateData.ethnicity || null,
         healthStatus: candidateData.healthStatus || null,
+        source: candidateData.source || null,
+        sourceDetail: candidateData.sourceDetail || null,
       }
       // After computing divisionList, ensure primary division is included
       payload.division = payload.divisionList && payload.divisionList.length > 0 ? payload.divisionList[0] : null
@@ -1188,9 +1193,6 @@ export default function CandidatesPage() {
                         Status
                       </th>
                       <th scope="col" className="px-3 py-3.5 text-left text-sm font-semibold text-gray-900">
-                        Source
-                      </th>
-                      <th scope="col" className="px-3 py-3.5 text-left text-sm font-semibold text-gray-900">
                         Applied
                       </th>
                       <th scope="col" className="relative py-3.5 pl-3 pr-4 sm:pr-6">
@@ -1282,9 +1284,6 @@ export default function CandidatesPage() {
                           <span className={`inline-flex rounded-full px-2 py-1 text-xs font-semibold ${statusColors[candidate.status]}`}>
                             {candidate.status.replace('_', ' ')}
                           </span>
-                        </td>
-                        <td className="whitespace-nowrap px-3 py-4 text-sm text-gray-500">
-                          {candidate.source}
                         </td>
                         <td className="whitespace-nowrap px-3 py-4 text-sm text-gray-500">
                           {new Date(candidate.createdAt).toLocaleDateString()}

@@ -445,6 +445,11 @@ router.put(
         drivingLicense: Array.isArray(formData.drivingLicense)
           ? formData.drivingLicense
           : (formData.drivingLicense ? [formData.drivingLicense] : []),
+        source: formData.source && String(formData.source).trim() ? String(formData.source).trim() : null,
+        sourceDetail:
+          formData.sourceDetail && String(formData.sourceDetail).trim()
+            ? String(formData.sourceDetail).trim()
+            : null,
         formDataDiri: {
           ...formData,
           submittedAt: new Date().toISOString(),
