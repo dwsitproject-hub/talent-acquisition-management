@@ -6,7 +6,8 @@ const bulkImportService = require('../services/bulkImportService');
 exports.listUsers = asyncHandler(async (req, res) => {
   const search = (req.query.search || '').toString();
   const role = req.query.role || null;
-  const users = await adminUserService.listUsers(search, role);
+  const area = req.query.area || null;
+  const users = await adminUserService.listUsers(search, role, area);
   res.json({ success: true, data: users });
 });
 

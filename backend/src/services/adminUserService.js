@@ -59,7 +59,49 @@ function mapUser(u) {
   };
 }
 
-async function listUsers(search, role) {
+function addConditionToWhere(where, condition) {
+  if (!condition || Object.keys(condition).length === 0) return;
+  if (where.OR) {
+    const existingOr = { OR: where.OR };
+    delete where.OR;
+    where.AND = [...(where.AND || []), existingOr, condition];
+  } else {
+    Object.assign(where, condition);
+  }
+}
+
+/** UI Area filter (Site / HO) for user list, including multi-value area fields. */
+function buildUserAreaFilterCondition(areaFilter) {
+  const target = (areaFilter || '').trim();
+  if (!target || target.toUpperCase() === 'ALL') return null;
+
+  const normalized = target.toLowerCase();
+  if (normalized === 'ho') {
+    return {
+      OR: [
+        { role: 'TA_HO' },
+        { area: { equals: 'HO', mode: 'insensitive' } },
+        { area: { startsWith: 'HO||', mode: 'insensitive' } },
+        { area: { endsWith: '||HO', mode: 'insensitive' } },
+        { area: { contains: '||HO||', mode: 'insensitive' } },
+      ],
+    };
+  }
+  if (normalized === 'site') {
+    return {
+      OR: [
+        { role: 'TA_SITE' },
+        { area: { equals: 'Site', mode: 'insensitive' } },
+        { area: { startsWith: 'Site||', mode: 'insensitive' } },
+        { area: { endsWith: '||Site', mode: 'insensitive' } },
+        { area: { contains: '||Site||', mode: 'insensitive' } },
+      ],
+    };
+  }
+  return null;
+}
+
+async function listUsers(search, role, area) {
   const where = {};
   
   if (search) {
@@ -74,6 +116,11 @@ async function listUsers(search, role) {
     // Map frontend role name to backend enum
     const mappedRole = mapRoleToEnum(role);
     where.role = mappedRole;
+  }
+
+  const areaFilterCondition = buildUserAreaFilterCondition(area);
+  if (areaFilterCondition) {
+    addConditionToWhere(where, areaFilterCondition);
   }
   
   const users = await prisma.user.findMany({

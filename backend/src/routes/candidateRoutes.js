@@ -229,6 +229,7 @@ router.get(
       skills: req.query.skills ? req.query.skills.split(',') : undefined,
       minScore: req.query.minScore,
       forFptkId: req.query.forFptkId || undefined,
+      excludeHired: req.query.excludeHired,
     };
     
     const pagination = {

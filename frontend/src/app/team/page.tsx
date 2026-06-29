@@ -11,6 +11,9 @@ import MultiSelectDropdown from '@/components/MultiSelectDropdown'
 
 const TA_SITE_AREA = 'Site'
 
+const USER_AREA_FILTERS = ['ALL', 'Site', 'HO'] as const
+type UserAreaFilterType = typeof USER_AREA_FILTERS[number]
+
 interface TeamMember {
   id: string
   firstName: string
@@ -35,6 +38,7 @@ export default function TeamPage() {
   const [loading, setLoading] = useState(true)
   const [searchTerm, setSearchTerm] = useState('')
   const [roleFilter, setRoleFilter] = useState('all')
+  const [areaFilter, setAreaFilter] = useState<UserAreaFilterType>('ALL')
   const [isAddOpen, setIsAddOpen] = useState(false)
   const [isEditOpen, setIsEditOpen] = useState(false)
   const [editingMember, setEditingMember] = useState<TeamMember | null>(null)
@@ -406,15 +410,19 @@ const handleSaveMenuAccess = async () => {
     if (isLoading || !isAuthenticated) return
     const delay = searchTerm ? 350 : 0
     const timer = setTimeout(() => {
-      loadTeamMembers(searchTerm, roleFilter)
+      loadTeamMembers(searchTerm, roleFilter, areaFilter)
     }, delay)
     return () => clearTimeout(timer)
-  }, [isLoading, isAuthenticated, searchTerm, roleFilter])
+  }, [isLoading, isAuthenticated, searchTerm, roleFilter, areaFilter])
 
-  const loadTeamMembers = async (search = '', role = 'all') => {
+  const loadTeamMembers = async (search = '', role = 'all', area: UserAreaFilterType = 'ALL') => {
     try {
       setLoading(true)
-      const members = await AdminUsersAPI.list(search, role !== 'all' ? role : undefined)
+      const members = await AdminUsersAPI.list(
+        search,
+        role !== 'all' ? role : undefined,
+        area !== 'ALL' ? area : undefined
+      )
       // Map API response to TeamMember format
       const mappedMembers: TeamMember[] = (members || [])
         .map((m: any) => ({
@@ -661,7 +669,7 @@ const handleSaveMenuAccess = async () => {
     if (!member) return
     await AdminUsersAPI.setStatus(memberId, !member.isActive)
     // Reload team members to get fresh data
-    await loadTeamMembers()
+    await loadTeamMembers(searchTerm, roleFilter, areaFilter)
   }
 
   const handleSaveMember = async () => {
@@ -693,7 +701,7 @@ const handleSaveMenuAccess = async () => {
         areaDetail: isNewScopedSite ? newMember.hrbpAreaDetails.join('||') : (newMember.areaDetail || ''),
       })
       // Reload team members to get fresh data
-      await loadTeamMembers()
+      await loadTeamMembers(searchTerm, roleFilter, areaFilter)
       setIsAddOpen(false)
       setNewMember({ firstName: '', lastName: '', email: '', phone: '', password: '', role: 'TA_HO', division: '', sectionName: '', hodDivisions: [], hodSections: [], hrbpPts: [], hrbpAreas: [], hrbpAreaDetails: [], pt: '', area: '', areaDetail: '' })
       setValidationErrors({})
@@ -740,7 +748,7 @@ const handleSaveMenuAccess = async () => {
         await AdminUsersAPI.resetPassword(editingMember.id, defaultPassword)
       }
       // Reload team members to get fresh data
-      await loadTeamMembers()
+      await loadTeamMembers(searchTerm, roleFilter, areaFilter)
       setIsEditOpen(false)
       setEditingMember(null)
       setValidationErrors({})
@@ -808,7 +816,7 @@ const handleSaveMenuAccess = async () => {
                     try {
                       const res = await AdminUsersAPI.bulkUpload(file)
                       setUploadResult(res?.data || res)
-                      await loadTeamMembers()
+                      await loadTeamMembers(searchTerm, roleFilter, areaFilter)
                     } catch (err: any) {
                       console.error('Bulk upload failed:', err)
                       alert(err.response?.data?.message || 'Bulk upload failed')
@@ -912,6 +920,27 @@ const handleSaveMenuAccess = async () => {
               </option>
             ))}
           </select>
+          <div className="flex items-center gap-2 w-full sm:w-auto">
+            <span className="text-xs font-medium text-gray-500 whitespace-nowrap">Area</span>
+            <div className="inline-flex rounded-md shadow-sm">
+              {USER_AREA_FILTERS.map((filter, index) => (
+                <button
+                  key={filter}
+                  type="button"
+                  onClick={() => setAreaFilter(filter)}
+                  className={`px-2.5 py-1.5 border text-xs font-medium ${
+                    filter === areaFilter
+                      ? 'bg-indigo-600 text-white border-indigo-600'
+                      : 'bg-white text-gray-600 border-gray-300 hover:bg-gray-50'
+                  } ${index === 0 ? 'rounded-l-md' : ''} ${
+                    index === USER_AREA_FILTERS.length - 1 ? 'rounded-r-md' : ''
+                  } ${index > 0 ? '-ml-px' : ''}`}
+                >
+                  {filter}
+                </button>
+              ))}
+            </div>
+          </div>
         </div>
 
         {/* Team Members List */}

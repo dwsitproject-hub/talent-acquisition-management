@@ -1,5 +1,6 @@
 const prisma = require('../config/database');
 const logger = require('../utils/logger');
+const { applyExcludeHiredCandidates } = require('../utils/candidateApplicationLock');
 const { buildHrbpFptkFilterFromUser, buildHrbpApplicationFptkFilterFromUser } = require('../utils/hrbpScope');
 const { isDepartmentHeadRole, buildHodFptkFilterFromUser, buildHodApplicationScopeFromUser, buildHodCandidateScopeFromUser } = require('../utils/hodScope');
 
@@ -293,6 +294,9 @@ async function getDashboardStats(user = null, options = {}) {
         addConditionToWhere(applicationWhere, { fptk: areaDetailsCondition });
       }
     }
+
+    // Total Candidates: active pipeline only — exclude hired / onboarding
+    applyExcludeHiredCandidates(candidateWhere);
 
     // Location charts: same scope as cards (priority/status/area) + current period when Compare is on
     const fptkLocationWhere = cloneWhere(fptkWhere);
