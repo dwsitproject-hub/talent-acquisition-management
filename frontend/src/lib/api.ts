@@ -184,8 +184,8 @@ export default api
 
 // Admin Users APIs
 export const AdminUsersAPI = {
-  async list(search?: string, role?: string) {
-    const res = await api.get('/admin/users', { params: { search, role } })
+  async list(search?: string, role?: string, area?: string) {
+    const res = await api.get('/admin/users', { params: { search, role, area } })
     return res.data.data
   },
   async create(payload: any) {
@@ -450,6 +450,8 @@ export const CandidatesAPI = {
       sortBy?: 'name' | string
       /** When set, lock flags are relative to applying on this FPTK. */
       forFptkId?: string
+      /** Omit candidates with HIRED or ONBOARDING applications. */
+      excludeHired?: boolean
     },
     pagination?: { page?: number; limit?: number }
   ) {
@@ -459,6 +461,7 @@ export const CandidatesAPI = {
     if (filters?.minScore) params.minScore = filters.minScore
     if (filters?.sortBy) params.sortBy = filters.sortBy
     if (filters?.forFptkId) params.forFptkId = filters.forFptkId
+    if (filters?.excludeHired) params.excludeHired = 'true'
     const res = await api.get('/candidates', { params })
     // API returns { success: true, data: [...], pagination: {...} }
     // Return the full response so frontend can access .data and .pagination

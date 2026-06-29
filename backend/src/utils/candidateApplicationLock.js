@@ -19,6 +19,31 @@ function positionTitleFromFptk(fptk) {
   return title || null;
 }
 
+/** Prisma condition: candidate has no HIRED/ONBOARDING application. */
+function buildExcludeHiredCandidatesCondition() {
+  return {
+    NOT: {
+      applications: {
+        some: {
+          status: { in: BLOCK_NEW_APPLICATION_STATUSES },
+        },
+      },
+    },
+  };
+}
+
+/** Merge hired/onboarding exclusion into an existing Prisma where (preserves OR scopes). */
+function applyExcludeHiredCandidates(where) {
+  const condition = buildExcludeHiredCandidatesCondition();
+  if (where.OR) {
+    const existingOr = { OR: where.OR };
+    delete where.OR;
+    where.AND = [...(where.AND || []), existingOr, condition];
+    return;
+  }
+  Object.assign(where, condition);
+}
+
 function buildBlockingWhere(candidateId, excludeFptkId = null) {
   const where = {
     candidateId,
@@ -155,6 +180,8 @@ async function enrichCandidateWithApplicationLock(candidate, excludeFptkId = nul
 
 module.exports = {
   BLOCK_NEW_APPLICATION_STATUSES,
+  buildExcludeHiredCandidatesCondition,
+  applyExcludeHiredCandidates,
   assertCandidateCanApplyToPosition,
   attachApplicationLockFields,
   buildCandidateLockError,

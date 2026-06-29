@@ -7,7 +7,11 @@ const {
   ACTIVE_CANDIDATE_WHERE,
   withActiveCandidate,
 } = require('../utils/candidateVisibility');
-const { enrichCandidatesWithApplicationLock, enrichCandidateWithApplicationLock } = require('../utils/candidateApplicationLock');
+const {
+  applyExcludeHiredCandidates,
+  enrichCandidatesWithApplicationLock,
+  enrichCandidateWithApplicationLock,
+} = require('../utils/candidateApplicationLock');
 const { buildHrbpApplicationFptkFilterFromUser } = require('../utils/hrbpScope');
 const { isDepartmentHeadRole, buildHodCandidateScopeFromUser } = require('../utils/hodScope');
 
@@ -980,6 +984,14 @@ async function searchCandidates(filters, pagination, user = null) {
     } else {
       where.overallScore = { gte: parseFloat(filters.minScore) };
     }
+  }
+
+  const excludeHired =
+    filters.excludeHired === true ||
+    filters.excludeHired === 'true' ||
+    filters.excludeHired === '1';
+  if (excludeHired) {
+    applyExcludeHiredCandidates(where);
   }
 
   const activeWhere = withActiveCandidate(where);

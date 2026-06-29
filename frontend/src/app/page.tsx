@@ -812,7 +812,7 @@ export default function Dashboard() {
     )
     try {
       const response = await CandidatesAPI.getAll(
-        { sortBy: 'name' },
+        { sortBy: 'name', excludeHired: true },
         { page, limit: TOTAL_CANDIDATES_MODAL_PAGE_SIZE }
       )
       const raw = response.data || []
@@ -913,9 +913,10 @@ export default function Dashboard() {
 
         {/* Unified Filter Toolbar */}
         <div
-          className="mb-4 flex flex-wrap items-center gap-x-3 gap-y-2 bg-white border border-gray-200 rounded-lg shadow-sm px-4 py-2.5"
+          className="mb-4 bg-white border border-gray-200 rounded-lg shadow-sm px-4 py-2.5"
           data-tour="dashboard-time-filter"
         >
+          <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
           {/* Priority */}
           <div className="flex items-center gap-2">
             <span className="text-xs font-medium text-gray-500 whitespace-nowrap">Priority</span>
@@ -1081,6 +1082,39 @@ export default function Dashboard() {
               </>
             )}
           </div>
+          </div>
+
+          {areaDetailFilterActive && (
+            <div className="mt-2 pt-2 border-t border-gray-100 flex flex-wrap items-end gap-x-3 gap-y-2">
+              {areaDetailOptionsLoading ? (
+                <div className="flex items-center gap-2 text-sm text-gray-500">
+                  <Spinner size="sm" />
+                  Loading office locations…
+                </div>
+              ) : (
+                <>
+                  <MultiSelectDropdown
+                    label={`Office location (${locationAreaFilter})`}
+                    options={areaDetailOptions}
+                    value={selectedAreaDetails}
+                    onChange={setSelectedAreaDetails}
+                    placeholder={
+                      areaDetailOptions.length === 0
+                        ? 'No office locations'
+                        : 'Select office locations…'
+                    }
+                    searchPlaceholder="Search office location…"
+                    className="w-52 sm:w-64"
+                  />
+                  {areaDetailSelectionEmpty && (
+                    <span className="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded px-2 py-1">
+                      Select at least one office location to view dashboard data.
+                    </span>
+                  )}
+                </>
+              )}
+            </div>
+          )}
         </div>
 
         {/* Stats Grid */}
@@ -1375,36 +1409,9 @@ export default function Dashboard() {
         {/* Charts Section - Location aligned view */}
         <div className="mt-4 bg-white shadow rounded-lg">
           <div className="px-4 py-4 sm:px-6">
-            <div className="flex flex-wrap items-end justify-between gap-3 mb-3">
-              <h3 className="text-base font-semibold text-gray-900">
-                Location Overview
-              </h3>
-
-              {areaDetailFilterActive && (
-                <div className="flex flex-wrap items-end gap-x-3 gap-y-2">
-                  {areaDetailOptionsLoading ? (
-                    <div className="flex items-center gap-2 text-sm text-gray-500 pb-2">
-                      <Spinner size="sm" />
-                      Loading area details…
-                    </div>
-                  ) : (
-                    <MultiSelectDropdown
-                      label={`Area Detail (${locationAreaFilter})`}
-                      options={areaDetailOptions}
-                      value={selectedAreaDetails}
-                      onChange={setSelectedAreaDetails}
-                      placeholder={
-                        areaDetailOptions.length === 0
-                          ? 'No area details'
-                          : 'Select area details…'
-                      }
-                      searchPlaceholder="Search area detail…"
-                      className="w-52 sm:w-64"
-                    />
-                  )}
-                </div>
-              )}
-            </div>
+            <h3 className="text-base font-semibold text-gray-900 mb-3">
+              Location Overview
+            </h3>
 
             <div className="hidden lg:grid grid-cols-3 gap-4 text-xs font-semibold text-gray-500 border-b pb-2 mb-4">
               <span>Location</span>
@@ -1414,7 +1421,7 @@ export default function Dashboard() {
 
             {areaDetailSelectionEmpty ? (
               <div className="text-sm text-gray-500 py-4">
-                Select at least one Area Detail to view location and dashboard data.
+                Select at least one office location in the filters above to view location data.
               </div>
             ) : combinedLocations.length === 0 ? (
               <div className="text-sm text-gray-500">

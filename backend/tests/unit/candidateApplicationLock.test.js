@@ -1,5 +1,7 @@
 const {
   BLOCK_NEW_APPLICATION_STATUSES,
+  applyExcludeHiredCandidates,
+  buildExcludeHiredCandidatesCondition,
   lockFieldsFromBlocking,
   buildCandidateLockError,
   attachApplicationLockFields,
@@ -8,6 +10,45 @@ const {
 describe('candidateApplicationLock', () => {
   test('BLOCK_NEW_APPLICATION_STATUSES includes ONBOARDING and HIRED', () => {
     expect(BLOCK_NEW_APPLICATION_STATUSES).toEqual(['ONBOARDING', 'HIRED']);
+  });
+
+  test('buildExcludeHiredCandidatesCondition excludes HIRED and ONBOARDING applications', () => {
+    expect(buildExcludeHiredCandidatesCondition()).toEqual({
+      NOT: {
+        applications: {
+          some: {
+            status: { in: ['ONBOARDING', 'HIRED'] },
+          },
+        },
+      },
+    });
+  });
+
+  test('applyExcludeHiredCandidates merges with existing role scope', () => {
+    const where = {
+      isDeleted: false,
+      applications: { some: { fptk: { area: 'HO' } } },
+    };
+    applyExcludeHiredCandidates(where);
+    expect(where).toEqual({
+      isDeleted: false,
+      applications: { some: { fptk: { area: 'HO' } } },
+      NOT: {
+        applications: {
+          some: {
+            status: { in: ['ONBOARDING', 'HIRED'] },
+          },
+        },
+      },
+    });
+  });
+
+  test('applyExcludeHiredCandidates wraps existing OR in AND', () => {
+    const where = { OR: [{ email: { contains: 'a' } }] };
+    applyExcludeHiredCandidates(where);
+    expect(where.AND).toHaveLength(2);
+    expect(where.AND[0]).toEqual({ OR: [{ email: { contains: 'a' } }] });
+    expect(where.AND[1].NOT.applications.some.status.in).toEqual(['ONBOARDING', 'HIRED']);
   });
 
   test('lockFieldsFromBlocking returns unlocked when no blocking app', () => {
