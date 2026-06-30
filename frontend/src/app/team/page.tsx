@@ -120,6 +120,46 @@ const routes: Array<{
     },
   },
   {
+    path: '/candidates',
+    label: 'Candidate → Candidates',
+    defaults: {
+      visibleRoles: [
+        'SUPER_ADMIN',
+        'Management',
+        'Head of Division',
+        'HRBP',
+        'TA_HO',
+        'TA_SITE',
+        'HIRING_MANAGER',
+        'INTERVIEWER',
+      ],
+      permissions: {
+        create: ['SUPER_ADMIN', 'HRBP', 'TA_HO', 'TA_SITE'],
+        edit: ['SUPER_ADMIN', 'HRBP', 'TA_HO', 'TA_SITE'],
+      },
+    },
+  },
+  {
+    path: '/candidates/kiv',
+    label: 'Candidate → KIV',
+    defaults: {
+      visibleRoles: [
+        'SUPER_ADMIN',
+        'Management',
+        'Head of Division',
+        'HRBP',
+        'TA_HO',
+        'TA_SITE',
+        'HIRING_MANAGER',
+        'INTERVIEWER',
+      ],
+      permissions: {
+        create: [],
+        edit: ['SUPER_ADMIN', 'HRBP', 'TA_HO', 'TA_SITE'],
+      },
+    },
+  },
+  {
     path: '/summary-by-position',
     label: 'Summary by Position',
     defaults: {
@@ -209,12 +249,7 @@ useEffect(() => {
     try {
       const access = await MenuAccessAPI.get()
       if (access && Object.keys(access).length > 0) {
-        // Merge with defaults for any missing paths
-        const merged = { ...defaultMenuAccessState }
-        Object.keys(access).forEach((path) => {
-          merged[path] = access[path]
-        })
-        setMenuAccessState(merged)
+        setMenuAccessState(hydrateMenuAccess(access))
       } else {
         setMenuAccessState(defaultMenuAccessState)
       }

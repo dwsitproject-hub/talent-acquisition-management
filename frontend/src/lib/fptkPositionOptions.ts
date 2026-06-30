@@ -1,13 +1,65 @@
 import { FPTKAPI } from '@/lib/api'
 import { isFptkOpenByCurrentStatus } from '@/utils/fptkPositionStatus'
 
+export const TA_SITE_FIXED_AREA = 'Site'
+const SCOPE_SEP = '||'
+
 export type PositionOption = {
   id: string
   title: string
   department?: string
   division?: string
+  pt?: string
+  area?: string
+  areaDetail?: string
   currentStatus?: string
   fptkNumber?: string
+}
+
+/** Parse User.pt / User.areaDetail (single value or `||`-delimited multi). */
+export function parseScopeValues(value?: string | string[] | null): string[] {
+  if (value == null || value === '') return []
+  if (Array.isArray(value)) {
+    return value.map((v) => String(v).trim()).filter(Boolean)
+  }
+  const s = String(value).trim()
+  if (!s) return []
+  return s.split(SCOPE_SEP).map((part) => part.trim()).filter(Boolean)
+}
+
+export function resolveAuthUserRoleName(user: { role?: unknown } | null | undefined): string {
+  const role = user?.role
+  if (typeof role === 'string') return role
+  if (role && typeof role === 'object' && 'name' in role) {
+    return String((role as { name?: string }).name || '')
+  }
+  return ''
+}
+
+export function isTaSiteAuthUser(user: { role?: unknown } | null | undefined): boolean {
+  return resolveAuthUserRoleName(user) === 'TA_SITE'
+}
+
+/** Open positions matching TA_SITE user's PT list and Area Detail (area fixed to Site). */
+export function filterPositionOptionsByTaSiteScope(
+  options: PositionOption[],
+  userPts: string[],
+  userAreaDetails: string[]
+): PositionOption[] {
+  if (userPts.length === 0 || userAreaDetails.length === 0) return []
+
+  const ptSet = new Set(userPts.map((v) => v.trim().toLowerCase()))
+  const detailSet = new Set(userAreaDetails.map((v) => v.trim().toLowerCase()))
+  const areaFixed = TA_SITE_FIXED_AREA.toLowerCase()
+
+  return options.filter((opt) => {
+    if (!isSelectableFptkStatus(opt.currentStatus)) return false
+    const optPt = (opt.pt || '').trim().toLowerCase()
+    const optArea = (opt.area || '').trim().toLowerCase()
+    const optDetail = (opt.areaDetail || '').trim().toLowerCase()
+    if (!optPt || !optArea || !optDetail) return false
+    return ptSet.has(optPt) && optArea === areaFixed && detailSet.has(optDetail)
+  })
 }
 
 const EXCLUDED_PICKER_STATUSES = new Set(['ON BOARDING', 'FILLED', 'CANCELLED', 'EXPIRED'])
@@ -59,6 +111,9 @@ export function mapRowToPositionOption(row: {
   positionTitle?: string
   department?: string
   division?: string
+  pt?: string
+  area?: string
+  areaDetail?: string
   currentStatus?: string
   fptkNumber?: string
 }): PositionOption {
@@ -73,6 +128,9 @@ export function mapRowToPositionOption(row: {
     title,
     department: row.department || '',
     division: row.division || '',
+    pt: row.pt || '',
+    area: row.area || '',
+    areaDetail: row.areaDetail || '',
     currentStatus: row.currentStatus || '',
     fptkNumber: row.fptkNumber,
   }
@@ -88,6 +146,16 @@ export function dedupePositionOptionsByTitle(options: PositionOption[]): Positio
     result.push(opt)
   }
   return result.sort((a, b) => a.title.localeCompare(b.title))
+}
+
+export function resolvePositionAppliedFptkIds(
+  titles: string[],
+  options: PositionOption[]
+): string[] {
+  const ids = titles
+    .map((title) => options.find((opt) => opt.title === title)?.id)
+    .filter((id): id is string => !!id)
+  return [...new Set(ids)]
 }
 
 export type LoadPositionOptionsResult = {

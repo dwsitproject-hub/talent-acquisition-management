@@ -8,6 +8,9 @@ export interface User {
   isActive: boolean
   division?: string
   department?: string
+  pt?: string
+  area?: string
+  areaDetail?: string
   lastLoginAt?: string
   createdAt: string
   updatedAt: string

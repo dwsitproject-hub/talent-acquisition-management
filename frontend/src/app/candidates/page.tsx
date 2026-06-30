@@ -557,7 +557,7 @@ export default function CandidatesPage() {
 
   const cfg = menuAccess['/candidates'] || {}
   const visibleRoles: string[] = cfg.visibleRoles && cfg.visibleRoles.length ? cfg.visibleRoles : [
-    'SUPER_ADMIN','Management','Head of Division','HRBP','TA_HO','TA_SITE'
+    'SUPER_ADMIN','Management','Head of Division','HRBP','TA_HO','TA_SITE','HIRING_MANAGER','INTERVIEWER'
   ]
   
   if (menuAccessLoading) {
@@ -572,7 +572,7 @@ export default function CandidatesPage() {
     router.push('/')
     return null
   }
-  const perms = cfg.permissions || { view: visibleRoles, create: ['SUPER_ADMIN','HRBP','TA_HO'], edit: ['SUPER_ADMIN','HRBP','TA_HO'] }
+  const perms = cfg.permissions || { view: visibleRoles, create: ['SUPER_ADMIN','HRBP','TA_HO','TA_SITE'], edit: ['SUPER_ADMIN','HRBP','TA_HO','TA_SITE'] }
   const canCreate = (perms.create || []).includes(roleName) || (perms.create || []).includes('*')
   const canEdit = (perms.edit || []).includes(roleName) || (perms.edit || []).includes('*')
   const canGenerateLink = ['SUPER_ADMIN', 'TA_HO', 'TA_SITE', 'HRBP'].includes(roleName)
@@ -622,6 +622,9 @@ export default function CandidatesPage() {
         division: divisionValue,
         divisionList: divisionArray,
         positionAppliedFor: Array.isArray(candidateData.positionAppliedFor) ? candidateData.positionAppliedFor : (candidateData.positionAppliedFor ? [candidateData.positionAppliedFor] : []),
+        positionAppliedFptkIds: Array.isArray(candidateData.positionAppliedFptkIds)
+          ? candidateData.positionAppliedFptkIds
+          : [],
         yearsOfExperience:
           candidateData.yearsOfExperience !== undefined &&
           candidateData.yearsOfExperience !== null &&
@@ -825,6 +828,9 @@ export default function CandidatesPage() {
           ? candidateData.division.map((div: string) => div.trim()).filter((div: string) => !!div)
           : (typeof candidateData.division === 'string' && candidateData.division.trim() ? [candidateData.division.trim()] : []),
         positionAppliedFor: candidateData.positionAppliedFor || [],
+        positionAppliedFptkIds: Array.isArray(candidateData.positionAppliedFptkIds)
+          ? candidateData.positionAppliedFptkIds
+          : [],
         yearsOfExperience:
           candidateData.yearsOfExperience !== undefined &&
           candidateData.yearsOfExperience !== null &&

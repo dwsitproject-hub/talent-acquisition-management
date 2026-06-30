@@ -14,6 +14,7 @@ const {
 } = require('../utils/candidateApplicationLock');
 const { buildHrbpApplicationFptkFilterFromUser } = require('../utils/hrbpScope');
 const { isDepartmentHeadRole, buildHodCandidateScopeFromUser } = require('../utils/hodScope');
+const { syncCandidateApplicationsFromPositions } = require('../utils/candidatePositionSync');
 
 function buildHiringManagerScopeFromUser(user = null) {
   if (!user) return null;
@@ -133,7 +134,7 @@ function enrichCandidateFromLanguages(candidate) {
 /**
  * Create candidate (for TA/HR)
  */
-async function createCandidate(data) {
+async function createCandidate(data, actorUser = null) {
   logger.info(`CREATE CANDIDATE - Received data:`, JSON.stringify(data, null, 2));
   
   const { 
@@ -144,6 +145,7 @@ async function createCandidate(data) {
     division, 
     divisionList,
     positionAppliedFor, 
+    positionAppliedFptkIds,
     yearsOfExperience, 
     height, 
     weight, 
@@ -413,6 +415,45 @@ async function createCandidate(data) {
   enrichCandidateFromLanguages(candidateWithUser);
 
   parseFormDataDiri(candidateWithUser);
+
+  if (positionAppliedFor !== undefined || positionAppliedFptkIds !== undefined) {
+    await syncCandidateApplicationsFromPositions(candidateWithUser.id, {
+      positionAppliedFor,
+      positionAppliedFptkIds,
+      actorUserId: actorUser?.id || null,
+      actorUser,
+    });
+    const refreshed = await prisma.candidate.findUnique({
+      where: { id: candidateWithUser.id },
+      include: {
+        user: {
+          select: {
+            id: true,
+            email: true,
+            firstName: true,
+            lastName: true,
+            phoneNumber: true,
+            division: true,
+          },
+        },
+        documents: {
+          orderBy: { uploadedAt: 'desc' },
+        },
+      },
+    });
+    if (refreshed) {
+      if (refreshed.nationalId) {
+        try {
+          refreshed.nationalId = decrypt(refreshed.nationalId);
+        } catch (e) {
+          refreshed.nationalId = null;
+        }
+      }
+      enrichCandidateFromLanguages(refreshed);
+      parseFormDataDiri(refreshed);
+      return refreshed;
+    }
+  }
   
   return candidateWithUser;
 }
@@ -537,7 +578,7 @@ async function updateCandidateProfile(candidateId, data) {
 /**
  * Update candidate (admin/TA side)
  */
-async function updateCandidate(candidateId, data) {
+async function updateCandidate(candidateId, data, actorUser = null) {
   // Log incoming data for debugging
   logger.info(`Updating candidate ${candidateId} with data:`, JSON.stringify(data, null, 2));
   
@@ -550,6 +591,7 @@ async function updateCandidate(candidateId, data) {
     division,
     divisionList,
     positionAppliedFor,
+    positionAppliedFptkIds,
     height,
     weight,
     taxNumber,
@@ -837,6 +879,38 @@ async function updateCandidate(candidateId, data) {
   enrichCandidateFromLanguages(updated);
 
   parseFormDataDiri(updated);
+
+  if (positionAppliedFor !== undefined || positionAppliedFptkIds !== undefined) {
+    await syncCandidateApplicationsFromPositions(candidateId, {
+      positionAppliedFor,
+      positionAppliedFptkIds,
+      actorUserId: actorUser?.id || null,
+      actorUser,
+    });
+    const refreshed = await prisma.candidate.findUnique({
+      where: { id: candidateId },
+      include: {
+        user: {
+          select: {
+            id: true,
+            email: true,
+            firstName: true,
+            lastName: true,
+            phoneNumber: true,
+            division: true,
+          },
+        },
+      },
+    });
+    if (refreshed) {
+      if (refreshed.nationalId) {
+        refreshed.nationalId = decrypt(refreshed.nationalId);
+      }
+      enrichCandidateFromLanguages(refreshed);
+      parseFormDataDiri(refreshed);
+      return refreshed;
+    }
+  }
 
   return updated;
 }

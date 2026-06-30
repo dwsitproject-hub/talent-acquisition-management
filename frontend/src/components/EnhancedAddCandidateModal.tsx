@@ -2,9 +2,19 @@
 
 import { useState, useRef, useEffect, useMemo } from 'react'
 import { useModalEscape } from '@/hooks/useModalEscape'
+import { useAuth } from '@/contexts/AuthContext'
 import { XMarkIcon, CloudArrowUpIcon, XCircleIcon } from '@heroicons/react/24/outline'
 import { MasterDivisionAPI } from '@/lib/api'
-import { loadSelectablePositionOptions, filterPositionOptionsByDivisions, prunePositionAppliedFor, type PositionOption } from '@/lib/fptkPositionOptions'
+import {
+  loadSelectablePositionOptions,
+  filterPositionOptionsByDivisions,
+  filterPositionOptionsByTaSiteScope,
+  parseScopeValues,
+  isTaSiteAuthUser,
+  prunePositionAppliedFor,
+  resolvePositionAppliedFptkIds,
+  type PositionOption,
+} from '@/lib/fptkPositionOptions'
 import PositionAppliedForField, { type PositionPickerMeta } from '@/components/PositionAppliedForField'
 import { compressFile, formatFileSize } from '@/utils/fileCompression'
 
@@ -54,6 +64,12 @@ function createInitialFormData() {
 }
 
 export default function EnhancedAddCandidateModal({ isOpen, onClose, onSave }: EnhancedAddCandidateModalProps) {
+  const { user } = useAuth()
+  const isTaSiteUser = isTaSiteAuthUser(user)
+  const taSitePts = useMemo(() => parseScopeValues((user as any)?.pt), [user])
+  const taSiteAreaDetails = useMemo(() => parseScopeValues((user as any)?.areaDetail), [user])
+  const taSiteScopeReady = taSitePts.length > 0 && taSiteAreaDetails.length > 0
+
   const [activeTab, setActiveTab] = useState('personal')
   const [formData, setFormData] = useState(createInitialFormData)
 
@@ -75,10 +91,12 @@ export default function EnhancedAddCandidateModal({ isOpen, onClose, onSave }: E
     [divisions]
   )
 
-  const positionOptionsForPicker = useMemo(
-    () => filterPositionOptionsByDivisions(activeJobPostings, formData.division),
-    [activeJobPostings, formData.division]
-  )
+  const positionOptionsForPicker = useMemo(() => {
+    if (isTaSiteUser) {
+      return filterPositionOptionsByTaSiteScope(activeJobPostings, taSitePts, taSiteAreaDetails)
+    }
+    return filterPositionOptionsByDivisions(activeJobPostings, formData.division)
+  }, [activeJobPostings, formData.division, isTaSiteUser, taSitePts, taSiteAreaDetails])
 
   const filteredPickerMeta = useMemo(
     () =>
@@ -91,7 +109,10 @@ export default function EnhancedAddCandidateModal({ isOpen, onClose, onSave }: E
     [positionOptionsForPicker, positionPickerMeta]
   )
 
-  const divisionSelected = formData.division.length > 0
+  const divisionSelected = isTaSiteUser ? taSiteScopeReady : formData.division.length > 0
+  const taSitePickerNotReadyMessage =
+    'Your account has no PT or Area Detail assigned. Contact an administrator.'
+  const taSiteNoOptionsMessage = 'No open positions for your PT / Area Detail scope'
   const [isCompressing, setIsCompressing] = useState(false)
 
   const cvInputRef = useRef<HTMLInputElement>(null)
@@ -289,7 +310,15 @@ export default function EnhancedAddCandidateModal({ isOpen, onClose, onSave }: E
     setFileErrors({})
     console.log('Saving enhanced candidate data:', formData)
     await Promise.resolve(
-      onSave(formData, {
+      onSave(
+        {
+          ...formData,
+          positionAppliedFptkIds: resolvePositionAppliedFptkIds(
+            formData.positionAppliedFor,
+            activeJobPostings
+          ),
+        },
+        {
         cvFile: formData.cvFile,
         formDataFile: formData.formDataFile,
         additionalFiles: formData.additionalFiles
@@ -500,8 +529,19 @@ export default function EnhancedAddCandidateModal({ isOpen, onClose, onSave }: E
                     meta={filteredPickerMeta}
                     divisionSelected={divisionSelected}
                     disabled={!divisionSelected}
+                    pickerNotReadyMessage={isTaSiteUser ? taSitePickerNotReadyMessage : undefined}
+                    noOptionsMessage={isTaSiteUser ? taSiteNoOptionsMessage : undefined}
                     onChange={(positionAppliedFor) =>
-                      setFormData((prev) => ({ ...prev, positionAppliedFor }))
+                      setFormData((prev) => {
+                        const next: typeof prev = { ...prev, positionAppliedFor }
+                        if (isTaSiteUser) {
+                          const divisionsFromPositions = positionAppliedFor
+                            .map((title) => activeJobPostings.find((opt) => opt.title === title)?.division?.trim())
+                            .filter((div): div is string => !!div)
+                          next.division = [...new Set(divisionsFromPositions)]
+                        }
+                        return next
+                      })
                     }
                   />
                   <div>

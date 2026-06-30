@@ -6,12 +6,16 @@ const candidateService = require('../services/candidateService');
 const prisma = require('../config/database');
 const { validationRules, validate } = require('../middleware/validator');
 const { uploadLimiter } = require('../middleware/rateLimiter');
+const { requireMenuCreate, requireMenuEdit } = require('../middleware/menuAccessAuth');
 const documentService = require('../services/documentService');
 const candidateFormTokenService = require('../services/candidateFormTokenService');
 const { parseSpreadsheet, sendTemplate } = require('../utils/spreadsheet');
 const bulkImportService = require('../services/bulkImportService');
 const { buildHrbpApplicationFptkFilterFromUser } = require('../utils/hrbpScope');
 const { isDepartmentHeadRole, buildHodCandidateScopeFromUser } = require('../utils/hodScope');
+
+const CANDIDATE_CREATE_FALLBACK = ['TA_HO', 'HRBP', 'TA_SITE', 'SUPER_ADMIN', 'CHRO'];
+const CANDIDATE_EDIT_FALLBACK = ['TA_HO', 'HRBP', 'TA_SITE', 'SUPER_ADMIN', 'CHRO'];
 
 function buildHiringManagerFptkScope(user = {}) {
   const firstName = String(user.firstName || '').trim();
@@ -136,11 +140,11 @@ router.post('/me/reference', authenticate, authorize('CANDIDATE'), asyncHandler(
 router.post(
   '/',
   authenticate,
-  authorize('TA_HO', 'HRBP', 'TA_SITE', 'SUPER_ADMIN', 'CHRO'),
+  requireMenuCreate('/candidates', CANDIDATE_CREATE_FALLBACK),
   asyncHandler(async (req, res) => {
     console.log('CREATE CANDIDATE - Received data:', JSON.stringify(req.body, null, 2));
     try {
-      const candidate = await candidateService.createCandidate(req.body);
+      const candidate = await candidateService.createCandidate(req.body, req.user);
       console.log('CREATE CANDIDATE - Created candidate:', JSON.stringify({
         id: candidate.id,
         division: candidate.user?.division,
@@ -191,7 +195,7 @@ router.get(
 router.post(
   '/bulk-upload',
   authenticate,
-  authorize('TA_HO', 'HRBP', 'TA_SITE', 'SUPER_ADMIN', 'CHRO'),
+  requireMenuCreate('/candidates', CANDIDATE_CREATE_FALLBACK),
   uploadLimiter,
   asyncHandler(async (req, res) => {
     if (!req.files || !req.files.file) {
@@ -255,12 +259,12 @@ router.get(
 router.put(
   '/:id',
   authenticate,
-  authorize('TA_HO', 'HRBP', 'TA_SITE', 'SUPER_ADMIN', 'CHRO'),
+  requireMenuEdit('/candidates', CANDIDATE_EDIT_FALLBACK),
   validationRules.uuidParam('id'),
   validate,
   asyncHandler(async (req, res) => {
     console.log('UPDATE CANDIDATE - Received data:', JSON.stringify(req.body, null, 2));
-    const updated = await candidateService.updateCandidate(req.params.id, req.body);
+    const updated = await candidateService.updateCandidate(req.params.id, req.body, req.user);
     console.log('UPDATE CANDIDATE - Updated candidate:', JSON.stringify({
       id: updated.id,
       division: updated.user?.division,
@@ -280,7 +284,7 @@ router.put(
 router.delete(
   '/:id',
   authenticate,
-  authorize('TA_HO', 'HRBP', 'TA_SITE', 'SUPER_ADMIN', 'CHRO'),
+  requireMenuEdit('/candidates', CANDIDATE_EDIT_FALLBACK),
   validationRules.uuidParam('id'),
   validate,
   asyncHandler(async (req, res) => {
@@ -301,7 +305,7 @@ router.delete(
 router.post(
   '/:id/documents',
   authenticate,
-  authorize('TA_HO', 'HRBP', 'TA_SITE', 'SUPER_ADMIN', 'CHRO'),
+  requireMenuEdit('/candidates', CANDIDATE_EDIT_FALLBACK),
   uploadLimiter,
   validationRules.uuidParam('id'),
   validate,
@@ -339,7 +343,7 @@ router.post(
 router.post(
   '/:id/form-link',
   authenticate,
-  authorize('TA_HO', 'HRBP', 'TA_SITE', 'SUPER_ADMIN', 'CHRO'),
+  requireMenuEdit('/candidates', CANDIDATE_EDIT_FALLBACK),
   validationRules.uuidParam('id'),
   validate,
   asyncHandler(async (req, res) => {

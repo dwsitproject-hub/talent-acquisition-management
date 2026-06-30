@@ -1202,6 +1202,9 @@ async function getFptkPositionOptions(filters, pagination, user = null) {
         position: true,
         department: true,
         division: true,
+        pt: true,
+        area: true,
+        areaDetail: true,
         currentStatus: true,
         status: true,
       },
@@ -1218,6 +1221,9 @@ async function getFptkPositionOptions(filters, pagination, user = null) {
     position: row.position,
     department: row.department || '',
     division: row.division || '',
+    pt: row.pt || '',
+    area: row.area || '',
+    areaDetail: row.areaDetail || '',
     currentStatus: row.currentStatus || row.status || '',
   }));
 
