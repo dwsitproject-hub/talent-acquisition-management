@@ -1,7 +1,7 @@
 const bcrypt = require('bcryptjs');
 const prisma = require('../config/database');
 const logger = require('../utils/logger');
-const { serializeHrbpFields } = require('../utils/hrbpScope');
+const { serializeHrbpFields, validateUserPtAreaAssignment } = require('../utils/hrbpScope');
 const { serializeHodFields } = require('../utils/hodScope');
 
 // Map frontend role names to backend enum values
@@ -130,7 +130,7 @@ async function listUsers(search, role, area) {
   return users.map(mapUser);
 }
 
-async function createUser(data) {
+async function createUser(data, requester = null) {
   const {
     email,
     password,
@@ -153,6 +153,14 @@ async function createUser(data) {
   // Map role to enum value
   const mappedRole = mapRoleToEnum(role);
   logger.info(`Creating user with role: "${role}" -> mapped to: "${mappedRole}"`);
+
+  validateUserPtAreaAssignment({
+    pt,
+    area,
+    areaDetail,
+    role: mappedRole,
+    requesterRole: requester?.role || null,
+  });
 
   const hodFields = serializeHodFields({ division, sectionName });
   const hrbpFields = serializeHrbpFields({ pt, area, areaDetail, role: mappedRole });
@@ -181,7 +189,7 @@ async function createUser(data) {
   return mapUser(user);
 }
 
-async function updateUser(id, data) {
+async function updateUser(id, data, requester = null) {
   // Map role to enum value
   const mappedRole = mapRoleToEnum(data.role);
   
@@ -192,6 +200,14 @@ async function updateUser(id, data) {
     }
     return String(value).trim() || null;
   };
+
+  validateUserPtAreaAssignment({
+    pt: data.pt,
+    area: data.area,
+    areaDetail: data.areaDetail,
+    role: mappedRole,
+    requesterRole: requester?.role || null,
+  });
   
   const hodFields = serializeHodFields({ division: data.division, sectionName: data.sectionName });
   const hrbpFields = serializeHrbpFields({

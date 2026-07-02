@@ -5,6 +5,7 @@ const { requireMenuCreate } = require('../middleware/menuAccessAuth');
 const { asyncHandler } = require('../middleware/errorHandler');
 const fptkService = require('../services/fptkService');
 const { validationRules, validate } = require('../middleware/validator');
+const { assertUserCanAccessFptk } = require('../utils/fptkAccess');
 
 /**
  * @route   POST /api/fptk
@@ -246,6 +247,10 @@ router.get(
         success: false,
         message: 'Authentication required',
       });
+    }
+
+    if (req.user) {
+      await assertUserCanAccessFptk(req.user, req.params.id);
     }
     
     res.json({

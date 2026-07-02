@@ -15,6 +15,7 @@ type Props = {
   placeholder?: string
   searchPlaceholder?: string
   className?: string
+  disabled?: boolean
 }
 
 const normalizeOptions = (options: Array<Option | string>): Option[] =>
@@ -28,6 +29,7 @@ export default function MultiSelectDropdown({
   placeholder = 'Select...',
   searchPlaceholder = 'Type to search...',
   className,
+  disabled = false,
 }: Props) {
   const [query, setQuery] = useState('')
   const normalized = useMemo(() => normalizeOptions(options), [options])
@@ -55,12 +57,32 @@ export default function MultiSelectDropdown({
   const displayCount = query.trim() ? filtered.length : normalized.length
   const selectAllCount = query.trim() ? filtered.length : normalized.length
 
-  const selectedText = value.length === 0 ? placeholder : `${value.length} selected`
+  const selectedText =
+    value.length === 0
+      ? placeholder
+      : value.length <= 2
+        ? value.join(', ')
+        : `${value.length} selected`
+
+  if (disabled) {
+    return (
+      <div className={className}>
+        <label className="block text-xs font-medium text-gray-500 mb-1">{label}</label>
+        <div className="w-full border border-gray-200 rounded-md px-3 py-2 text-sm bg-gray-50 text-gray-700 min-h-[38px]">
+          {value.length === 0 ? (
+            <span className="text-gray-400">{placeholder}</span>
+          ) : (
+            selectedText
+          )}
+        </div>
+      </div>
+    )
+  }
 
   return (
     <div className={className}>
       <label className="block text-xs font-medium text-gray-500 mb-1">{label}</label>
-      <Popover className="relative">
+      <Popover className="relative z-40">
         {({ open }) => (
           <>
             <Popover.Button
@@ -82,7 +104,7 @@ export default function MultiSelectDropdown({
               leaveFrom="opacity-100 translate-y-0"
               leaveTo="opacity-0 translate-y-1"
             >
-              <Popover.Panel className="absolute z-20 mt-2 w-full min-w-[16rem] rounded-md border bg-white shadow-lg p-2">
+              <Popover.Panel className="absolute z-50 mt-2 w-full min-w-[16rem] rounded-md border bg-white shadow-lg p-2">
                 <div className="flex items-center justify-between gap-2 mb-2 px-0.5">
                   <div className="text-xs">
                     <button

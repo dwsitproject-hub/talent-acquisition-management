@@ -70,5 +70,53 @@ router.get(
   })
 );
 
+/**
+ * @route   GET /api/dashboard/details
+ * @desc    Drill-down list for dashboard cards / location overview (same filters as stats)
+ * @access  Private
+ */
+router.get(
+  '/details',
+  authenticate,
+  authorize('TA_HO', 'HRBP', 'TA_SITE', 'SUPER_ADMIN', 'CHRO', 'DEPARTMENT_HEAD', 'HIRING_MANAGER'),
+  asyncHandler(async (req, res) => {
+    const {
+      priority,
+      positionStatus,
+      area,
+      areaDetails,
+      periodStart,
+      periodEnd,
+      previousStart,
+      previousEnd,
+      detail,
+      areaDetail,
+      slaBucket,
+      usePeriod,
+    } = req.query;
+    const result = await dashboardService.getDashboardDetailList(req.user, {
+      priority,
+      positionStatus,
+      area,
+      areaDetails,
+      periodStart,
+      periodEnd,
+      previousStart,
+      previousEnd,
+      detail,
+      areaDetail,
+      slaBucket,
+      usePeriod,
+    });
+    res.set('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
+    res.set('Pragma', 'no-cache');
+    res.set('Expires', '0');
+    res.json({
+      success: true,
+      data: result,
+    });
+  })
+);
+
 module.exports = router;
 

@@ -13,14 +13,14 @@ exports.listUsers = asyncHandler(async (req, res) => {
 
 exports.createUser = asyncHandler(async (req, res) => {
   const data = req.body;
-  const result = await adminUserService.createUser(data);
+  const result = await adminUserService.createUser(data, req.user);
   res.status(201).json({ success: true, data: result });
 });
 
 exports.updateUser = asyncHandler(async (req, res) => {
   const id = req.params.id;
   const data = req.body;
-  const result = await adminUserService.updateUser(id, data);
+  const result = await adminUserService.updateUser(id, data, req.user);
   res.json({ success: true, data: result });
 });
 

@@ -42,8 +42,17 @@ interface SummaryRow {
   statusFktk: string
   remark: string
   sla: string
+  hiringManager: string
   counts: StatusCounts
   onboardingCandidates: OnboardingCandidate[]
+}
+
+function hiringManagerMatches(rowHm: string, selected: string[]): boolean {
+  if (selected.length === 0) return true
+  const normalized = (rowHm || '').trim().toLowerCase()
+  return selected.some(
+    (hm) => hm.trim().toLowerCase() === normalized
+  )
 }
 
 const DEFAULT_STATUSES: string[] = [
@@ -353,7 +362,9 @@ function SummaryByPositionContent() {
   )
   const [areaFilter, setAreaFilter] = useState<string[]>([])
   const [statusFktkFilter, setStatusFktkFilter] = useState<string[]>([])
+  const [hiringManagerFilter, setHiringManagerFilter] = useState<string[]>([])
   const [divisions, setDivisions] = useState<string[]>([])
+  const [hiringManagers, setHiringManagers] = useState<string[]>([])
   const [locations, setLocations] = useState<string[]>([])
   const [areaToLocations, setAreaToLocations] = useState<Record<string, string[]>>({})
   const [hiddenStatuses, setHiddenStatuses] = useState<Set<string>>(new Set())
@@ -472,6 +483,7 @@ function SummaryByPositionContent() {
           statusFktk: job.statusFktk || '-',
           remark: job.remark || '-',
           sla: slaBucket,
+          hiringManager: (job.hiringManager || '').trim() || '—',
           counts,
           onboardingCandidates: onboardingCandidatesMap[job.id] ?? [],
         }
@@ -479,6 +491,15 @@ function SummaryByPositionContent() {
 
       setAllStatuses(Array.from(collectedStatuses))
       setRows(result)
+
+      const hmOpts =
+        Array.isArray(payload?.hiringManagers) && payload.hiringManagers.length
+          ? payload.hiringManagers
+          : Array.from(
+              new Set(result.map((r) => r.hiringManager).filter((hm) => hm && hm !== '—'))
+            ).sort((a, b) => a.localeCompare(b, undefined, { sensitivity: 'base' }))
+      setHiringManagers(hmOpts)
+      setHiringManagerFilter((prev) => prev.filter((hm) => hmOpts.includes(hm)))
 
       const divOpts = Array.isArray(payload?.divisions) && payload.divisions.length
         ? payload.divisions
@@ -509,6 +530,8 @@ function SummaryByPositionContent() {
       setAllStatuses([...DEFAULT_STATUSES])
       setDivisions([])
       setLocations([])
+      setHiringManagers([])
+      setHiringManagerFilter([])
       setAreaToLocations({})
     } finally {
       if (!options?.silent) {
@@ -529,9 +552,10 @@ function SummaryByPositionContent() {
         const locationOk = locationFilter.length === 0 || locationFilter.includes(r.location)
         const divisionOk = divisionFilter.length === 0 || divisionFilter.includes(r.division)
         const statusFktkOk = statusFktkFilter.length === 0 || statusFktkFilter.includes(r.statusFktk)
-        return priorityOk && areaOk && locationOk && divisionOk && statusFktkOk
+        const hiringManagerOk = hiringManagerMatches(r.hiringManager, hiringManagerFilter)
+        return priorityOk && areaOk && locationOk && divisionOk && statusFktkOk && hiringManagerOk
       }),
-    [rows, priorityFilter, areaFilter, locationFilter, divisionFilter, statusFktkFilter]
+    [rows, priorityFilter, areaFilter, locationFilter, divisionFilter, statusFktkFilter, hiringManagerFilter]
   )
 
   // Location options visible in the dropdown, narrowed to the selected area(s)
@@ -710,7 +734,7 @@ function SummaryByPositionContent() {
         )}
 
         {/* Filters */}
-        <div className="bg-white shadow rounded-lg p-4 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
+        <div className="bg-white shadow rounded-lg p-4 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
           <MultiSelectDropdown
             label="Priority"
             options={priorities}
@@ -719,6 +743,16 @@ function SummaryByPositionContent() {
             placeholder="All priorities"
             searchPlaceholder="Search priority..."
           />
+          {hiringManagers.length > 1 && (
+            <MultiSelectDropdown
+              label="Hiring Manager"
+              options={hiringManagers}
+              value={hiringManagerFilter}
+              onChange={setHiringManagerFilter}
+              placeholder="All hiring managers"
+              searchPlaceholder="Search hiring manager..."
+            />
+          )}
           <MultiSelectDropdown
             label="Area"
             options={['HO', 'Site']}
@@ -1057,6 +1091,7 @@ function SummaryByPositionContent() {
         onClose={positionEdit.close}
         onSave={positionEdit.handleSave}
         headerBackLabel={`Back to ${positionEdit.backLabel || 'Summary'}`}
+        candidateStatusOnly={positionEdit.candidateStatusOnly}
       />
     </Layout>
   )

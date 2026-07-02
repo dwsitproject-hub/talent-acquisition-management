@@ -579,4 +579,21 @@ export const DashboardAPI = {
     const res = await api.get('/dashboard/stats', { params })
     return res.data.data
   },
+  async getDetails(params?: {
+    priority?: string
+    positionStatus?: string
+    area?: string
+    areaDetails?: string
+    periodStart?: string
+    periodEnd?: string
+    previousStart?: string
+    previousEnd?: string
+    detail?: string
+    areaDetail?: string
+    slaBucket?: string
+    usePeriod?: string | boolean
+  }) {
+    const res = await api.get('/dashboard/details', { params })
+    return res.data.data as { items: Array<Record<string, unknown>> }
+  },
 }

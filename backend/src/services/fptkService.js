@@ -1202,6 +1202,9 @@ async function getFptkPositionOptions(filters, pagination, user = null) {
         position: true,
         department: true,
         division: true,
+        pt: true,
+        area: true,
+        areaDetail: true,
         currentStatus: true,
         status: true,
       },
@@ -1218,6 +1221,9 @@ async function getFptkPositionOptions(filters, pagination, user = null) {
     position: row.position,
     department: row.department || '',
     division: row.division || '',
+    pt: row.pt || '',
+    area: row.area || '',
+    areaDetail: row.areaDetail || '',
     currentStatus: row.currentStatus || row.status || '',
   }));
 
@@ -1250,6 +1256,7 @@ async function getSummaryByPosition(user = null) {
     location: true,
     area: true,
     areaDetail: true,
+    hiringManager: true,
     requestDate: true,
     fptkReceiveDate: true,
     closedAt: true,
@@ -1365,6 +1372,7 @@ async function getSummaryByPosition(user = null) {
   const priorities = new Set();
   const divisions = new Set();
   const locations = new Set();
+  const hiringManagers = new Set();
   fptks.forEach((f) => {
     const p = (f.priority || '').toString().trim();
     if (p) priorities.add(p);
@@ -1372,6 +1380,8 @@ async function getSummaryByPosition(user = null) {
     if (d) divisions.add(d);
     const l = (f.areaDetail || f.area || f.location || '').toString().trim();
     if (l) locations.add(l);
+    const hm = (f.hiringManager || '').toString().trim();
+    if (hm) hiringManagers.add(hm);
   });
 
   return {
@@ -1383,6 +1393,9 @@ async function getSummaryByPosition(user = null) {
     priorities: Array.from(priorities),
     divisions: Array.from(divisions),
     locations: Array.from(locations),
+    hiringManagers: Array.from(hiringManagers).sort((a, b) =>
+      a.localeCompare(b, undefined, { sensitivity: 'base' })
+    ),
   };
 }
 
