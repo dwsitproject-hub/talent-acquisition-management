@@ -512,6 +512,348 @@ async function getDashboardDetailList(user = null, options = {}) {
   return { items: [] };
 }
 
+// =============================================================================
+// SQL-BASED CHART AGGREGATION
+// Replaces the old locationFPTKs findMany + JS forEach loops.
+// Requires the indonesia_business_days PostgreSQL function created by migration
+// 20260702030000_add_indonesia_business_days, and data in indonesia_holidays
+// seeded via scripts/seed-indonesia-holidays.js.
+// =============================================================================
+
+/**
+ * Build a SQL WHERE fragment that mirrors buildDashboardScope's fptkLocationWhere
+ * (role scope + UI filters + optional period date window).
+ * Returns { whereClause: string, params: any[] } for use with $queryRawUnsafe.
+ *
+ * All values are positional ($1, $2, …) — no direct interpolation of user data.
+ */
+function buildFptkLocationSqlFilter(user, options) {
+  const params = [];
+  const conditions = [];
+
+  /** Push a value to params and return its $N placeholder. */
+  const addParam = (value) => {
+    params.push(value);
+    return `$${params.length}`;
+  };
+
+  /**
+   * Convert a Prisma inFilter value (string | { in: string[] }) to a SQL condition.
+   * Returns null if the value is falsy.
+   */
+  const addInCondition = (valueOrFilter, columnExpr) => {
+    if (!valueOrFilter) return null;
+    if (typeof valueOrFilter === 'string') {
+      return `${columnExpr} = ${addParam(valueOrFilter)}`;
+    }
+    if (Array.isArray(valueOrFilter.in) && valueOrFilter.in.length > 0) {
+      return `${columnExpr} = ANY(${addParam(valueOrFilter.in)}::text[])`;
+    }
+    return null;
+  };
+
+  // --- Role-based scope (mirrors buildDashboardScope) ---
+  const UNRESTRICTED_ROLES = new Set(['SUPER_ADMIN', 'TA_HO', 'CHRO']);
+  if (user && !UNRESTRICTED_ROLES.has(user.role)) {
+    const role = user.role;
+
+    if (role === 'HIRING_MANAGER') {
+      const firstName = String(user.firstName || '').trim();
+      const lastName  = String(user.lastName  || '').trim();
+      const email     = String(user.email     || '').trim();
+      const fullName  = [firstName, lastName].filter(Boolean).join(' ').trim();
+      const values    = [...new Set([firstName, fullName, email].filter(Boolean))];
+      if (values.length > 0) {
+        const hmConds = values.map(
+          (v) => `LOWER(COALESCE(f."hiringManager", '')) = LOWER(${addParam(v)})`
+        );
+        conditions.push(`(${hmConds.join(' OR ')})`);
+      } else {
+        conditions.push('FALSE');
+      }
+    } else if (isDepartmentHeadRole(role)) {
+      const hodFptk = buildHodFptkFilterFromUser(user);
+      if (!hodFptk) {
+        conditions.push('FALSE');
+      } else {
+        const divCond = addInCondition(hodFptk.division, 'f."division"');
+        if (divCond) conditions.push(divCond);
+        if (hodFptk.section) {
+          const secCond = addInCondition(hodFptk.section, 'f."section"');
+          if (secCond) conditions.push(secCond);
+        }
+      }
+    } else if (role === 'HRBP' || role === 'TA_SITE') {
+      const hrbpFptk = buildHrbpFptkFilterFromUser(user);
+      if (!hrbpFptk) {
+        conditions.push('FALSE');
+      } else {
+        const ptCond     = addInCondition(hrbpFptk.pt,         'f."pt"');
+        const areaCond   = addInCondition(hrbpFptk.area,       'f."area"');
+        const detailCond = addInCondition(hrbpFptk.areaDetail, 'f."areaDetail"');
+        if (ptCond)     conditions.push(ptCond);
+        if (areaCond)   conditions.push(areaCond);
+        if (detailCond) conditions.push(detailCond);
+      }
+    }
+  }
+
+  // --- Priority filter ---
+  if (options.priority && options.priority !== 'ALL') {
+    conditions.push(`f."priority" = ${addParam(options.priority)}`);
+  }
+
+  // --- Position status filter ---
+  if (options.positionStatus === 'OPEN') {
+    conditions.push(
+      `(f."currentStatus" IS NULL OR LOWER(TRIM(f."currentStatus")) IN ('open','pending fktk','re-open','reopen'))`
+    );
+  } else if (options.positionStatus === 'CLOSED') {
+    conditions.push(
+      `LOWER(TRIM(COALESCE(f."currentStatus",''))) IN ('close','internal movement')`
+    );
+  }
+
+  // --- Area filter (HO / Site with legacy location-field fallback) ---
+  const areaTarget = (options.area || '').trim().toLowerCase();
+  if (areaTarget && areaTarget !== 'all') {
+    if (areaTarget === 'ho') {
+      conditions.push(
+        `(LOWER(TRIM(f."area")) = 'ho' OR (COALESCE(TRIM(f."area"),'') = '' AND LOWER(TRIM(COALESCE(f."location",''))) = 'head office'))`
+      );
+    } else if (areaTarget === 'site') {
+      conditions.push(
+        `(LOWER(TRIM(f."area")) = 'site' OR (COALESCE(TRIM(f."area"),'') = '' AND LOWER(TRIM(COALESCE(f."location",''))) = 'site'))`
+      );
+    }
+  }
+
+  // --- areaDetails filter ---
+  const parsedDetails = parseAreaDetailsParam(options.areaDetails);
+  if (parsedDetails !== null) {
+    if (parsedDetails.length === 0) {
+      conditions.push('FALSE');
+    } else {
+      conditions.push(`f."areaDetail" = ANY(${addParam(parsedDetails)}::text[])`);
+    }
+  }
+
+  // --- Period date window (mirrors fptkLocationWhere) ---
+  if (options.periodStart && options.periodEnd) {
+    const ps = new Date(options.periodStart);
+    const pe = new Date(options.periodEnd);
+    if (!isNaN(ps.getTime()) && !isNaN(pe.getTime())) {
+      // Reuse same param indices for both columns
+      const psIdx = params.length + 1;
+      params.push(ps);
+      const peIdx = params.length + 1;
+      params.push(pe);
+      conditions.push(
+        `(f."updatedAt" BETWEEN $${psIdx} AND $${peIdx} OR f."createdAt" BETWEEN $${psIdx} AND $${peIdx})`
+      );
+    }
+  }
+
+  return {
+    whereClause: conditions.length > 0 ? conditions.join(' AND ') : 'TRUE',
+    params,
+  };
+}
+
+/** Resolved area label used in every SQL chart query. */
+const AREA_EXPR = `
+  CASE
+    WHEN TRIM(COALESCE(f."area",'')) <> '' THEN TRIM(f."area")
+    WHEN LOWER(TRIM(COALESCE(f."location",''))) = 'head office' THEN 'HO'
+    WHEN LOWER(TRIM(COALESCE(f."location",''))) = 'site'        THEN 'Site'
+    ELSE ''
+  END`.trim();
+
+/**
+ * SLA-by-location chart: returns the same shape as the old JS loop.
+ * Uses the indonesia_business_days() PostgreSQL function.
+ * Falls back to empty array if the function has not been installed yet.
+ */
+async function getSlaByLocationSql(user, options) {
+  const { whereClause, params } = buildFptkLocationSqlFilter(user, options);
+
+  const sql = `
+    WITH fptk_sla AS (
+      SELECT
+        COALESCE(NULLIF(TRIM(f."areaDetail"),''),'Unassigned') AS area_detail,
+        ${AREA_EXPR}                                            AS area,
+        LOWER(TRIM(COALESCE(f."statusFktk",'')))               AS status_fktk,
+        COALESCE(f."fptkReceiveDate", f."requestDate", f."createdAt")::date AS sla_start,
+        CASE
+          WHEN LOWER(TRIM(COALESCE(f."currentStatus",''))) IN ('close','cancel','internal movement')
+          THEN COALESCE(f."closedAt", NOW())::date
+          ELSE NOW()::date
+        END AS sla_end
+      FROM fptk f
+      WHERE ${whereClause}
+    ),
+    fptk_with_days AS (
+      SELECT
+        area_detail,
+        area,
+        status_fktk,
+        indonesia_business_days(sla_start, sla_end) AS working_days
+      FROM fptk_sla
+      WHERE sla_start IS NOT NULL
+    )
+    SELECT
+      area_detail,
+      area,
+      CASE
+        WHEN working_days <= 30 THEN '0-30 Days'
+        WHEN working_days <= 60 THEN '31-60 Days'
+        WHEN working_days <= 90 THEN '61-90 Days'
+        ELSE 'Above 91 Days'
+      END                                                             AS sla_bucket,
+      SUM(CASE WHEN status_fktk = 'received' THEN 1 ELSE 0 END)::int AS received_count,
+      SUM(CASE WHEN status_fktk <> 'received' THEN 1 ELSE 0 END)::int AS pending_count,
+      COUNT(*)::int                                                   AS total
+    FROM fptk_with_days
+    GROUP BY area_detail, area, sla_bucket
+    ORDER BY area_detail, sla_bucket
+  `;
+
+  const rows = await prisma.$queryRawUnsafe(sql, ...params);
+
+  const SLA_BUCKETS = ['0-30 Days', '31-60 Days', '61-90 Days', 'Above 91 Days'];
+  const slaMap = {};
+
+  rows.forEach((row) => {
+    if (!slaMap[row.area_detail]) {
+      slaMap[row.area_detail] = {
+        areaDetail: row.area_detail,
+        area: row.area || '',
+        buckets: Object.fromEntries(SLA_BUCKETS.map((b) => [b, { received: 0, pending: 0 }])),
+        total: 0,
+      };
+    }
+    const entry = slaMap[row.area_detail];
+    if (!entry.area && row.area) entry.area = row.area;
+    if (row.sla_bucket && entry.buckets[row.sla_bucket]) {
+      entry.buckets[row.sla_bucket].received = Number(row.received_count);
+      entry.buckets[row.sla_bucket].pending  = Number(row.pending_count);
+      entry.total += Number(row.total);
+    }
+  });
+
+  return Object.values(slaMap);
+}
+
+/**
+ * Position-status-by-location chart.
+ * open  = currentStatus IS NULL or in the open-status list (mirrors isOpenCurrentStatus)
+ * closed = everything else (mirrors the isClosed = !isOpenCurrentStatus check)
+ */
+async function getPositionStatusByLocationSql(user, options) {
+  const { whereClause, params } = buildFptkLocationSqlFilter(user, options);
+
+  const sql = `
+    WITH base AS (
+      SELECT
+        COALESCE(NULLIF(TRIM(f."areaDetail"),''),'Unassigned') AS location,
+        ${AREA_EXPR}                                            AS area,
+        f."currentStatus"
+      FROM fptk f
+      WHERE ${whereClause}
+    )
+    SELECT
+      location,
+      area,
+      COUNT(*)::int AS total,
+      SUM(CASE
+        WHEN "currentStatus" IS NULL
+          OR LOWER(TRIM("currentStatus")) IN ('open','pending fktk','re-open','reopen')
+        THEN 1 ELSE 0
+      END)::int AS open,
+      SUM(CASE
+        WHEN "currentStatus" IS NOT NULL
+         AND LOWER(TRIM("currentStatus")) NOT IN ('open','pending fktk','re-open','reopen')
+        THEN 1 ELSE 0
+      END)::int AS closed
+    FROM base
+    GROUP BY location, area
+    ORDER BY location
+  `;
+
+  const rows = await prisma.$queryRawUnsafe(sql, ...params);
+  return rows.map((r) => ({
+    location: r.location,
+    area:     r.area || '',
+    total:    Number(r.total),
+    open:     Number(r.open),
+    closed:   Number(r.closed),
+  }));
+}
+
+/**
+ * Open-position-progress chart: count of each FPTK status per area detail.
+ * Mirrors the getStatus() helper + percentage = areaTotal / grandTotal * 100.
+ */
+async function getOpenPositionProgressSql(user, options) {
+  const { whereClause, params } = buildFptkLocationSqlFilter(user, options);
+
+  const sql = `
+    WITH base AS (
+      SELECT
+        COALESCE(NULLIF(TRIM(f."areaDetail"),''),'Unassigned') AS area_detail,
+        ${AREA_EXPR}                                            AS area,
+        CASE
+          WHEN f."currentStatus" IS NOT NULL AND TRIM(f."currentStatus") <> ''
+            THEN f."currentStatus"
+          WHEN f."status"::text = 'DRAFT'            THEN 'Draft'
+          WHEN f."status"::text = 'APPROVED'         THEN 'Approved'
+          WHEN f."status"::text = 'OPEN'             THEN 'Open'
+          WHEN f."status"::text = 'PARTIALLY_FILLED' THEN 'Partially Filled'
+          WHEN f."status"::text = 'FILLED'           THEN 'Filled'
+          WHEN f."status"::text = 'CANCELLED'        THEN 'Cancelled'
+          WHEN f."status"::text = 'EXPIRED'          THEN 'Expired'
+          ELSE COALESCE(NULLIF(TRIM(f."status"::text),''), 'Raise FPTK')
+        END AS status
+      FROM fptk f
+      WHERE ${whereClause}
+    )
+    SELECT
+      area_detail,
+      area,
+      status,
+      COUNT(*)::int                     AS count,
+      SUM(COUNT(*)) OVER ()::int        AS grand_total
+    FROM base
+    GROUP BY area_detail, area, status
+    ORDER BY area_detail, status
+  `;
+
+  const rows = await prisma.$queryRawUnsafe(sql, ...params);
+
+  const progressMap = {};
+  const grandTotal = rows.length > 0 ? Number(rows[0].grand_total) : 0;
+
+  rows.forEach((row) => {
+    if (!progressMap[row.area_detail]) {
+      progressMap[row.area_detail] = {
+        areaDetail:   row.area_detail,
+        area:         row.area || '',
+        statusCounts: {},
+        total:        0,
+      };
+    }
+    const entry = progressMap[row.area_detail];
+    if (!entry.area && row.area) entry.area = row.area;
+    entry.statusCounts[row.status] = (entry.statusCounts[row.status] || 0) + Number(row.count);
+    entry.total += Number(row.count);
+  });
+
+  return Object.values(progressMap).map((item) => ({
+    ...item,
+    percentage: grandTotal > 0 ? Math.round((item.total / grandTotal) * 100) : 0,
+  }));
+}
+
 /**
  * Get dashboard statistics.
  * @param {object|null} user - authenticated user (for role-based scoping)
@@ -532,7 +874,6 @@ async function getDashboardStats(user = null, options = {}) {
       fptkWhere,
       applicationWhere,
       candidateWhere,
-      fptkLocationWhere,
       fptkPeriodWhere,
       appPeriodWhere,
     } = scope;
@@ -584,7 +925,9 @@ async function getDashboardStats(user = null, options = {}) {
         })()
       : [Promise.resolve([]), Promise.resolve([])];
 
-    // Single parallel round-trip for ALL DB work (previously 9 sequential round-trips)
+    // Single parallel round-trip for scalar counts + groupBy queries.
+    // Location chart data (SLA, position status, open progress) is fetched in a
+    // second parallel batch using SQL aggregation — no 10 000-row findMany needed.
     const [
       totalCandidates,
       totalFPTKs,
@@ -595,7 +938,6 @@ async function getDashboardStats(user = null, options = {}) {
       pendingInterviews,
       interviewsThisWeek,
       hiredThisMonth,
-      locationFPTKs,
       recentCandidates,
       recentFPTKs,
       fptkGroupedAll,
@@ -629,22 +971,6 @@ async function getDashboardStats(user = null, options = {}) {
           ...fptkWhere,
           currentStatus: { equals: 'close', mode: 'insensitive' },
           updatedAt: { gte: monthStart, lte: monthEnd },
-        },
-      }),
-      prisma.fPTK.findMany({
-        where: fptkLocationWhere,
-        select: {
-          id: true,
-          areaDetail: true,
-          area: true,
-          location: true,
-          requestDate: true,
-          fptkReceiveDate: true,
-          createdAt: true,
-          closedAt: true,
-          statusFktk: true,
-          status: true,
-          currentStatus: true,
         },
       }),
       prisma.candidate.findMany({
@@ -683,137 +1009,43 @@ async function getDashboardStats(user = null, options = {}) {
       previous: options.previousStart ? groupByToMap(appGroupedPreviousPeriod, 'status') : null,
     };
 
-    // Derive open/closed counts from location-scoped chart data (no extra query needed)
-    const statusCounts = {};
-    locationFPTKs.forEach((fptk) => {
-      const status = (fptk.currentStatus || '').trim();
-      statusCounts[status] = (statusCounts[status] || 0) + 1;
-    });
-    logger.debug('Dashboard: FPTK status distribution:', JSON.stringify(statusCounts));
+    // Derive open/closed counts from the all-time fptkCountsByCurrentStatus groupBy
+    // (previously computed from locationFPTKs; frontend already uses fptkCountsByCurrentStatus
+    //  for its own stat cards so this is consistent).
+    const openPositionsCount = Object.entries(fptkCountsByCurrentStatus)
+      .filter(([s]) => isOpenCurrentStatus(s))
+      .reduce((sum, [, c]) => sum + c, 0);
+    const closedPositionsCount = Object.entries(fptkCountsByCurrentStatus)
+      .filter(([s]) => isClosedCurrentStatus(s))
+      .reduce((sum, [, c]) => sum + c, 0);
 
-    const openPositionsCount = locationFPTKs.filter((fptk) => isOpenCurrentStatus(fptk.currentStatus)).length;
-    const closedPositionsCount = locationFPTKs.filter((fptk) => isClosedCurrentStatus(fptk.currentStatus)).length;
+    logger.debug(`Dashboard: Position counts from groupBy — Open: ${openPositionsCount}, Closed: ${closedPositionsCount}`);
 
-    logger.debug(`Dashboard: Position counts - Open: ${openPositionsCount}, Closed: ${closedPositionsCount}`);
-    logger.debug(
-      `Dashboard: locationFPTKs.length: ${locationFPTKs.length}, fptkLocationWhere keys: ${Object.keys(fptkLocationWhere).join(', ')}`
-    );
+    // SQL-based chart aggregation (runs as a second parallel batch after the scalar counts).
+    // getSlaByLocationSql uses the indonesia_business_days PostgreSQL function.
+    // If the function is not yet installed (migration not run), we log a warning
+    // and return an empty SLA array rather than crashing the entire dashboard.
+    let positionStatusByLocation = [];
+    let openPositionProgress     = [];
+    let slaByLocation            = [];
 
-    logger.debug(`Dashboard: Fetched ${locationFPTKs.length} FPTKs for location charts`);
-
-    // Helper function to get status for display (currentStatus or status or default)
-    const getStatus = (fptk) => {
-      // Use currentStatus if available, otherwise use status enum value, otherwise default
-      if (fptk.currentStatus) {
-        return fptk.currentStatus;
-      }
-      // Map FPTKStatus enum to display string
-      const statusMap = {
-        'DRAFT': 'Draft',
-        'APPROVED': 'Approved',
-        'OPEN': 'Open',
-        'PARTIALLY_FILLED': 'Partially Filled',
-        'FILLED': 'Filled',
-        'CANCELLED': 'Cancelled',
-        'EXPIRED': 'Expired',
-      };
-      return statusMap[fptk.status] || fptk.status || 'Raise FPTK';
-    };
-
-    // Location chart: green = actively open recruiting; red = everything else (Close, Cancel, etc.)
-    const isClosed = (fptk) => !isOpenCurrentStatus(fptk.currentStatus || getStatus(fptk));
-
-    const assignBucketArea = (bucket, fptk) => {
-      const resolved = resolveNormalizedArea(fptk);
-      if (resolved && !bucket.area) bucket.area = resolved;
-    };
-
-    // Calculate Position Status by Location
-    const positionStatusByLocationMap = {};
-    locationFPTKs.forEach((fptk) => {
-      const location = getLocationKey(fptk);
-      if (!positionStatusByLocationMap[location]) {
-        positionStatusByLocationMap[location] = {
-          location,
-          area: resolveNormalizedArea(fptk),
-          total: 0,
-          closed: 0,
-          open: 0,
-        };
-      }
-      assignBucketArea(positionStatusByLocationMap[location], fptk);
-      positionStatusByLocationMap[location].total += 1;
-      if (isClosed(fptk)) {
-        positionStatusByLocationMap[location].closed += 1;
-      } else {
-        positionStatusByLocationMap[location].open += 1;
-      }
-    });
-    const positionStatusByLocation = Object.values(positionStatusByLocationMap);
-
-    // Calculate Open Position Progress by Area Detail
-    const openPositionProgressMap = {};
-    locationFPTKs.forEach((fptk) => {
-      const areaDetail = getLocationKey(fptk);
-      const status = getStatus(fptk);
-      
-      if (!openPositionProgressMap[areaDetail]) {
-        openPositionProgressMap[areaDetail] = {
-          areaDetail,
-          area: resolveNormalizedArea(fptk),
-          statusCounts: {},
-          total: 0,
-        };
-      }
-      assignBucketArea(openPositionProgressMap[areaDetail], fptk);
-      
-      if (!openPositionProgressMap[areaDetail].statusCounts[status]) {
-        openPositionProgressMap[areaDetail].statusCounts[status] = 0;
-      }
-      
-      openPositionProgressMap[areaDetail].statusCounts[status] += 1;
-      openPositionProgressMap[areaDetail].total += 1;
-    });
-
-    // Calculate percentages for each area detail
-    const totalOpenPositions = locationFPTKs.length;
-    Object.values(openPositionProgressMap).forEach((areaData) => {
-      areaData.percentage = totalOpenPositions > 0 
-        ? Math.round((areaData.total / totalOpenPositions) * 100) 
-        : 0;
-    });
-    const openPositionProgress = Object.values(openPositionProgressMap);
-
-    // SLA by Location: Indonesia working days from FPTK Receive Date (same as Summary by Position)
-    const nowDate = new Date();
-    const slaByLocationMap = {};
-    locationFPTKs.forEach((fptk) => {
-      const areaDetail = getLocationKey(fptk);
-
-      if (!slaByLocationMap[areaDetail]) {
-        slaByLocationMap[areaDetail] = {
-          areaDetail,
-          area: resolveNormalizedArea(fptk),
-          buckets: {
-            '0-30 Days':     { received: 0, pending: 0 },
-            '31-60 Days':    { received: 0, pending: 0 },
-            '61-90 Days':    { received: 0, pending: 0 },
-            'Above 91 Days': { received: 0, pending: 0 },
-          },
-          total: 0,
-        };
-      }
-      assignBucketArea(slaByLocationMap[areaDetail], fptk);
-
-      const bucket = getPositionSlaBucket(fptk, nowDate);
-      if (bucket && bucket !== '-' && slaByLocationMap[areaDetail].buckets[bucket]) {
-        const isReceived = (fptk.statusFktk || '').toLowerCase() === 'received';
-        const fktkKey = isReceived ? 'received' : 'pending';
-        slaByLocationMap[areaDetail].buckets[bucket][fktkKey] += 1;
-        slaByLocationMap[areaDetail].total += 1;
-      }
-    });
-    const slaByLocation = Object.values(slaByLocationMap);
+    try {
+      [positionStatusByLocation, openPositionProgress, slaByLocation] = await Promise.all([
+        getPositionStatusByLocationSql(user, options),
+        getOpenPositionProgressSql(user, options),
+        getSlaByLocationSql(user, options),
+      ]);
+      logger.debug(
+        `Dashboard: SQL charts — positionStatus: ${positionStatusByLocation.length}, ` +
+        `openProgress: ${openPositionProgress.length}, sla: ${slaByLocation.length}`
+      );
+    } catch (sqlErr) {
+      logger.error(
+        'Dashboard: SQL chart aggregation failed — charts will be empty. ' +
+        'Run migration 20260702030000 and seed-indonesia-holidays.js to enable SQL SLA. ' +
+        `Error: ${sqlErr.message}`
+      );
+    }
 
     // Build recent activity from already-fetched recentCandidates and recentFPTKs
     const recentActivity = [

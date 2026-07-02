@@ -8,7 +8,6 @@ import PositionEditOverlay from '@/components/PositionEditOverlay'
 import { FPTKAPI } from '@/lib/api'
 import MultiSelectDropdown from '@/components/MultiSelectDropdown'
 import { usePositionEditOverlay } from '@/hooks/usePositionEditOverlay'
-import { getSlaBucketIndonesiaWorkingDays } from '@/utils/indoBusinessDays'
 import {
   displayFptkCurrentStatus,
   isFptkClosedByCurrentStatus,
@@ -455,18 +454,10 @@ function SummaryByPositionContent() {
         // as candidates move through later stages.
         counts['Applied'] = totalApplicants[job.id] ?? counts['Applied'] ?? 0
 
-        const referenceDate = job.fptkReceiveDate || job.requestDate || job.createdAt
-        const isClosed = isFptkClosedByCurrentStatus(job.currentStatus)
-        const closeAnchorRaw = isClosed ? (job.closedAt || null) : null
-        const closeAnchorDate = closeAnchorRaw ? new Date(closeAnchorRaw) : null
-        const slaEndDate = closeAnchorDate && !isNaN(closeAnchorDate.getTime()) ? closeAnchorDate : new Date()
-        let slaBucket = '-'
-        if (referenceDate) {
-          const dateObj = new Date(referenceDate)
-          if (!isNaN(dateObj.getTime())) {
-            slaBucket = getSlaBucketIndonesiaWorkingDays(dateObj, slaEndDate)
-          }
-        }
+        // SLA bucket is pre-computed server-side using the memoised Indonesia
+        // holiday lookup (same logic as dashboard). Use it directly — no browser
+        // date-holidays calculation needed.
+        const slaBucket: string = job.sla || '-'
 
         return {
           id: job.id,

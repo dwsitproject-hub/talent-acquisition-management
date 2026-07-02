@@ -5,6 +5,40 @@ const { asyncHandler } = require('../middleware/errorHandler');
 const dashboardService = require('../services/dashboardService');
 
 /**
+ * Simple in-process TTL cache for dashboard stats.
+ * Key: "<userId>:<serialised filter options>"
+ * Prevents redundant DB round-trips when the same user refreshes or
+ * toggles filters rapidly. Entries expire after CACHE_TTL_MS.
+ */
+const CACHE_TTL_MS = 30_000; // 30 seconds
+const _statsCache = new Map();
+
+function buildStatsCacheKey(user, options) {
+  const userId = user?.id ?? 'anon';
+  const opts = JSON.stringify(options);
+  return `${userId}:${opts}`;
+}
+
+function getCachedStats(key) {
+  const entry = _statsCache.get(key);
+  if (!entry) return null;
+  if (Date.now() - entry.ts > CACHE_TTL_MS) {
+    _statsCache.delete(key);
+    return null;
+  }
+  return entry.data;
+}
+
+function setCachedStats(key, data) {
+  // Evict oldest entries when cache grows beyond 200 entries (memory guard)
+  if (_statsCache.size >= 200) {
+    const oldest = _statsCache.keys().next().value;
+    _statsCache.delete(oldest);
+  }
+  _statsCache.set(key, { ts: Date.now(), data });
+}
+
+/**
  * @route   GET /api/dashboard/stats
  * @desc    Get dashboard statistics
  * @access  Private (TA, HRBP, Admin, CHRO)
@@ -26,10 +60,19 @@ router.get(
       previousStart,
       previousEnd,
     };
+
+    const cacheKey = buildStatsCacheKey(req.user, options);
+    const cached = getCachedStats(cacheKey);
+    if (cached) {
+      res.set('Cache-Control', `private, max-age=${Math.floor(CACHE_TTL_MS / 1000)}`);
+      res.set('X-Dashboard-Cache', 'HIT');
+      return res.json({ success: true, data: cached });
+    }
+
     const stats = await dashboardService.getDashboardStats(req.user, options);
-    res.set('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
-    res.set('Pragma', 'no-cache');
-    res.set('Expires', '0');
+    setCachedStats(cacheKey, stats);
+    res.set('Cache-Control', `private, max-age=${Math.floor(CACHE_TTL_MS / 1000)}`);
+    res.set('X-Dashboard-Cache', 'MISS');
     res.json({
       success: true,
       data: stats,
@@ -59,10 +102,19 @@ router.get(
       previousStart,
       previousEnd,
     };
+
+    const cacheKey = buildStatsCacheKey(req.user, options);
+    const cached = getCachedStats(cacheKey);
+    if (cached) {
+      res.set('Cache-Control', `private, max-age=${Math.floor(CACHE_TTL_MS / 1000)}`);
+      res.set('X-Dashboard-Cache', 'HIT');
+      return res.json({ success: true, data: cached });
+    }
+
     const stats = await dashboardService.getDashboardStats(req.user, options);
-    res.set('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
-    res.set('Pragma', 'no-cache');
-    res.set('Expires', '0');
+    setCachedStats(cacheKey, stats);
+    res.set('Cache-Control', `private, max-age=${Math.floor(CACHE_TTL_MS / 1000)}`);
+    res.set('X-Dashboard-Cache', 'MISS');
     res.json({
       success: true,
       data: stats,
@@ -108,9 +160,8 @@ router.get(
       slaBucket,
       usePeriod,
     });
-    res.set('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
-    res.set('Pragma', 'no-cache');
-    res.set('Expires', '0');
+    // Detail lists are user-scoped drill-downs; short private cache is safe
+    res.set('Cache-Control', 'private, max-age=30');
     res.json({
       success: true,
       data: result,

@@ -131,6 +131,33 @@ router.get(
 );
 
 /**
+ * In-process TTL cache for getSummaryByPosition.
+ * Keyed by user ID (role-scoped) — prevents redundant DB work on every page visit.
+ * 60-second TTL: SLA buckets change slowly; this is a safe window.
+ */
+const SUMMARY_CACHE_TTL_MS = 60_000;
+const _summaryCache = new Map();
+
+function getSummaryCacheKey(user) {
+  return user?.id ?? 'anon';
+}
+function getCachedSummary(key) {
+  const entry = _summaryCache.get(key);
+  if (!entry) return null;
+  if (Date.now() - entry.ts > SUMMARY_CACHE_TTL_MS) {
+    _summaryCache.delete(key);
+    return null;
+  }
+  return entry.data;
+}
+function setCachedSummary(key, data) {
+  if (_summaryCache.size >= 100) {
+    _summaryCache.delete(_summaryCache.keys().next().value);
+  }
+  _summaryCache.set(key, { ts: Date.now(), data });
+}
+
+/**
  * @route   GET /api/fptk/summary-by-position
  * @desc    Summary by Position (pre-aggregated application counts per FPTK)
  * @access  Private (TA, HRBP, Admin, HM, CHRO, Dept Head)
@@ -140,11 +167,18 @@ router.get(
   authenticate,
   authorize('TA_HO', 'HRBP', 'TA_SITE', 'SUPER_ADMIN', 'HIRING_MANAGER', 'CHRO', 'DEPARTMENT_HEAD'),
   asyncHandler(async (req, res) => {
+    const cacheKey = getSummaryCacheKey(req.user);
+    const cached = getCachedSummary(cacheKey);
+    if (cached) {
+      res.set('Cache-Control', `private, max-age=${Math.floor(SUMMARY_CACHE_TTL_MS / 1000)}`);
+      res.set('X-Summary-Cache', 'HIT');
+      return res.json({ success: true, data: cached });
+    }
     const result = await fptkService.getSummaryByPosition(req.user);
-    res.json({
-      success: true,
-      data: result,
-    });
+    setCachedSummary(cacheKey, result);
+    res.set('Cache-Control', `private, max-age=${Math.floor(SUMMARY_CACHE_TTL_MS / 1000)}`);
+    res.set('X-Summary-Cache', 'MISS');
+    res.json({ success: true, data: result });
   })
 );
 

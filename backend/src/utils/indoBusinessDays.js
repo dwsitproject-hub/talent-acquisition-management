@@ -14,15 +14,27 @@ const isWeekend = (d) => {
   return day === 0 || day === 6;
 };
 
-function isIndonesiaWorkingDay(d) {
-  if (isWeekend(d)) return false;
-  const holidays = hd.getHolidays(d.getFullYear());
-  const ymd = toYmd(d);
-  const isHoliday = holidays.some((h) => (h.date || '').slice(0, 10) === ymd);
-  return !isHoliday;
+/** Memoised Set<'YYYY-MM-DD'> per calendar year — built once, reused across all requests. */
+const _holidaySetCache = new Map();
+
+function getHolidaySetForYear(year) {
+  if (!_holidaySetCache.has(year)) {
+    const raw = hd.getHolidays(year);
+    _holidaySetCache.set(year, new Set(raw.map((h) => (h.date || '').slice(0, 10))));
+  }
+  return _holidaySetCache.get(year);
 }
 
-/** Counts working days between start and end, excluding start and including end. */
+function isIndonesiaWorkingDay(d) {
+  if (isWeekend(d)) return false;
+  return !getHolidaySetForYear(d.getFullYear()).has(toYmd(d));
+}
+
+/**
+ * Counts Indonesia working days between start and end.
+ * Excludes start, includes end. Uses a day-by-day loop but holiday lookups
+ * are O(1) via year-keyed Sets built once per process lifetime.
+ */
 function businessDaysDiffIndonesia(start, end) {
   const startDay = new Date(start);
   const endDay = new Date(end);
