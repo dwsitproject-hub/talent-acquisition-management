@@ -20,9 +20,8 @@ import {
   ArrowLeftOnRectangleIcon,
 } from '@heroicons/react/24/outline'
 import { DashboardStats, PositionStatusByLocation, OpenPositionProgress, SLALocation, FPTK } from '@/types'
-import { DashboardAPI, CandidatesAPI, FPTKAPI, ApplicationsAPI, MasterOfficeLocationAPI } from '@/lib/api'
+import { DashboardAPI, FPTKAPI, MasterOfficeLocationAPI } from '@/lib/api'
 import { mapApiFptk } from './fptk/page'
-import { businessDaysDiffIndonesia } from '@/utils/indoBusinessDays'
 import {
   getDashboardPeriodBounds,
   periodOverPeriodChange,
@@ -70,18 +69,32 @@ const isClosedCurrentStatusLabel = (value?: string) => {
 
 const isHoldCurrentStatusLabel = (value?: string) => normalizeUiCurrentStatus(value) === 'hold'
 
+const CARD_DETAIL_MAP: Record<string, string> = {
+  Interview: 'interview',
+  'Offering Stage': 'offering',
+  MCU: 'mcu',
+  Hired: 'hired',
+  'Offer Rejected': 'offer_rejected',
+  Rejected: 'rejected',
+  Withdrawn: 'withdrawn',
+  'Open Positions': 'open_positions',
+}
+
 type DashboardListItem = {
   id?: string
   kind?: 'fptk' | 'candidate'
   title: string
   subtitle?: string
   meta?: string
+  agingDays?: number
 }
 
 const matchesQuery = (item: DashboardListItem, query: string) => {
   const q = (query || '').trim().toLowerCase()
   if (!q) return true
-  const hay = `${item.title || ''} ${item.subtitle || ''} ${item.meta || ''}`.toLowerCase()
+  const agingPart =
+    typeof item.agingDays === 'number' ? `${item.agingDays} working days` : ''
+  const hay = `${item.title || ''} ${item.subtitle || ''} ${item.meta || ''} ${agingPart}`.toLowerCase()
   return hay.includes(q)
 }
 
@@ -166,7 +179,7 @@ export default function Dashboard() {
   const [openPositionsLoading, setOpenPositionsLoading] = useState(false)
   const [openPositionsError, setOpenPositionsError] = useState<string>('')
   const [openPositionsList, setOpenPositionsList] = useState<any[]>([])
-  const openPositionsLoadedOnceRef = useRef(false)
+  const totalCandidatesItemsRef = useRef<DashboardListItem[] | null>(null)
 
   const TOTAL_CANDIDATES_MODAL_PAGE_SIZE = 100
   const DETAIL_MODAL_PAGE_SIZE = 100
@@ -299,24 +312,6 @@ export default function Dashboard() {
     const map = compareToPrevious && appPeriod.current ? appPeriod.current : appCounts
     return sumAppStatuses(map, ['WITHDRAWN'])
   }, [compareToPrevious, appPeriod, appCounts])
-
-  // ── mapApplicationToDetailItem (still used for lazy-load modals) ────────────
-  const mapApplicationToDetailItem = (application: any): DashboardListItem => {
-    const candidateName =
-      `${application?.candidate?.user?.firstName || ''} ${application?.candidate?.user?.lastName || ''}`.trim() ||
-      application?.candidate?.fullName ||
-      'Unknown Candidate'
-    const positionTitle =
-      application?.fptk?.positionTitle || application?.fptk?.position || 'Unknown Position'
-    const department = application?.fptk?.department || application?.candidate?.user?.division || 'N/A'
-    return {
-      id: application?.fptkId || application?.id,
-      kind: application?.fptkId ? ('fptk' as const) : undefined,
-      title: candidateName,
-      subtitle: `${positionTitle} • ${department}`,
-      meta: asUpperStatus(application?.status).replace(/_/g, ' '),
-    }
-  }
 
   // ── WoW deltas — now from backend period-filtered groupBy counts ────────────
   const wowOpenPositions = useMemo(() => {
@@ -573,7 +568,20 @@ export default function Dashboard() {
     periodBounds,
   ])
 
+  const buildDashboardDetailParams = useCallback(
+    (extra: { detail: string; areaDetail?: string; slaBucket?: string }) => ({
+      ...currentParams,
+      ...(compareToPrevious && periodBounds ? { usePeriod: 'true' } : {}),
+      ...extra,
+    }),
+    [currentParams, compareToPrevious, periodBounds]
+  )
+
   const didInitialLoad = useRef(false)
+
+  useEffect(() => {
+    totalCandidatesItemsRef.current = null
+  }, [currentParams])
 
   // Load Area Detail options when Site/HO is selected (master office locations)
   useEffect(() => {
@@ -692,30 +700,23 @@ export default function Dashboard() {
     setOpenPositionsLoading(true)
     setOpenPositionsError('')
     try {
-      const limit = 100
-      const maxPages = 20
-      let page = 1
-      let hasMore = true
-      let positions: any[] = []
-
-      while (hasMore && page <= maxPages) {
-        const response = await FPTKAPI.getAll({ search: query || '' }, { page, limit })
-        const data = Array.isArray(response?.data) ? response.data : []
-        const mapped = data.map((fptk: any) => mapApiFptk(fptk))
-        positions = positions.concat(mapped)
-
-        const totalPages = response?.pagination?.totalPages
-        if (totalPages) {
-          hasMore = page < totalPages
-        } else {
-          hasMore = data.length === limit
-        }
-        page += 1
+      const result = await DashboardAPI.getDetails(
+        buildDashboardDetailParams({ detail: 'open_positions' })
+      )
+      let items = (result.items || []) as DashboardListItem[]
+      if (query.trim()) {
+        items = items.filter((it) => matchesQuery(it, query))
       }
-
-      const openOnly = positions.filter((p: any) => isOpenCurrentStatusLabel(p?.currentStatus || p?.status))
-      setOpenPositionsList(openOnly.map((p: any) => ({ ...p, kind: 'fptk' as const })))
-      openPositionsLoadedOnceRef.current = true
+      setOpenPositionsList(
+        items.map((it) => ({
+          id: it.id,
+          title: it.title,
+          department: it.subtitle?.split(' • ')[0] || 'N/A',
+          location: it.subtitle?.split(' • ')[1] || 'N/A',
+          currentStatus: it.meta,
+          kind: 'fptk' as const,
+        }))
+      )
     } catch (e: any) {
       console.error('fetchOpenPositions failed:', e)
       setOpenPositionsError(e?.response?.data?.message || e?.message || 'Failed to load open positions')
@@ -764,45 +765,11 @@ export default function Dashboard() {
    * Called only when the user clicks on a card — no pre-loading.
    */
   const loadModalItems = async (cardName: string): Promise<DashboardListItem[]> => {
-    const appStatusMap: Record<string, string> = {
-      Interview: 'INTERVIEW_SCHEDULED,INTERVIEW_COMPLETED,TECHNICAL_TEST',
-      'Offering Stage': 'OFFER_PROPOSED,OFFER_APPROVED,OFFER_ACCEPTED',
-      MCU: 'MEDICAL_CHECKUP_COMPLETED',
-      'Offer Rejected': 'OFFER_REJECTED',
-      Rejected: 'REJECTED',
-      Withdrawn: 'WITHDRAWN',
-    }
-
-    const appStatus = appStatusMap[cardName]
-    if (appStatus) {
-      const res = await ApplicationsAPI.getAll({ status: appStatus }, { limit: 500 })
-      const data = Array.isArray(res?.data) ? res.data : []
-      return data.map(mapApplicationToDetailItem)
-    }
-
-    if (cardName === 'Hired') {
-      const res = await FPTKAPI.getAll({ currentStatus: 'Close' }, { limit: 500 })
-      const data = Array.isArray(res?.data) ? res.data : []
-      return data.map((p: any) => ({
-        id: p?.id,
-        kind: 'fptk' as const,
-        title: p?.positionTitle || p?.position || 'Unknown Position',
-        subtitle: `${p?.department || 'N/A'} • ${p?.areaDetail || p?.area || p?.location || 'N/A'}`,
-        meta: p?.currentStatus || 'Close',
-      }))
-    }
-
-    return []
+    const detail = CARD_DETAIL_MAP[cardName]
+    if (!detail) return []
+    const result = await DashboardAPI.getDetails(buildDashboardDetailParams({ detail }))
+    return (result.items || []) as DashboardListItem[]
   }
-
-  const mapApiCandidatesToDashboardItems = (rows: any[]): DashboardListItem[] =>
-    (rows || []).map((c: any) => ({
-      id: c.id,
-      kind: 'candidate' as const,
-      title: `${c.user?.firstName || ''} ${c.user?.lastName || ''}`.trim() || 'Unknown',
-      subtitle: c.user?.email || 'No email',
-      meta: c._count?.applications ? `${c._count.applications} application(s)` : 'No applications',
-    }))
 
   const loadTotalCandidatesModalPage = async (page: number) => {
     setTotalCandidatesModal((prev) =>
@@ -811,23 +778,26 @@ export default function Dashboard() {
         : { page: 1, totalPages: 1, total: 0, items: [], loading: true }
     )
     try {
-      const response = await CandidatesAPI.getAll(
-        { sortBy: 'name', excludeHired: true },
-        { page, limit: TOTAL_CANDIDATES_MODAL_PAGE_SIZE }
-      )
-      const raw = response.data || []
-      const p = response.pagination || {}
-      const totalPages = Math.max(1, p.totalPages ?? 1)
-      const total = typeof p.total === 'number' ? p.total : raw.length
+      if (!totalCandidatesItemsRef.current) {
+        const result = await DashboardAPI.getDetails(
+          buildDashboardDetailParams({ detail: 'candidates' })
+        )
+        totalCandidatesItemsRef.current = (result.items || []) as DashboardListItem[]
+      }
+      const all = totalCandidatesItemsRef.current
+      const totalPages = Math.max(1, Math.ceil(all.length / TOTAL_CANDIDATES_MODAL_PAGE_SIZE))
+      const safePage = Math.min(Math.max(1, page), totalPages)
+      const start = (safePage - 1) * TOTAL_CANDIDATES_MODAL_PAGE_SIZE
       setTotalCandidatesModal({
-        page: p.page ?? page,
+        page: safePage,
         totalPages,
-        total,
-        items: mapApiCandidatesToDashboardItems(raw),
+        total: all.length,
+        items: all.slice(start, start + TOTAL_CANDIDATES_MODAL_PAGE_SIZE),
         loading: false,
       })
     } catch (error: any) {
       console.error('Error loading candidates list:', error)
+      totalCandidatesItemsRef.current = null
       setTotalCandidatesModal({
         page: 1,
         totalPages: 1,
@@ -839,7 +809,7 @@ export default function Dashboard() {
   }
 
   const positionEdit = usePositionEditOverlay(() => {
-    void loadDashboardData()
+    void loadDashboardData(currentParams)
   })
 
   const openFptkEdit = (id?: string, backLabel = 'Dashboard') => {
@@ -1139,9 +1109,7 @@ export default function Dashboard() {
                 if (item.name === 'Open Positions') {
                   setOpenPositionsPage(1)
                   setOpenPositionsModalOpen(true)
-                  if (!openPositionsLoadedOnceRef.current) {
-                    await fetchOpenPositions('')
-                  }
+                  await fetchOpenPositions('')
                   return
                 }
                 setDetailModal({ title: item.name, items: [] })
@@ -1556,43 +1524,27 @@ export default function Dashboard() {
                               {Object.entries(slaData.buckets).map(
                                 ([bucket, counts]: [string, any]) => {
                                   const bucketTotal = (counts?.received ?? 0) + (counts?.pending ?? 0)
-                                  const openModal = () => {
+                                  const openModal = async () => {
                                     const modalTitle = `${bucket} • ${slaData.areaDetail}`
                                     setDetailModal({ title: modalTitle, items: [] })
-                                    FPTKAPI.getAll({}, { limit: 500 })
-                                      .then((res) => {
-                                        const data = Array.isArray(res?.data) ? res.data : []
-                                        const nowDate = new Date()
-                                        const items = data
-                                          .filter((j: any) => {
-                                            // Match location using the same fallback as dashboardService
-                                            const loc = j?.areaDetail || j?.area || 'Unknown'
-                                            if (loc !== slaData.areaDetail) return false
-                                            const dateValue = j?.fptkReceiveDate || j?.requestDate
-                                            if (!dateValue) return false
-                                            const d = new Date(dateValue)
-                                            if (isNaN(d.getTime())) return false
-                                            const diffDays = businessDaysDiffIndonesia(d, nowDate)
-                                            if (bucket === '0-30 Days') return diffDays <= 30
-                                            if (bucket === '31-60 Days') return diffDays > 30 && diffDays <= 60
-                                            if (bucket === '61-90 Days') return diffDays > 60 && diffDays <= 90
-                                            return diffDays > 90
-                                          })
-                                          .map((j: any) => ({
-                                            id: j.id,
-                                            kind: 'fptk',
-                                            title: j.positionTitle || j.position || 'Unknown Position',
-                                            subtitle: `${j.department || 'N/A'} • ${j.areaDetail || j.area || 'N/A'}`,
-                                            meta: `FKTK: ${j.statusFktk || 'Pending'} • FPTK Received: ${j.fptkReceiveDate || j.requestDate ? new Date(j.fptkReceiveDate || j.requestDate).toLocaleDateString() : '-'}`,
-                                          }))
-                                        setDetailModal({ title: modalTitle, items })
-                                      })
-                                      .catch(() => {
-                                        setDetailModal({
-                                          title: modalTitle,
-                                          items: [{ title: 'Failed to load positions', subtitle: 'Please try again', meta: 'Error' }],
+                                    try {
+                                      const result = await DashboardAPI.getDetails(
+                                        buildDashboardDetailParams({
+                                          detail: 'sla',
+                                          areaDetail: slaData.areaDetail,
+                                          slaBucket: bucket,
                                         })
+                                      )
+                                      setDetailModal({
+                                        title: modalTitle,
+                                        items: (result.items || []) as DashboardListItem[],
                                       })
+                                    } catch {
+                                      setDetailModal({
+                                        title: modalTitle,
+                                        items: [{ title: 'Failed to load positions', subtitle: 'Please try again', meta: 'Error' }],
+                                      })
+                                    }
                                   }
                                   return (
                                     <div key={bucket}>
@@ -1803,18 +1755,36 @@ export default function Dashboard() {
                         <li key={it.id || idx} className="py-3">
                           {clickable ? (
                             <button className="w-full text-left group" onClick={onClick}>
-                              <div className="text-sm font-medium text-indigo-700 group-hover:underline flex items-center gap-1">
-                                {it.title}
-                                <span className="text-[10px] text-indigo-400 font-normal opacity-0 group-hover:opacity-100 transition-opacity">View details →</span>
+                              <div className="flex items-start justify-between gap-3">
+                                <div className="min-w-0 flex-1">
+                                  <div className="text-sm font-medium text-indigo-700 group-hover:underline flex items-center gap-1">
+                                    {it.title}
+                                    <span className="text-[10px] text-indigo-400 font-normal opacity-0 group-hover:opacity-100 transition-opacity">View details →</span>
+                                  </div>
+                                  {it.subtitle && <div className="text-sm text-gray-600">{it.subtitle}</div>}
+                                  {it.meta && <div className="text-xs text-gray-500 mt-1">{it.meta}</div>}
+                                </div>
+                                {typeof it.agingDays === 'number' && (
+                                  <span className="shrink-0 inline-flex items-center rounded-full bg-purple-50 px-2 py-0.5 text-xs font-semibold text-purple-700 border border-purple-100">
+                                    {it.agingDays} day{it.agingDays === 1 ? '' : 's'}
+                                  </span>
+                                )}
                               </div>
-                              {it.subtitle && <div className="text-sm text-gray-600">{it.subtitle}</div>}
-                              {it.meta && <div className="text-xs text-gray-500 mt-1">{it.meta}</div>}
                             </button>
                           ) : (
                             <>
-                              <div className="text-sm font-medium text-gray-900">{it.title}</div>
-                              {it.subtitle && <div className="text-sm text-gray-600">{it.subtitle}</div>}
-                              {it.meta && <div className="text-xs text-gray-500 mt-1">{it.meta}</div>}
+                              <div className="flex items-start justify-between gap-3">
+                                <div className="min-w-0 flex-1">
+                                  <div className="text-sm font-medium text-gray-900">{it.title}</div>
+                                  {it.subtitle && <div className="text-sm text-gray-600">{it.subtitle}</div>}
+                                  {it.meta && <div className="text-xs text-gray-500 mt-1">{it.meta}</div>}
+                                </div>
+                                {typeof it.agingDays === 'number' && (
+                                  <span className="shrink-0 inline-flex items-center rounded-full bg-purple-50 px-2 py-0.5 text-xs font-semibold text-purple-700 border border-purple-100">
+                                    {it.agingDays} day{it.agingDays === 1 ? '' : 's'}
+                                  </span>
+                                )}
+                              </div>
                             </>
                           )}
                         </li>
@@ -1870,6 +1840,7 @@ export default function Dashboard() {
         onClose={positionEdit.close}
         onSave={positionEdit.handleSave}
         headerBackLabel={`Back to ${positionEdit.backLabel || 'Dashboard'}`}
+        candidateStatusOnly={positionEdit.candidateStatusOnly}
       />
 
       <ViewJobPostingModal

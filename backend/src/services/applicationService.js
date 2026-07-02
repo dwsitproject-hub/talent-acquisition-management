@@ -606,8 +606,8 @@ async function shortlistApplication(applicationId, userId) {
 /**
  * Reject application
  */
-async function rejectApplication(applicationId, userId, reason) {
-  return await updateApplicationStatus(applicationId, 'REJECTED', userId, reason);
+async function rejectApplication(applicationId, userId, reason, options = {}) {
+  return await updateApplicationStatus(applicationId, 'REJECTED', userId, reason, options);
 }
 
 /**

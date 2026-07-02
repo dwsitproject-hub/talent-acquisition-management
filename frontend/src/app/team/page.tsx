@@ -11,6 +11,41 @@ import MultiSelectDropdown from '@/components/MultiSelectDropdown'
 
 const TA_SITE_AREA = 'Site'
 
+const SINGLE_PT_AREA_DETAIL_ROLES = new Set(['Management', 'TA_HO'])
+
+function splitScopeField(value?: string | null): string[] {
+  return (value || '').split('||').map((part) => part.trim()).filter(Boolean)
+}
+
+function roleUsesMultiPtAreaDetail(role: string): boolean {
+  return !SINGLE_PT_AREA_DETAIL_ROLES.has(role)
+}
+
+function buildPtAreaPayload(
+  member: {
+    pt: string
+    area: string
+    areaDetail: string
+    hrbpPts: string[]
+    hrbpAreas: string[]
+    hrbpAreaDetails: string[]
+  },
+  role: string
+) {
+  if (!roleUsesMultiPtAreaDetail(role)) {
+    return {
+      pt: member.pt || '',
+      area: member.area || '',
+      areaDetail: member.areaDetail || '',
+    }
+  }
+  return {
+    pt: member.hrbpPts.join('||'),
+    area: role === 'TA_SITE' ? TA_SITE_AREA : member.hrbpAreas.join('||'),
+    areaDetail: member.hrbpAreaDetails.join('||'),
+  }
+}
+
 const USER_AREA_FILTERS = ['ALL', 'Site', 'HO'] as const
 type UserAreaFilterType = typeof USER_AREA_FILTERS[number]
 
@@ -276,59 +311,59 @@ const handleSaveMenuAccess = async () => {
   }
 }
 
-  const ptOptions = useMemo(() => {
+  const allAreaOptions = useMemo(() => {
     const set = new Set<string>()
     officeLocations.forEach((loc) => {
-      if (loc?.pt) {
+      if (loc?.area) {
+        set.add(loc.area)
+      }
+    })
+    return Array.from(set).sort()
+  }, [officeLocations])
+
+  const newMemberPtOptions = useMemo(() => {
+    if (!newMember.area) return []
+    const set = new Set<string>()
+    officeLocations.forEach((loc) => {
+      if (loc?.area === newMember.area && loc?.pt) {
         set.add(loc.pt)
       }
     })
-    return Array.from(set)
-  }, [officeLocations])
-
-  const newMemberAreaOptions = useMemo(() => {
-    if (!newMember.pt) return []
-    const set = new Set<string>()
-    officeLocations.forEach((loc) => {
-      if (loc?.pt === newMember.pt && loc?.area) {
-        set.add(loc.area)
-      }
-    })
-    return Array.from(set)
-  }, [newMember.pt, officeLocations])
+    return Array.from(set).sort()
+  }, [newMember.area, officeLocations])
 
   const newMemberAreaDetailOptions = useMemo(() => {
-    if (!newMember.pt || !newMember.area) return []
+    if (!newMember.area || !newMember.pt) return []
     const set = new Set<string>()
     officeLocations.forEach((loc) => {
-      if (loc?.pt === newMember.pt && loc?.area === newMember.area && loc?.areaDetail) {
+      if (loc?.area === newMember.area && loc?.pt === newMember.pt && loc?.areaDetail) {
         set.add(loc.areaDetail)
       }
     })
-    return Array.from(set)
-  }, [newMember.pt, newMember.area, officeLocations])
+    return Array.from(set).sort()
+  }, [newMember.area, newMember.pt, officeLocations])
 
-  const editMemberAreaOptions = useMemo(() => {
-    if (!editMember.pt) return []
+  const editMemberPtOptions = useMemo(() => {
+    if (!editMember.area) return []
     const set = new Set<string>()
     officeLocations.forEach((loc) => {
-      if (loc?.pt === editMember.pt && loc?.area) {
-        set.add(loc.area)
+      if (loc?.area === editMember.area && loc?.pt) {
+        set.add(loc.pt)
       }
     })
-    return Array.from(set)
-  }, [editMember.pt, officeLocations])
+    return Array.from(set).sort()
+  }, [editMember.area, officeLocations])
 
   const editMemberAreaDetailOptions = useMemo(() => {
-    if (!editMember.pt || !editMember.area) return []
+    if (!editMember.area || !editMember.pt) return []
     const set = new Set<string>()
     officeLocations.forEach((loc) => {
-      if (loc?.pt === editMember.pt && loc?.area === editMember.area && loc?.areaDetail) {
+      if (loc?.area === editMember.area && loc?.pt === editMember.pt && loc?.areaDetail) {
         set.add(loc.areaDetail)
       }
     })
-    return Array.from(set)
-  }, [editMember.pt, editMember.area, officeLocations])
+    return Array.from(set).sort()
+  }, [editMember.area, editMember.pt, officeLocations])
 
   const uniqueDivisionOptions = useMemo(() => [...new Set(divisions.map(d => d.divisionName))], [divisions])
 
@@ -354,78 +389,110 @@ const handleSaveMenuAccess = async () => {
     return Array.from(set)
   }, [editMember.hodDivisions, divisions])
 
-  const newScopedAreaOptions = useMemo(() => {
-    if (newMember.hrbpPts.length === 0) return []
+  const newScopedAreaOptions = allAreaOptions
+
+  const newScopedPtOptions = useMemo(() => {
+    if (newMember.hrbpAreas.length === 0) return []
     const set = new Set<string>()
     officeLocations.forEach((loc) => {
-      if (newMember.hrbpPts.includes(loc?.pt) && loc?.area) {
-        set.add(loc.area)
+      if (newMember.hrbpAreas.includes(loc?.area) && loc?.pt) {
+        set.add(loc.pt)
       }
     })
-    return Array.from(set)
-  }, [newMember.hrbpPts, officeLocations])
+    return Array.from(set).sort()
+  }, [newMember.hrbpAreas, officeLocations])
 
   const newScopedAreaDetailOptions = useMemo(() => {
-    if (newMember.hrbpPts.length === 0 || newMember.hrbpAreas.length === 0) return []
+    if (newMember.hrbpAreas.length === 0 || newMember.hrbpPts.length === 0) return []
     const set = new Set<string>()
     officeLocations.forEach((loc) => {
       if (
-        newMember.hrbpPts.includes(loc?.pt) &&
         newMember.hrbpAreas.includes(loc?.area) &&
+        newMember.hrbpPts.includes(loc?.pt) &&
         loc?.areaDetail
       ) {
         set.add(loc.areaDetail)
       }
     })
-    return Array.from(set)
-  }, [newMember.hrbpPts, newMember.hrbpAreas, officeLocations])
+    return Array.from(set).sort()
+  }, [newMember.hrbpAreas, newMember.hrbpPts, officeLocations])
 
-  const editScopedAreaOptions = useMemo(() => {
-    if (editMember.hrbpPts.length === 0) return []
+  const editScopedAreaOptions = allAreaOptions
+
+  const editScopedPtOptions = useMemo(() => {
+    if (editMember.hrbpAreas.length === 0) return []
     const set = new Set<string>()
     officeLocations.forEach((loc) => {
-      if (editMember.hrbpPts.includes(loc?.pt) && loc?.area) {
-        set.add(loc.area)
+      if (editMember.hrbpAreas.includes(loc?.area) && loc?.pt) {
+        set.add(loc.pt)
       }
     })
-    return Array.from(set)
-  }, [editMember.hrbpPts, officeLocations])
+    return Array.from(set).sort()
+  }, [editMember.hrbpAreas, officeLocations])
 
   const editScopedAreaDetailOptions = useMemo(() => {
-    if (editMember.hrbpPts.length === 0 || editMember.hrbpAreas.length === 0) return []
+    if (editMember.hrbpAreas.length === 0 || editMember.hrbpPts.length === 0) return []
     const set = new Set<string>()
     officeLocations.forEach((loc) => {
       if (
-        editMember.hrbpPts.includes(loc?.pt) &&
         editMember.hrbpAreas.includes(loc?.area) &&
+        editMember.hrbpPts.includes(loc?.pt) &&
         loc?.areaDetail
       ) {
         set.add(loc.areaDetail)
       }
     })
-    return Array.from(set)
-  }, [editMember.hrbpPts, editMember.hrbpAreas, officeLocations])
+    return Array.from(set).sort()
+  }, [editMember.hrbpAreas, editMember.hrbpPts, officeLocations])
+
+  const newTaSitePtOptions = useMemo(() => {
+    const set = new Set<string>()
+    officeLocations.forEach((loc) => {
+      if (loc?.area === TA_SITE_AREA && loc?.pt) {
+        set.add(loc.pt)
+      }
+    })
+    return Array.from(set).sort()
+  }, [officeLocations])
+
+  const editTaSitePtOptions = useMemo(() => {
+    const set = new Set<string>()
+    officeLocations.forEach((loc) => {
+      if (loc?.area === TA_SITE_AREA && loc?.pt) {
+        set.add(loc.pt)
+      }
+    })
+    return Array.from(set).sort()
+  }, [officeLocations])
 
   const newTaSiteAreaDetailOptions = useMemo(() => {
     if (newMember.role !== 'TA_SITE' || newMember.hrbpPts.length === 0) return []
     const set = new Set<string>()
     officeLocations.forEach((loc) => {
-      if (newMember.hrbpPts.includes(loc?.pt) && loc?.area === TA_SITE_AREA && loc?.areaDetail) {
+      if (
+        newMember.hrbpPts.includes(loc?.pt) &&
+        loc?.area === TA_SITE_AREA &&
+        loc?.areaDetail
+      ) {
         set.add(loc.areaDetail)
       }
     })
-    return Array.from(set)
+    return Array.from(set).sort()
   }, [newMember.role, newMember.hrbpPts, officeLocations])
 
   const editTaSiteAreaDetailOptions = useMemo(() => {
     if (editMember.role !== 'TA_SITE' || editMember.hrbpPts.length === 0) return []
     const set = new Set<string>()
     officeLocations.forEach((loc) => {
-      if (editMember.hrbpPts.includes(loc?.pt) && loc?.area === TA_SITE_AREA && loc?.areaDetail) {
+      if (
+        editMember.hrbpPts.includes(loc?.pt) &&
+        loc?.area === TA_SITE_AREA &&
+        loc?.areaDetail
+      ) {
         set.add(loc.areaDetail)
       }
     })
-    return Array.from(set)
+    return Array.from(set).sort()
   }, [editMember.role, editMember.hrbpPts, officeLocations])
 
   const formatScopeValues = (value?: string | null) =>
@@ -590,6 +657,8 @@ const handleSaveMenuAccess = async () => {
   const canCreateTeam = canCreateFromMenuAccess || (!hasCreateRolesConfigured && canCreateFromDefault)
   
   const canManageMenu = roleName === 'SUPER_ADMIN'
+  const canEditPtScope = roleName === 'SUPER_ADMIN'
+  const ptScopeAdminHint = 'Only SUPER_ADMIN can assign multiple PT and Area Detail values.'
   
   if (!canViewTeam) {
     router.push('/')
@@ -651,7 +720,7 @@ const handleSaveMenuAccess = async () => {
         errors.hodSections = 'At least one section is required for Head of Division role'
       }
     }
-    if (member.role === 'HRBP') {
+    if (canEditPtScope && member.role === 'HRBP') {
       if (!member.hrbpPts?.length) {
         errors.pt = 'At least one PT is required for HRBP role'
       }
@@ -662,7 +731,7 @@ const handleSaveMenuAccess = async () => {
         errors.areaDetail = 'At least one Area Detail is required for HRBP role'
       }
     }
-    if (member.role === 'TA_SITE') {
+    if (canEditPtScope && member.role === 'TA_SITE') {
       if (!member.hrbpPts?.length) {
         errors.pt = 'At least one PT is required for TA_SITE role'
       }
@@ -676,7 +745,7 @@ const handleSaveMenuAccess = async () => {
   const handleEditClick = (member: TeamMember) => {
     setEditingMember(member)
     const isHoD = member.role === 'Head of Division'
-    const isScopedSite = member.role === 'HRBP' || member.role === 'TA_SITE'
+    const isMultiPt = roleUsesMultiPtAreaDetail(member.role)
     setEditMember({
       firstName: member.firstName,
       lastName: member.lastName,
@@ -685,14 +754,14 @@ const handleSaveMenuAccess = async () => {
       role: member.role,
       division: isHoD ? '' : (member.division || ''),
       sectionName: isHoD ? '' : (member.sectionName || ''),
-      hodDivisions: isHoD ? (member.division ? member.division.split('||').filter(Boolean) : []) : [],
-      hodSections: isHoD ? (member.sectionName ? member.sectionName.split('||').filter(Boolean) : []) : [],
-      hrbpPts: isScopedSite ? (member.pt ? member.pt.split('||').filter(Boolean) : []) : [],
-      hrbpAreas: member.role === 'HRBP' ? (member.area ? member.area.split('||').filter(Boolean) : []) : [],
-      hrbpAreaDetails: isScopedSite ? (member.areaDetail ? member.areaDetail.split('||').filter(Boolean) : []) : [],
-      pt: isScopedSite ? '' : (member.pt || ''),
-      area: isScopedSite ? '' : (member.area || ''),
-      areaDetail: isScopedSite ? '' : (member.areaDetail || ''),
+      hodDivisions: isHoD ? splitScopeField(member.division) : [],
+      hodSections: isHoD ? splitScopeField(member.sectionName) : [],
+      hrbpPts: isMultiPt ? splitScopeField(member.pt) : [],
+      hrbpAreas: isMultiPt && member.role !== 'TA_SITE' ? splitScopeField(member.area) : [],
+      hrbpAreaDetails: isMultiPt ? splitScopeField(member.areaDetail) : [],
+      pt: !isMultiPt ? (member.pt || '') : '',
+      area: !isMultiPt ? (member.area || '') : '',
+      areaDetail: !isMultiPt ? (member.areaDetail || '') : '',
       resetPassword: false
     })
     setValidationErrors({})
@@ -717,7 +786,7 @@ const handleSaveMenuAccess = async () => {
     
     try {
       const isNewHoD = newMember.role === 'Head of Division'
-      const isNewScopedSite = newMember.role === 'HRBP' || newMember.role === 'TA_SITE'
+      const ptArea = buildPtAreaPayload(newMember, newMember.role)
       const created = await AdminUsersAPI.create({
         firstName: newMember.firstName.trim(),
         lastName: newMember.lastName.trim(),
@@ -727,13 +796,9 @@ const handleSaveMenuAccess = async () => {
         division: isNewHoD ? newMember.hodDivisions.join('||') : (newMember.division || ''),
         sectionName: isNewHoD ? newMember.hodSections.join('||') : (newMember.sectionName || ''),
         password: newMember.password || defaultPassword,
-        pt: isNewScopedSite ? newMember.hrbpPts.join('||') : (newMember.pt || ''),
-        area: newMember.role === 'TA_SITE'
-          ? TA_SITE_AREA
-          : isNewScopedSite
-            ? newMember.hrbpAreas.join('||')
-            : (newMember.area || ''),
-        areaDetail: isNewScopedSite ? newMember.hrbpAreaDetails.join('||') : (newMember.areaDetail || ''),
+        pt: ptArea.pt,
+        area: ptArea.area,
+        areaDetail: ptArea.areaDetail,
       })
       // Reload team members to get fresh data
       await loadTeamMembers(searchTerm, roleFilter, areaFilter)
@@ -762,7 +827,18 @@ const handleSaveMenuAccess = async () => {
     
     try {
       const isEditHoD = editMember.role === 'Head of Division'
-      const isEditScopedSite = editMember.role === 'HRBP' || editMember.role === 'TA_SITE'
+      let ptArea = buildPtAreaPayload(editMember, editMember.role)
+      if (
+        !canEditPtScope &&
+        editingMember &&
+        roleUsesMultiPtAreaDetail(editMember.role)
+      ) {
+        ptArea = {
+          pt: editingMember.pt || '',
+          area: editingMember.area || '',
+          areaDetail: editingMember.areaDetail || '',
+        }
+      }
       const updated = await AdminUsersAPI.update(editingMember.id, {
         firstName: editMember.firstName.trim(),
         lastName: editMember.lastName.trim(),
@@ -771,13 +847,9 @@ const handleSaveMenuAccess = async () => {
         role: editMember.role,
         division: isEditHoD ? editMember.hodDivisions.join('||') : (editMember.division || ''),
         sectionName: isEditHoD ? editMember.hodSections.join('||') : (editMember.sectionName || ''),
-        pt: isEditScopedSite ? editMember.hrbpPts.join('||') : (editMember.pt || ''),
-        area: editMember.role === 'TA_SITE'
-          ? TA_SITE_AREA
-          : isEditScopedSite
-            ? editMember.hrbpAreas.join('||')
-            : (editMember.area || ''),
-        areaDetail: isEditScopedSite ? editMember.hrbpAreaDetails.join('||') : (editMember.areaDetail || ''),
+        pt: ptArea.pt,
+        area: ptArea.area,
+        areaDetail: ptArea.areaDetail,
       })
       if (editMember.resetPassword && canManageMenu) {
         await AdminUsersAPI.resetPassword(editingMember.id, defaultPassword)
@@ -1067,8 +1139,8 @@ const handleSaveMenuAccess = async () => {
                           <div className="mt-1 text-sm text-gray-500">
                             <p>
                               {[
-                                formatScopeValues(member.pt),
                                 formatScopeValues(member.area),
+                                formatScopeValues(member.pt),
                                 formatScopeValues(member.areaDetail),
                               ].filter(Boolean).join(' • ')}
                             </p>
@@ -1366,12 +1438,10 @@ const handleSaveMenuAccess = async () => {
                         const newRole = e.target.value
                         if (newRole === 'Head of Division') {
                           setNewMember({ ...newMember, role: newRole, division: '', sectionName: '', hodDivisions: [], hodSections: [], hrbpPts: [], hrbpAreas: [], hrbpAreaDetails: [], pt: '', area: '', areaDetail: '' })
-                        } else if (newRole === 'TA_SITE') {
-                          setNewMember({ ...newMember, role: newRole, hodDivisions: [], hodSections: [], division: '', sectionName: '', hrbpPts: [], hrbpAreas: [], hrbpAreaDetails: [], pt: '', area: '', areaDetail: '' })
-                        } else if (newRole === 'HRBP') {
+                        } else if (roleUsesMultiPtAreaDetail(newRole)) {
                           setNewMember({ ...newMember, role: newRole, hodDivisions: [], hodSections: [], division: '', sectionName: '', hrbpPts: [], hrbpAreas: [], hrbpAreaDetails: [], pt: '', area: '', areaDetail: '' })
                         } else {
-                          setNewMember({ ...newMember, role: newRole, hodDivisions: [], hodSections: [], hrbpPts: [], hrbpAreas: [], hrbpAreaDetails: [] })
+                          setNewMember({ ...newMember, role: newRole, hodDivisions: [], hodSections: [], hrbpPts: [], hrbpAreas: [], hrbpAreaDetails: [], pt: '', area: '', areaDetail: '' })
                         }
                       }}
                     >
@@ -1449,12 +1519,21 @@ const handleSaveMenuAccess = async () => {
                 </div>
                 )}
                 {newMember.role === 'TA_SITE' ? (
+                  <div className="space-y-2">
                   <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                    <div>
+                      <label className="block text-sm text-gray-700 mb-1">Area</label>
+                      <div className="w-full border rounded-md px-3 py-2 text-sm bg-gray-50 text-gray-700">
+                        {TA_SITE_AREA}
+                      </div>
+                      <p className="mt-1 text-xs text-gray-500">TA Site users are always scoped to Site area.</p>
+                    </div>
                     <div>
                       <MultiSelectDropdown
                         label="PT *"
-                        options={ptOptions}
+                        options={newTaSitePtOptions}
                         value={newMember.hrbpPts}
+                        disabled={!canEditPtScope}
                         onChange={(vals) => {
                           const detailsToKeep = newMember.hrbpAreaDetails.filter((detail) =>
                             officeLocations.some(
@@ -1481,17 +1560,11 @@ const handleSaveMenuAccess = async () => {
                       )}
                     </div>
                     <div>
-                      <label className="block text-sm text-gray-700 mb-1">Area</label>
-                      <div className="w-full border rounded-md px-3 py-2 text-sm bg-gray-50 text-gray-700">
-                        {TA_SITE_AREA}
-                      </div>
-                      <p className="mt-1 text-xs text-gray-500">TA Site users are always scoped to Site area.</p>
-                    </div>
-                    <div>
                       <MultiSelectDropdown
                         label="Area Detail *"
                         options={newTaSiteAreaDetailOptions}
                         value={newMember.hrbpAreaDetails}
+                        disabled={!canEditPtScope}
                         onChange={(vals) => {
                           setNewMember({ ...newMember, hrbpAreaDetails: vals })
                           if (validationErrors.areaDetail) {
@@ -1506,62 +1579,42 @@ const handleSaveMenuAccess = async () => {
                       )}
                     </div>
                   </div>
-                ) : newMember.role === 'HRBP' ? (
+                  {!canEditPtScope && (
+                    <p className="text-xs text-amber-700">{ptScopeAdminHint}</p>
+                  )}
+                  </div>
+                ) : roleUsesMultiPtAreaDetail(newMember.role) && newMember.role !== 'TA_SITE' ? (
+                  <div className="space-y-2">
                   <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                     <div>
                       <MultiSelectDropdown
-                        label="PT *"
-                        options={ptOptions}
-                        value={newMember.hrbpPts}
+                        label={newMember.role === 'HRBP' ? 'Area *' : 'Area'}
+                        options={newScopedAreaOptions}
+                        value={newMember.hrbpAreas}
+                        disabled={!canEditPtScope}
                         onChange={(vals) => {
-                          const areasToKeep = newMember.hrbpAreas.filter((area) =>
-                            officeLocations.some((loc) => vals.includes(loc?.pt) && loc?.area === area)
+                          const ptsToKeep = newMember.hrbpPts.filter((pt) =>
+                            officeLocations.some((loc) => vals.includes(loc?.area) && loc?.pt === pt)
                           )
                           const detailsToKeep = newMember.hrbpAreaDetails.filter((detail) =>
                             officeLocations.some(
                               (loc) =>
-                                vals.includes(loc?.pt) &&
-                                areasToKeep.includes(loc?.area) &&
+                                vals.includes(loc?.area) &&
+                                ptsToKeep.includes(loc?.pt) &&
                                 loc?.areaDetail === detail
                             )
                           )
                           setNewMember({
                             ...newMember,
-                            hrbpPts: vals,
-                            hrbpAreas: areasToKeep,
+                            hrbpAreas: vals,
+                            hrbpPts: ptsToKeep,
                             hrbpAreaDetails: detailsToKeep,
                           })
-                          if (validationErrors.pt) {
-                            setValidationErrors({ ...validationErrors, pt: '' })
-                          }
-                        }}
-                        placeholder="Select PT"
-                        searchPlaceholder="Search PT..."
-                      />
-                      {validationErrors.pt && (
-                        <p className="mt-1 text-sm text-red-500">{validationErrors.pt}</p>
-                      )}
-                    </div>
-                    <div>
-                      <MultiSelectDropdown
-                        label="Area *"
-                        options={newScopedAreaOptions}
-                        value={newMember.hrbpAreas}
-                        onChange={(vals) => {
-                          const detailsToKeep = newMember.hrbpAreaDetails.filter((detail) =>
-                            officeLocations.some(
-                              (loc) =>
-                                newMember.hrbpPts.includes(loc?.pt) &&
-                                vals.includes(loc?.area) &&
-                                loc?.areaDetail === detail
-                            )
-                          )
-                          setNewMember({ ...newMember, hrbpAreas: vals, hrbpAreaDetails: detailsToKeep })
                           if (validationErrors.area) {
                             setValidationErrors({ ...validationErrors, area: '' })
                           }
                         }}
-                        placeholder={newMember.hrbpPts.length === 0 ? 'Select PT first' : 'Select Area'}
+                        placeholder="Select Area"
                         searchPlaceholder="Search areas..."
                       />
                       {validationErrors.area && (
@@ -1570,9 +1623,41 @@ const handleSaveMenuAccess = async () => {
                     </div>
                     <div>
                       <MultiSelectDropdown
-                        label="Area Detail *"
+                        label={newMember.role === 'HRBP' ? 'PT *' : 'PT'}
+                        options={newScopedPtOptions}
+                        value={newMember.hrbpPts}
+                        disabled={!canEditPtScope}
+                        onChange={(vals) => {
+                          const detailsToKeep = newMember.hrbpAreaDetails.filter((detail) =>
+                            officeLocations.some(
+                              (loc) =>
+                                newMember.hrbpAreas.includes(loc?.area) &&
+                                vals.includes(loc?.pt) &&
+                                loc?.areaDetail === detail
+                            )
+                          )
+                          setNewMember({
+                            ...newMember,
+                            hrbpPts: vals,
+                            hrbpAreaDetails: detailsToKeep,
+                          })
+                          if (validationErrors.pt) {
+                            setValidationErrors({ ...validationErrors, pt: '' })
+                          }
+                        }}
+                        placeholder={newMember.hrbpAreas.length === 0 ? 'Select Area first' : 'Select PT'}
+                        searchPlaceholder="Search PT..."
+                      />
+                      {validationErrors.pt && (
+                        <p className="mt-1 text-sm text-red-500">{validationErrors.pt}</p>
+                      )}
+                    </div>
+                    <div>
+                      <MultiSelectDropdown
+                        label={newMember.role === 'HRBP' ? 'Area Detail *' : 'Area Detail'}
                         options={newScopedAreaDetailOptions}
                         value={newMember.hrbpAreaDetails}
+                        disabled={!canEditPtScope}
                         onChange={(vals) => {
                           setNewMember({ ...newMember, hrbpAreaDetails: vals })
                           if (validationErrors.areaDetail) {
@@ -1580,7 +1665,7 @@ const handleSaveMenuAccess = async () => {
                           }
                         }}
                         placeholder={
-                          newMember.hrbpAreas.length === 0 ? 'Select Area first' : 'Select Area Detail'
+                          newMember.hrbpPts.length === 0 ? 'Select PT first' : 'Select Area Detail'
                         }
                         searchPlaceholder="Search area details..."
                       />
@@ -1589,39 +1674,43 @@ const handleSaveMenuAccess = async () => {
                       )}
                     </div>
                   </div>
-                ) : (
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                  <div>
-                    <label className="block text-sm text-gray-700 mb-1">PT</label>
-                    <select
-                      className="w-full border rounded-md px-3 py-2 text-sm"
-                      value={newMember.pt}
-                      onChange={(e) => {
-                        setNewMember({ ...newMember, pt: e.target.value, area: '', areaDetail: '' })
-                      }}
-                    >
-                      <option value="">Select PT</option>
-                      {ptOptions.map((pt) => (
-                        <option key={pt} value={pt}>
-                          {pt}
-                        </option>
-                      ))}
-                    </select>
+                  {!canEditPtScope && (
+                    <p className="text-xs text-amber-700">{ptScopeAdminHint}</p>
+                  )}
                   </div>
+                ) : SINGLE_PT_AREA_DETAIL_ROLES.has(newMember.role) ? (
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                   <div>
                     <label className="block text-sm text-gray-700 mb-1">Area</label>
                     <select
                       className="w-full border rounded-md px-3 py-2 text-sm"
                       value={newMember.area}
                       onChange={(e) => {
-                        setNewMember({ ...newMember, area: e.target.value, areaDetail: '' })
+                        setNewMember({ ...newMember, area: e.target.value, pt: '', areaDetail: '' })
                       }}
-                      disabled={!newMember.pt || newMemberAreaOptions.length === 0}
                     >
-                      <option value="">{newMember.pt ? 'Select Area' : 'Select PT first'}</option>
-                      {newMemberAreaOptions.map((area) => (
+                      <option value="">Select Area</option>
+                      {allAreaOptions.map((area) => (
                         <option key={area} value={area}>
                           {area}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-sm text-gray-700 mb-1">PT</label>
+                    <select
+                      className="w-full border rounded-md px-3 py-2 text-sm"
+                      value={newMember.pt}
+                      onChange={(e) => {
+                        setNewMember({ ...newMember, pt: e.target.value, areaDetail: '' })
+                      }}
+                      disabled={!newMember.area || newMemberPtOptions.length === 0}
+                    >
+                      <option value="">{newMember.area ? 'Select PT' : 'Select Area first'}</option>
+                      {newMemberPtOptions.map((pt) => (
+                        <option key={pt} value={pt}>
+                          {pt}
                         </option>
                       ))}
                     </select>
@@ -1634,9 +1723,9 @@ const handleSaveMenuAccess = async () => {
                       onChange={(e) => {
                         setNewMember({ ...newMember, areaDetail: e.target.value })
                       }}
-                      disabled={!newMember.area || newMemberAreaDetailOptions.length === 0}
+                      disabled={!newMember.pt || newMemberAreaDetailOptions.length === 0}
                     >
-                      <option value="">{newMember.area ? 'Select Area Detail' : 'Select Area first'}</option>
+                      <option value="">{newMember.pt ? 'Select Area Detail' : 'Select PT first'}</option>
                       {newMemberAreaDetailOptions.map((detail) => (
                         <option key={detail} value={detail}>
                           {detail}
@@ -1645,7 +1734,7 @@ const handleSaveMenuAccess = async () => {
                     </select>
                   </div>
                 </div>
-                )}
+                ) : null}
               </div>
               <div className="px-6 py-4 border-t flex justify-end gap-2">
                 <button 
@@ -1750,12 +1839,10 @@ const handleSaveMenuAccess = async () => {
                         const newRole = e.target.value
                         if (newRole === 'Head of Division') {
                           setEditMember({ ...editMember, role: newRole, division: '', sectionName: '', hodDivisions: [], hodSections: [], hrbpPts: [], hrbpAreas: [], hrbpAreaDetails: [], pt: '', area: '', areaDetail: '' })
-                        } else if (newRole === 'TA_SITE') {
-                          setEditMember({ ...editMember, role: newRole, hodDivisions: [], hodSections: [], division: '', sectionName: '', hrbpPts: [], hrbpAreas: [], hrbpAreaDetails: [], pt: '', area: '', areaDetail: '' })
-                        } else if (newRole === 'HRBP') {
+                        } else if (roleUsesMultiPtAreaDetail(newRole)) {
                           setEditMember({ ...editMember, role: newRole, hodDivisions: [], hodSections: [], division: '', sectionName: '', hrbpPts: [], hrbpAreas: [], hrbpAreaDetails: [], pt: '', area: '', areaDetail: '' })
                         } else {
-                          setEditMember({ ...editMember, role: newRole, hodDivisions: [], hodSections: [], hrbpPts: [], hrbpAreas: [], hrbpAreaDetails: [] })
+                          setEditMember({ ...editMember, role: newRole, hodDivisions: [], hodSections: [], hrbpPts: [], hrbpAreas: [], hrbpAreaDetails: [], pt: '', area: '', areaDetail: '' })
                         }
                       }}
                     >
@@ -1832,12 +1919,21 @@ const handleSaveMenuAccess = async () => {
                 </div>
                 )}
                 {editMember.role === 'TA_SITE' ? (
+                  <div className="space-y-2">
                   <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                    <div>
+                      <label className="block text-sm text-gray-700 mb-1">Area</label>
+                      <div className="w-full border rounded-md px-3 py-2 text-sm bg-gray-50 text-gray-700">
+                        {TA_SITE_AREA}
+                      </div>
+                      <p className="mt-1 text-xs text-gray-500">TA Site users are always scoped to Site area.</p>
+                    </div>
                     <div>
                       <MultiSelectDropdown
                         label="PT *"
-                        options={ptOptions}
+                        options={editTaSitePtOptions}
                         value={editMember.hrbpPts}
+                        disabled={!canEditPtScope}
                         onChange={(vals) => {
                           const detailsToKeep = editMember.hrbpAreaDetails.filter((detail) =>
                             officeLocations.some(
@@ -1864,17 +1960,11 @@ const handleSaveMenuAccess = async () => {
                       )}
                     </div>
                     <div>
-                      <label className="block text-sm text-gray-700 mb-1">Area</label>
-                      <div className="w-full border rounded-md px-3 py-2 text-sm bg-gray-50 text-gray-700">
-                        {TA_SITE_AREA}
-                      </div>
-                      <p className="mt-1 text-xs text-gray-500">TA Site users are always scoped to Site area.</p>
-                    </div>
-                    <div>
                       <MultiSelectDropdown
                         label="Area Detail *"
                         options={editTaSiteAreaDetailOptions}
                         value={editMember.hrbpAreaDetails}
+                        disabled={!canEditPtScope}
                         onChange={(vals) => {
                           setEditMember({ ...editMember, hrbpAreaDetails: vals })
                           if (validationErrors.areaDetail) {
@@ -1889,62 +1979,42 @@ const handleSaveMenuAccess = async () => {
                       )}
                     </div>
                   </div>
-                ) : editMember.role === 'HRBP' ? (
+                  {!canEditPtScope && (
+                    <p className="text-xs text-amber-700">{ptScopeAdminHint}</p>
+                  )}
+                  </div>
+                ) : roleUsesMultiPtAreaDetail(editMember.role) && editMember.role !== 'TA_SITE' ? (
+                  <div className="space-y-2">
                   <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                     <div>
                       <MultiSelectDropdown
-                        label="PT *"
-                        options={ptOptions}
-                        value={editMember.hrbpPts}
+                        label={editMember.role === 'HRBP' ? 'Area *' : 'Area'}
+                        options={editScopedAreaOptions}
+                        value={editMember.hrbpAreas}
+                        disabled={!canEditPtScope}
                         onChange={(vals) => {
-                          const areasToKeep = editMember.hrbpAreas.filter((area) =>
-                            officeLocations.some((loc) => vals.includes(loc?.pt) && loc?.area === area)
+                          const ptsToKeep = editMember.hrbpPts.filter((pt) =>
+                            officeLocations.some((loc) => vals.includes(loc?.area) && loc?.pt === pt)
                           )
                           const detailsToKeep = editMember.hrbpAreaDetails.filter((detail) =>
                             officeLocations.some(
                               (loc) =>
-                                vals.includes(loc?.pt) &&
-                                areasToKeep.includes(loc?.area) &&
+                                vals.includes(loc?.area) &&
+                                ptsToKeep.includes(loc?.pt) &&
                                 loc?.areaDetail === detail
                             )
                           )
                           setEditMember({
                             ...editMember,
-                            hrbpPts: vals,
-                            hrbpAreas: areasToKeep,
+                            hrbpAreas: vals,
+                            hrbpPts: ptsToKeep,
                             hrbpAreaDetails: detailsToKeep,
                           })
-                          if (validationErrors.pt) {
-                            setValidationErrors({ ...validationErrors, pt: '' })
-                          }
-                        }}
-                        placeholder="Select PT"
-                        searchPlaceholder="Search PT..."
-                      />
-                      {validationErrors.pt && (
-                        <p className="mt-1 text-sm text-red-500">{validationErrors.pt}</p>
-                      )}
-                    </div>
-                    <div>
-                      <MultiSelectDropdown
-                        label="Area *"
-                        options={editScopedAreaOptions}
-                        value={editMember.hrbpAreas}
-                        onChange={(vals) => {
-                          const detailsToKeep = editMember.hrbpAreaDetails.filter((detail) =>
-                            officeLocations.some(
-                              (loc) =>
-                                editMember.hrbpPts.includes(loc?.pt) &&
-                                vals.includes(loc?.area) &&
-                                loc?.areaDetail === detail
-                            )
-                          )
-                          setEditMember({ ...editMember, hrbpAreas: vals, hrbpAreaDetails: detailsToKeep })
                           if (validationErrors.area) {
                             setValidationErrors({ ...validationErrors, area: '' })
                           }
                         }}
-                        placeholder={editMember.hrbpPts.length === 0 ? 'Select PT first' : 'Select Area'}
+                        placeholder="Select Area"
                         searchPlaceholder="Search areas..."
                       />
                       {validationErrors.area && (
@@ -1953,9 +2023,41 @@ const handleSaveMenuAccess = async () => {
                     </div>
                     <div>
                       <MultiSelectDropdown
-                        label="Area Detail *"
+                        label={editMember.role === 'HRBP' ? 'PT *' : 'PT'}
+                        options={editScopedPtOptions}
+                        value={editMember.hrbpPts}
+                        disabled={!canEditPtScope}
+                        onChange={(vals) => {
+                          const detailsToKeep = editMember.hrbpAreaDetails.filter((detail) =>
+                            officeLocations.some(
+                              (loc) =>
+                                editMember.hrbpAreas.includes(loc?.area) &&
+                                vals.includes(loc?.pt) &&
+                                loc?.areaDetail === detail
+                            )
+                          )
+                          setEditMember({
+                            ...editMember,
+                            hrbpPts: vals,
+                            hrbpAreaDetails: detailsToKeep,
+                          })
+                          if (validationErrors.pt) {
+                            setValidationErrors({ ...validationErrors, pt: '' })
+                          }
+                        }}
+                        placeholder={editMember.hrbpAreas.length === 0 ? 'Select Area first' : 'Select PT'}
+                        searchPlaceholder="Search PT..."
+                      />
+                      {validationErrors.pt && (
+                        <p className="mt-1 text-sm text-red-500">{validationErrors.pt}</p>
+                      )}
+                    </div>
+                    <div>
+                      <MultiSelectDropdown
+                        label={editMember.role === 'HRBP' ? 'Area Detail *' : 'Area Detail'}
                         options={editScopedAreaDetailOptions}
                         value={editMember.hrbpAreaDetails}
+                        disabled={!canEditPtScope}
                         onChange={(vals) => {
                           setEditMember({ ...editMember, hrbpAreaDetails: vals })
                           if (validationErrors.areaDetail) {
@@ -1963,7 +2065,7 @@ const handleSaveMenuAccess = async () => {
                           }
                         }}
                         placeholder={
-                          editMember.hrbpAreas.length === 0 ? 'Select Area first' : 'Select Area Detail'
+                          editMember.hrbpPts.length === 0 ? 'Select PT first' : 'Select Area Detail'
                         }
                         searchPlaceholder="Search area details..."
                       />
@@ -1972,39 +2074,43 @@ const handleSaveMenuAccess = async () => {
                       )}
                     </div>
                   </div>
-                ) : (
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                  <div>
-                    <label className="block text-sm text-gray-700 mb-1">PT</label>
-                    <select
-                      className="w-full border rounded-md px-3 py-2 text-sm"
-                      value={editMember.pt}
-                      onChange={(e) => {
-                        setEditMember({ ...editMember, pt: e.target.value, area: '', areaDetail: '' })
-                      }}
-                    >
-                      <option value="">Select PT</option>
-                      {ptOptions.map((pt) => (
-                        <option key={pt} value={pt}>
-                          {pt}
-                        </option>
-                      ))}
-                    </select>
+                  {!canEditPtScope && (
+                    <p className="text-xs text-amber-700">{ptScopeAdminHint}</p>
+                  )}
                   </div>
+                ) : SINGLE_PT_AREA_DETAIL_ROLES.has(editMember.role) ? (
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                   <div>
                     <label className="block text-sm text-gray-700 mb-1">Area</label>
                     <select
                       className="w-full border rounded-md px-3 py-2 text-sm"
                       value={editMember.area}
                       onChange={(e) => {
-                        setEditMember({ ...editMember, area: e.target.value, areaDetail: '' })
+                        setEditMember({ ...editMember, area: e.target.value, pt: '', areaDetail: '' })
                       }}
-                      disabled={!editMember.pt || editMemberAreaOptions.length === 0}
                     >
-                      <option value="">{editMember.pt ? 'Select Area' : 'Select PT first'}</option>
-                      {editMemberAreaOptions.map((area) => (
+                      <option value="">Select Area</option>
+                      {allAreaOptions.map((area) => (
                         <option key={area} value={area}>
                           {area}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-sm text-gray-700 mb-1">PT</label>
+                    <select
+                      className="w-full border rounded-md px-3 py-2 text-sm"
+                      value={editMember.pt}
+                      onChange={(e) => {
+                        setEditMember({ ...editMember, pt: e.target.value, areaDetail: '' })
+                      }}
+                      disabled={!editMember.area || editMemberPtOptions.length === 0}
+                    >
+                      <option value="">{editMember.area ? 'Select PT' : 'Select Area first'}</option>
+                      {editMemberPtOptions.map((pt) => (
+                        <option key={pt} value={pt}>
+                          {pt}
                         </option>
                       ))}
                     </select>
@@ -2017,9 +2123,9 @@ const handleSaveMenuAccess = async () => {
                       onChange={(e) => {
                         setEditMember({ ...editMember, areaDetail: e.target.value })
                       }}
-                      disabled={!editMember.area || editMemberAreaDetailOptions.length === 0}
+                      disabled={!editMember.pt || editMemberAreaDetailOptions.length === 0}
                     >
-                      <option value="">{editMember.area ? 'Select Area Detail' : 'Select Area first'}</option>
+                      <option value="">{editMember.pt ? 'Select Area Detail' : 'Select PT first'}</option>
                       {editMemberAreaDetailOptions.map((detail) => (
                         <option key={detail} value={detail}>
                           {detail}
@@ -2028,7 +2134,7 @@ const handleSaveMenuAccess = async () => {
                     </select>
                   </div>
                 </div>
-                )}
+                ) : null}
                 {canManageMenu && (
                   <div className="border-t pt-3 mt-3 space-y-3">
                     <div className="flex items-center">

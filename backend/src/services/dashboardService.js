@@ -3,6 +3,8 @@ const logger = require('../utils/logger');
 const { applyExcludeHiredCandidates } = require('../utils/candidateApplicationLock');
 const { buildHrbpFptkFilterFromUser, buildHrbpApplicationFptkFilterFromUser } = require('../utils/hrbpScope');
 const { isDepartmentHeadRole, buildHodFptkFilterFromUser, buildHodApplicationScopeFromUser, buildHodCandidateScopeFromUser } = require('../utils/hodScope');
+const { withActiveCandidateOnApplication } = require('../utils/candidateVisibility');
+const { getPositionSlaBucket, getPositionSlaWorkingDays } = require('../utils/positionSla');
 
 function buildHiringManagerScopeFromUser(user = null) {
   if (!user) return null;
@@ -165,6 +167,351 @@ function cloneWhere(where) {
   return JSON.parse(JSON.stringify(where));
 }
 
+const OPEN_FPTK_STATUS_CONDITION = {
+  OR: [
+    { currentStatus: null },
+    { currentStatus: { equals: 'Open', mode: 'insensitive' } },
+    { currentStatus: { equals: 'Pending FKTK', mode: 'insensitive' } },
+    { currentStatus: { equals: 'Re-Open', mode: 'insensitive' } },
+    { currentStatus: { equals: 'Reopen', mode: 'insensitive' } },
+  ],
+};
+
+const DETAIL_APPLICATION_STATUSES = {
+  interview: ['INTERVIEW_SCHEDULED', 'INTERVIEW_COMPLETED', 'TECHNICAL_TEST'],
+  offering: ['OFFER_PROPOSED', 'OFFER_APPROVED', 'OFFER_ACCEPTED'],
+  mcu: ['MEDICAL_CHECKUP_COMPLETED'],
+  offer_rejected: ['OFFER_REJECTED'],
+  rejected: ['REJECTED'],
+  withdrawn: ['WITHDRAWN'],
+};
+
+/**
+ * Build Prisma WHERE scopes shared by dashboard stats and detail lists.
+ */
+function buildDashboardScope(user = null, options = {}) {
+  const fptkWhere = {};
+  const applicationWhere = {};
+  const candidateWhere = { isDeleted: false };
+
+  if (user) {
+    const userRole = user.role;
+
+    if (userRole === 'HIRING_MANAGER') {
+      const hmScope = buildHiringManagerScopeFromUser(user);
+      if (hmScope) {
+        Object.assign(fptkWhere, hmScope);
+        applicationWhere.fptk = hmScope;
+        candidateWhere.applications = {
+          some: {
+            fptk: hmScope,
+          },
+        };
+      } else {
+        fptkWhere.id = '00000000-0000-0000-0000-000000000000';
+        applicationWhere.id = '00000000-0000-0000-0000-000000000000';
+        candidateWhere.id = '00000000-0000-0000-0000-000000000000';
+      }
+    } else if (isDepartmentHeadRole(userRole)) {
+      const hodFptk = buildHodFptkFilterFromUser(user);
+      const hodApplications = buildHodApplicationScopeFromUser(user);
+      const hodCandidates = buildHodCandidateScopeFromUser(user);
+      if (hodFptk) {
+        Object.assign(fptkWhere, hodFptk);
+      } else {
+        fptkWhere.id = '00000000-0000-0000-0000-000000000000';
+      }
+      if (hodApplications) {
+        Object.assign(applicationWhere, hodApplications);
+      } else {
+        applicationWhere.id = '00000000-0000-0000-0000-000000000000';
+      }
+      if (hodCandidates) {
+        Object.assign(candidateWhere, hodCandidates);
+      } else {
+        candidateWhere.id = '00000000-0000-0000-0000-000000000000';
+      }
+    } else if (userRole === 'HRBP' || userRole === 'TA_SITE') {
+      const hrbpFptk = buildHrbpFptkFilterFromUser(user);
+      const hrbpApplications = buildHrbpApplicationFptkFilterFromUser(user);
+      if (hrbpFptk) {
+        Object.assign(fptkWhere, hrbpFptk);
+      } else {
+        fptkWhere.id = '00000000-0000-0000-0000-000000000000';
+      }
+      if (hrbpApplications) {
+        Object.assign(applicationWhere, hrbpApplications);
+        candidateWhere.applications = {
+          some: hrbpApplications,
+        };
+      } else {
+        applicationWhere.id = '00000000-0000-0000-0000-000000000000';
+        candidateWhere.id = '00000000-0000-0000-0000-000000000000';
+      }
+    }
+  }
+
+  if (options.priority && options.priority !== 'ALL') {
+    fptkWhere.priority = options.priority;
+    if (applicationWhere.fptk) {
+      applicationWhere.fptk = { AND: [applicationWhere.fptk, { priority: options.priority }] };
+    } else {
+      addConditionToWhere(applicationWhere, { fptk: { priority: options.priority } });
+    }
+  }
+  if (options.positionStatus === 'OPEN') {
+    addConditionToWhere(fptkWhere, OPEN_FPTK_STATUS_CONDITION);
+  } else if (options.positionStatus === 'CLOSED') {
+    addConditionToWhere(fptkWhere, {
+      OR: [
+        { currentStatus: { equals: 'Close', mode: 'insensitive' } },
+        { currentStatus: { equals: 'Internal Movement', mode: 'insensitive' } },
+      ],
+    });
+  }
+
+  const areaFilterCondition = buildAreaFilterCondition(options.area);
+  if (areaFilterCondition) {
+    addConditionToWhere(fptkWhere, areaFilterCondition);
+    if (applicationWhere.fptk) {
+      applicationWhere.fptk = { AND: [applicationWhere.fptk, areaFilterCondition] };
+    } else {
+      addConditionToWhere(applicationWhere, { fptk: areaFilterCondition });
+    }
+  }
+
+  const parsedAreaDetails = parseAreaDetailsParam(options.areaDetails);
+  if (parsedAreaDetails !== null) {
+    const areaDetailsCondition = buildAreaDetailsFilterCondition(parsedAreaDetails);
+    addConditionToWhere(fptkWhere, areaDetailsCondition);
+    if (applicationWhere.fptk) {
+      applicationWhere.fptk = { AND: [applicationWhere.fptk, areaDetailsCondition] };
+    } else {
+      addConditionToWhere(applicationWhere, { fptk: areaDetailsCondition });
+    }
+  }
+
+  applyExcludeHiredCandidates(candidateWhere);
+
+  const fptkLocationWhere = cloneWhere(fptkWhere);
+  const locationPeriodCondition = buildFptkDateCondition(options.periodStart, options.periodEnd);
+  if (locationPeriodCondition) {
+    addConditionToWhere(fptkLocationWhere, locationPeriodCondition);
+  }
+
+  let fptkPeriodWhere = null;
+  let appPeriodWhere = null;
+  if (options.periodStart && options.periodEnd) {
+    const fptkDateCondition = buildFptkDateCondition(options.periodStart, options.periodEnd);
+    if (fptkDateCondition) {
+      fptkPeriodWhere = cloneWhere(fptkWhere);
+      addConditionToWhere(fptkPeriodWhere, fptkDateCondition);
+
+      const ps = new Date(options.periodStart);
+      const pe = new Date(options.periodEnd);
+      appPeriodWhere = cloneWhere(applicationWhere);
+      addConditionToWhere(appPeriodWhere, {
+        OR: [
+          { updatedAt: { gte: ps, lte: pe } },
+          { appliedAt: { gte: ps, lte: pe } },
+        ],
+      });
+    }
+  }
+
+  return {
+    fptkWhere,
+    applicationWhere,
+    candidateWhere,
+    fptkLocationWhere,
+    fptkPeriodWhere,
+    appPeriodWhere,
+  };
+}
+
+function formatApplicationDetailItem(application) {
+  const candidateName =
+    `${application?.candidate?.user?.firstName || ''} ${application?.candidate?.user?.lastName || ''}`.trim() ||
+    'Unknown Candidate';
+  const positionTitle =
+    application?.fptk?.positionTitle || application?.fptk?.position || 'Unknown Position';
+  const department = application?.fptk?.department || application?.candidate?.user?.division || 'N/A';
+  return {
+    id: application?.fptkId || application?.id,
+    kind: application?.fptkId ? 'fptk' : 'application',
+    title: candidateName,
+    subtitle: `${positionTitle} • ${department}`,
+    meta: (application?.status || '').toString().trim().replace(/_/g, ' ') || 'Unknown',
+  };
+}
+
+function formatFptkDetailItem(fptk) {
+  return {
+    id: fptk?.id,
+    kind: 'fptk',
+    title: fptk?.positionTitle || fptk?.position || 'Unknown Position',
+    subtitle: `${fptk?.department || 'N/A'} • ${fptk?.areaDetail || fptk?.area || fptk?.location || 'N/A'}`,
+    meta: fptk?.currentStatus || fptk?.status || 'N/A',
+  };
+}
+
+function formatSlaFptkDetailItem(fptk, nowDate = new Date()) {
+  const agingDays = getPositionSlaWorkingDays(fptk, nowDate);
+  const receivedRaw = fptk?.fptkReceiveDate || fptk?.requestDate;
+  const receivedLabel = receivedRaw
+    ? new Date(receivedRaw).toLocaleDateString('id-ID')
+    : '-';
+  return {
+    id: fptk?.id,
+    kind: 'fptk',
+    title: fptk?.positionTitle || fptk?.position || 'Unknown Position',
+    subtitle: `${fptk?.department || 'N/A'} • ${fptk?.areaDetail || fptk?.area || 'N/A'}`,
+    agingDays,
+    meta: `FKTK: ${fptk?.statusFktk || 'Pending'} • FPTK Received: ${receivedLabel}`,
+  };
+}
+
+function formatCandidateDetailItem(candidate) {
+  return {
+    id: candidate?.id,
+    kind: 'candidate',
+    title: `${candidate?.user?.firstName || ''} ${candidate?.user?.lastName || ''}`.trim() || 'Unknown',
+    subtitle: candidate?.user?.email || 'No email',
+    meta: candidate?._count?.applications
+      ? `${candidate._count.applications} application(s)`
+      : 'No applications',
+  };
+}
+
+const DASHBOARD_DETAIL_LIMIT = 2000;
+
+/**
+ * List rows for dashboard card / location drill-down modals (same filters as stats).
+ */
+async function getDashboardDetailList(user = null, options = {}) {
+  const scope = buildDashboardScope(user, options);
+  const detail = (options.detail || '').trim().toLowerCase();
+  const usePeriod = options.usePeriod === 'true' || options.usePeriod === true;
+
+  if (detail === 'candidates') {
+    const rows = await prisma.candidate.findMany({
+      where: scope.candidateWhere,
+      take: DASHBOARD_DETAIL_LIMIT,
+      orderBy: [{ user: { firstName: 'asc' } }, { user: { lastName: 'asc' } }],
+      include: {
+        user: {
+          select: {
+            firstName: true,
+            lastName: true,
+            email: true,
+          },
+        },
+        _count: {
+          select: { applications: true },
+        },
+      },
+    });
+    return { items: rows.map(formatCandidateDetailItem) };
+  }
+
+  const applicationStatuses = DETAIL_APPLICATION_STATUSES[detail];
+  if (applicationStatuses) {
+    const baseWhere = usePeriod && scope.appPeriodWhere ? scope.appPeriodWhere : scope.applicationWhere;
+    const where = cloneWhere(baseWhere);
+    addConditionToWhere(where, { status: { in: applicationStatuses } });
+    const rows = await prisma.application.findMany({
+      where: withActiveCandidateOnApplication(where),
+      take: DASHBOARD_DETAIL_LIMIT,
+      orderBy: { updatedAt: 'desc' },
+      include: {
+        candidate: {
+          include: {
+            user: {
+              select: {
+                firstName: true,
+                lastName: true,
+                email: true,
+                division: true,
+              },
+            },
+          },
+        },
+        fptk: {
+          select: {
+            id: true,
+            positionTitle: true,
+            position: true,
+            department: true,
+          },
+        },
+      },
+    });
+    return { items: rows.map(formatApplicationDetailItem) };
+  }
+
+  if (detail === 'hired' || detail === 'open_positions') {
+    const baseWhere = usePeriod && scope.fptkPeriodWhere ? scope.fptkPeriodWhere : scope.fptkWhere;
+    const where = cloneWhere(baseWhere);
+    if (detail === 'hired') {
+      addConditionToWhere(where, { currentStatus: { equals: 'close', mode: 'insensitive' } });
+    } else {
+      addConditionToWhere(where, OPEN_FPTK_STATUS_CONDITION);
+    }
+    const rows = await prisma.fPTK.findMany({
+      where,
+      take: DASHBOARD_DETAIL_LIMIT,
+      orderBy: { positionTitle: 'asc' },
+      select: {
+        id: true,
+        positionTitle: true,
+        position: true,
+        department: true,
+        areaDetail: true,
+        area: true,
+        location: true,
+        currentStatus: true,
+        status: true,
+      },
+    });
+    return { items: rows.map(formatFptkDetailItem) };
+  }
+
+  if (detail === 'sla') {
+    const areaDetail = (options.areaDetail || '').trim();
+    const slaBucket = (options.slaBucket || '').trim();
+    const where = cloneWhere(scope.fptkLocationWhere);
+    if (areaDetail) {
+      addConditionToWhere(where, { areaDetail });
+    }
+    const rows = await prisma.fPTK.findMany({
+      where,
+      take: DASHBOARD_DETAIL_LIMIT,
+      select: {
+        id: true,
+        positionTitle: true,
+        position: true,
+        department: true,
+        areaDetail: true,
+        area: true,
+        fptkReceiveDate: true,
+        requestDate: true,
+        createdAt: true,
+        currentStatus: true,
+        closedAt: true,
+        statusFktk: true,
+      },
+    });
+    const nowDate = new Date();
+    const items = rows
+      .filter((fptk) => !slaBucket || getPositionSlaBucket(fptk, nowDate) === slaBucket)
+      .map((fptk) => formatSlaFptkDetailItem(fptk, nowDate))
+      .sort((a, b) => (b.agingDays ?? 0) - (a.agingDays ?? 0));
+    return { items };
+  }
+
+  return { items: [] };
+}
+
 /**
  * Get dashboard statistics.
  * @param {object|null} user - authenticated user (for role-based scoping)
@@ -180,130 +527,15 @@ function cloneWhere(where) {
  */
 async function getDashboardStats(user = null, options = {}) {
   try {
-    // Build role-based filters
-    const fptkWhere = {};
-    const applicationWhere = {};
-    const candidateWhere = { isDeleted: false };
-
-    if (user) {
-      const userRole = user.role;
-
-      if (userRole === 'HIRING_MANAGER') {
-        const hmScope = buildHiringManagerScopeFromUser(user);
-        if (hmScope) {
-          Object.assign(fptkWhere, hmScope);
-          applicationWhere.fptk = hmScope;
-          candidateWhere.applications = {
-            some: {
-              fptk: hmScope,
-            },
-          };
-        } else {
-          fptkWhere.id = '00000000-0000-0000-0000-000000000000';
-          applicationWhere.id = '00000000-0000-0000-0000-000000000000';
-          candidateWhere.id = '00000000-0000-0000-0000-000000000000';
-        }
-      } else if (isDepartmentHeadRole(userRole)) {
-        const hodFptk = buildHodFptkFilterFromUser(user);
-        const hodApplications = buildHodApplicationScopeFromUser(user);
-        const hodCandidates = buildHodCandidateScopeFromUser(user);
-        if (hodFptk) {
-          Object.assign(fptkWhere, hodFptk);
-        } else {
-          fptkWhere.id = '00000000-0000-0000-0000-000000000000';
-        }
-        if (hodApplications) {
-          Object.assign(applicationWhere, hodApplications);
-        } else {
-          applicationWhere.id = '00000000-0000-0000-0000-000000000000';
-        }
-        if (hodCandidates) {
-          Object.assign(candidateWhere, hodCandidates);
-        } else {
-          candidateWhere.id = '00000000-0000-0000-0000-000000000000';
-        }
-      } else if (userRole === 'HRBP' || userRole === 'TA_SITE') {
-        const hrbpFptk = buildHrbpFptkFilterFromUser(user);
-        const hrbpApplications = buildHrbpApplicationFptkFilterFromUser(user);
-        if (hrbpFptk) {
-          Object.assign(fptkWhere, hrbpFptk);
-        } else {
-          fptkWhere.id = '00000000-0000-0000-0000-000000000000';
-        }
-        if (hrbpApplications) {
-          Object.assign(applicationWhere, hrbpApplications);
-          candidateWhere.applications = {
-            some: hrbpApplications,
-          };
-        } else {
-          applicationWhere.id = '00000000-0000-0000-0000-000000000000';
-          candidateWhere.id = '00000000-0000-0000-0000-000000000000';
-        }
-      }
-    }
-
-    // Apply optional UI-level filters on top of role scope
-    if (options.priority && options.priority !== 'ALL') {
-      fptkWhere.priority = options.priority;
-
-      // Scope application counts to only those belonging to priority-matched FPTKs
-      if (applicationWhere.fptk) {
-        // HIRING_MANAGER (fptk has OR) or HRBP/TA_SITE (fptk has plain fields) — AND the priority in
-        applicationWhere.fptk = { AND: [applicationWhere.fptk, { priority: options.priority }] };
-      } else {
-        // Head of Division (top-level OR) or no role scope — add fptk.priority condition
-        addConditionToWhere(applicationWhere, { fptk: { priority: options.priority } });
-      }
-    }
-    if (options.positionStatus === 'OPEN') {
-      addConditionToWhere(fptkWhere, {
-        OR: [
-          { currentStatus: null },
-          { currentStatus: { equals: 'Open', mode: 'insensitive' } },
-          { currentStatus: { equals: 'Pending FKTK', mode: 'insensitive' } },
-          { currentStatus: { equals: 'Re-Open', mode: 'insensitive' } },
-          { currentStatus: { equals: 'Reopen', mode: 'insensitive' } },
-        ],
-      });
-    } else if (options.positionStatus === 'CLOSED') {
-      addConditionToWhere(fptkWhere, {
-        OR: [
-          { currentStatus: { equals: 'Close', mode: 'insensitive' } },
-          { currentStatus: { equals: 'Internal Movement', mode: 'insensitive' } },
-        ],
-      });
-    }
-
-    const areaFilterCondition = buildAreaFilterCondition(options.area);
-    if (areaFilterCondition) {
-      addConditionToWhere(fptkWhere, areaFilterCondition);
-      if (applicationWhere.fptk) {
-        applicationWhere.fptk = { AND: [applicationWhere.fptk, areaFilterCondition] };
-      } else {
-        addConditionToWhere(applicationWhere, { fptk: areaFilterCondition });
-      }
-    }
-
-    const parsedAreaDetails = parseAreaDetailsParam(options.areaDetails);
-    if (parsedAreaDetails !== null) {
-      const areaDetailsCondition = buildAreaDetailsFilterCondition(parsedAreaDetails);
-      addConditionToWhere(fptkWhere, areaDetailsCondition);
-      if (applicationWhere.fptk) {
-        applicationWhere.fptk = { AND: [applicationWhere.fptk, areaDetailsCondition] };
-      } else {
-        addConditionToWhere(applicationWhere, { fptk: areaDetailsCondition });
-      }
-    }
-
-    // Total Candidates: active pipeline only — exclude hired / onboarding
-    applyExcludeHiredCandidates(candidateWhere);
-
-    // Location charts: same scope as cards (priority/status/area) + current period when Compare is on
-    const fptkLocationWhere = cloneWhere(fptkWhere);
-    const locationPeriodCondition = buildFptkDateCondition(options.periodStart, options.periodEnd);
-    if (locationPeriodCondition) {
-      addConditionToWhere(fptkLocationWhere, locationPeriodCondition);
-    }
+    const scope = buildDashboardScope(user, options);
+    const {
+      fptkWhere,
+      applicationWhere,
+      candidateWhere,
+      fptkLocationWhere,
+      fptkPeriodWhere,
+      appPeriodWhere,
+    } = scope;
 
     // Compute all date ranges upfront (before any DB queries)
     const now = new Date();
@@ -322,35 +554,35 @@ async function getDashboardStats(user = null, options = {}) {
           : interviewStatusFilter,
     };
 
-    // Build optional period groupBy queries (resolve to [] when not requested).
-    // Uses updatedAt-or-createdAt for FPTKs and updatedAt-or-appliedAt for applications so
-    // records that were created within the period but never subsequently updated are included.
-    const buildPeriodGroupBys = (start, end) => {
-      const fptkDateCondition = buildFptkDateCondition(start, end);
-      if (!fptkDateCondition) return [Promise.resolve([]), Promise.resolve([])];
-
-      const ps = new Date(start);
-      const pe = new Date(end);
-      const appDateCondition = {
-        OR: [
-          { updatedAt: { gte: ps, lte: pe } },
-          { appliedAt: { gte: ps, lte: pe } },
-        ],
-      };
-
-      const fptkPeriodWhere = cloneWhere(fptkWhere);
-      addConditionToWhere(fptkPeriodWhere, fptkDateCondition);
-
-      const appPeriodWhere = { ...applicationWhere };
-      addConditionToWhere(appPeriodWhere, appDateCondition);
-
+    const buildPeriodGroupBys = () => {
+      if (!fptkPeriodWhere || !appPeriodWhere) {
+        return [Promise.resolve([]), Promise.resolve([])];
+      }
       return [
         prisma.fPTK.groupBy({ by: ['currentStatus'], where: fptkPeriodWhere, _count: { _all: true } }),
         prisma.application.groupBy({ by: ['status'], where: appPeriodWhere, _count: { _all: true } }),
       ];
     };
-    const [currentPeriodFptkQ, currentPeriodAppQ] = buildPeriodGroupBys(options.periodStart, options.periodEnd);
-    const [previousPeriodFptkQ, previousPeriodAppQ] = buildPeriodGroupBys(options.previousStart, options.previousEnd);
+    const [currentPeriodFptkQ, currentPeriodAppQ] = buildPeriodGroupBys();
+    const [previousPeriodFptkQ, previousPeriodAppQ] = options.previousStart && options.previousEnd && fptkPeriodWhere
+      ? (() => {
+          const prevFptkWhere = cloneWhere(fptkWhere);
+          addConditionToWhere(prevFptkWhere, buildFptkDateCondition(options.previousStart, options.previousEnd));
+          const ps = new Date(options.previousStart);
+          const pe = new Date(options.previousEnd);
+          const prevAppWhere = cloneWhere(applicationWhere);
+          addConditionToWhere(prevAppWhere, {
+            OR: [
+              { updatedAt: { gte: ps, lte: pe } },
+              { appliedAt: { gte: ps, lte: pe } },
+            ],
+          });
+          return [
+            prisma.fPTK.groupBy({ by: ['currentStatus'], where: prevFptkWhere, _count: { _all: true } }),
+            prisma.application.groupBy({ by: ['status'], where: prevAppWhere, _count: { _all: true } }),
+          ];
+        })()
+      : [Promise.resolve([]), Promise.resolve([])];
 
     // Single parallel round-trip for ALL DB work (previously 9 sequential round-trips)
     const [
@@ -408,6 +640,8 @@ async function getDashboardStats(user = null, options = {}) {
           location: true,
           requestDate: true,
           fptkReceiveDate: true,
+          createdAt: true,
+          closedAt: true,
           statusFktk: true,
           status: true,
           currentStatus: true,
@@ -550,13 +784,12 @@ async function getDashboardStats(user = null, options = {}) {
     });
     const openPositionProgress = Object.values(openPositionProgressMap);
 
-    // Calculate SLA by Location (from FPTK Receive Date, fallback to Request Date)
+    // SLA by Location: Indonesia working days from FPTK Receive Date (same as Summary by Position)
     const nowDate = new Date();
     const slaByLocationMap = {};
     locationFPTKs.forEach((fptk) => {
       const areaDetail = getLocationKey(fptk);
-      const referenceDate = fptk.fptkReceiveDate || fptk.requestDate;
-      
+
       if (!slaByLocationMap[areaDetail]) {
         slaByLocationMap[areaDetail] = {
           areaDetail,
@@ -571,26 +804,12 @@ async function getDashboardStats(user = null, options = {}) {
         };
       }
       assignBucketArea(slaByLocationMap[areaDetail], fptk);
-      
-      if (referenceDate && !isNaN(new Date(referenceDate).getTime())) {
-        const requestDateObj = new Date(referenceDate);
-        const diffDays = Math.floor(
-          (nowDate.getTime() - requestDateObj.getTime()) / (1000 * 60 * 60 * 24)
-        );
-        
+
+      const bucket = getPositionSlaBucket(fptk, nowDate);
+      if (bucket && bucket !== '-' && slaByLocationMap[areaDetail].buckets[bucket]) {
         const isReceived = (fptk.statusFktk || '').toLowerCase() === 'received';
         const fktkKey = isReceived ? 'received' : 'pending';
-
-        if (diffDays <= 30) {
-          slaByLocationMap[areaDetail].buckets['0-30 Days'][fktkKey] += 1;
-        } else if (diffDays <= 60) {
-          slaByLocationMap[areaDetail].buckets['31-60 Days'][fktkKey] += 1;
-        } else if (diffDays <= 90) {
-          slaByLocationMap[areaDetail].buckets['61-90 Days'][fktkKey] += 1;
-        } else {
-          slaByLocationMap[areaDetail].buckets['Above 91 Days'][fktkKey] += 1;
-        }
-        
+        slaByLocationMap[areaDetail].buckets[bucket][fktkKey] += 1;
         slaByLocationMap[areaDetail].total += 1;
       }
     });
@@ -650,6 +869,8 @@ async function getDashboardStats(user = null, options = {}) {
 
 module.exports = {
   getDashboardStats,
+  getDashboardDetailList,
+  buildDashboardScope,
   buildAreaFilterCondition,
   buildAreaDetailsFilterCondition,
   buildFptkDateCondition,

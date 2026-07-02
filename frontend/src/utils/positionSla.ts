@@ -1,4 +1,4 @@
-import { getSlaBucketIndonesiaWorkingDays } from '@/utils/indoBusinessDays'
+import { businessDaysDiffIndonesia, getSlaBucketIndonesiaWorkingDays } from '@/utils/indoBusinessDays'
 import { isFptkClosedByCurrentStatus } from '@/utils/fptkPositionStatus'
 
 /** Minimal FPTK fields used for SLA / matrix aggregation on the dashboard. */
@@ -65,13 +65,16 @@ export function getPositionLocationKey(job: {
  * SLA bucket from FPTK receive date (fallback requestDate, createdAt).
  * Frozen at closedAt when position is closed — same as Summary by Position.
  */
-export function getPositionSlaBucket(job: {
-  fptkReceiveDate?: string | null
-  requestDate?: string | null
-  createdAt?: string | null
-  currentStatus?: string | null
-  closedAt?: string | null
-}): SlaBucketLabel | '-' {
+export function getPositionSlaBucket(
+  job: {
+    fptkReceiveDate?: string | null
+    requestDate?: string | null
+    createdAt?: string | null
+    currentStatus?: string | null
+    closedAt?: string | null
+  },
+  now = new Date()
+): SlaBucketLabel | '-' {
   const referenceDate = job.fptkReceiveDate || job.requestDate || job.createdAt
   if (!referenceDate) return '-'
 
@@ -82,7 +85,33 @@ export function getPositionSlaBucket(job: {
   const closeAnchorRaw = isClosed ? job.closedAt || null : null
   const closeAnchorDate = closeAnchorRaw ? new Date(closeAnchorRaw) : null
   const slaEndDate =
-    closeAnchorDate && !isNaN(closeAnchorDate.getTime()) ? closeAnchorDate : new Date()
+    closeAnchorDate && !isNaN(closeAnchorDate.getTime()) ? closeAnchorDate : now
 
   return getSlaBucketIndonesiaWorkingDays(start, slaEndDate)
+}
+
+/** Working-day count for SLA display — same end-date rules as {@link getPositionSlaBucket}. */
+export function getPositionSlaWorkingDays(
+  job: {
+    fptkReceiveDate?: string | null
+    requestDate?: string | null
+    createdAt?: string | null
+    currentStatus?: string | null
+    closedAt?: string | null
+  },
+  now = new Date()
+): number | null {
+  const referenceDate = job.fptkReceiveDate || job.requestDate || job.createdAt
+  if (!referenceDate) return null
+
+  const start = new Date(referenceDate)
+  if (isNaN(start.getTime())) return null
+
+  const isClosed = isFptkClosedByCurrentStatus(job.currentStatus)
+  const closeAnchorRaw = isClosed ? job.closedAt || null : null
+  const closeAnchorDate = closeAnchorRaw ? new Date(closeAnchorRaw) : null
+  const slaEndDate =
+    closeAnchorDate && !isNaN(closeAnchorDate.getTime()) ? closeAnchorDate : now
+
+  return businessDaysDiffIndonesia(start, slaEndDate)
 }
