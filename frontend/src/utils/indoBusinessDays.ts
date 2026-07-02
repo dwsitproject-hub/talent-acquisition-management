@@ -14,12 +14,20 @@ const isWeekend = (d: Date) => {
   return day === 0 || day === 6
 }
 
+/** Memoised Set<'YYYY-MM-DD'> per calendar year — built once, reused on every call. */
+const _holidaySetCache = new Map<number, Set<string>>()
+
+function getHolidaySetForYear(year: number): Set<string> {
+  if (!_holidaySetCache.has(year)) {
+    const raw = hd.getHolidays(year)
+    _holidaySetCache.set(year, new Set(raw.map((h) => (h.date || '').slice(0, 10))))
+  }
+  return _holidaySetCache.get(year)!
+}
+
 export const isIndonesiaWorkingDay = (d: Date) => {
   if (isWeekend(d)) return false
-  const holidays = hd.getHolidays(d.getFullYear())
-  const ymd = toYmd(d)
-  const isHoliday = holidays.some((h) => (h.date || '').slice(0, 10) === ymd)
-  return !isHoliday
+  return !getHolidaySetForYear(d.getFullYear()).has(toYmd(d))
 }
 
 // Counts working days between start and end, excluding the start date and including the end date.

@@ -11,6 +11,7 @@ const {
   PRISMA_APP_STATUS_STRINGS,
   mapUiStatusToApplicationStatus,
 } = require('../utils/applicationStatus');
+const { getPositionSlaBucket } = require('../utils/positionSla');
 
 const FPTK_RELATION_INCLUDE = {
   creator: {
@@ -1368,12 +1369,20 @@ async function getSummaryByPosition(user = null) {
     countsByFptkId[g.fptkId][status] = g._count?._all || 0;
   });
 
+  // Pre-compute SLA bucket server-side (uses memoised Indonesia holiday lookups).
+  // Returning it here means the browser never has to call getHolidays() at all.
+  const nowDate = new Date();
+  const fptksWithSla = fptks.map((f) => ({
+    ...f,
+    sla: getPositionSlaBucket(f, nowDate),
+  }));
+
   // Provide unique filter options quickly
   const priorities = new Set();
   const divisions = new Set();
   const locations = new Set();
   const hiringManagers = new Set();
-  fptks.forEach((f) => {
+  fptksWithSla.forEach((f) => {
     const p = (f.priority || '').toString().trim();
     if (p) priorities.add(p);
     const d = (f.department || f.division || '').toString().trim();
@@ -1385,7 +1394,7 @@ async function getSummaryByPosition(user = null) {
   });
 
   return {
-    fptks,
+    fptks: fptksWithSla,
     applicationCounts: countsByFptkId,
     totalApplicants: totalApplicantsByFptkId,
     onboardingCandidates: onboardingByFptkId,

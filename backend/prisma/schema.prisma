@@ -464,6 +464,11 @@ model FPTK {
   @@index([priority])
   @@index([currentStatus])
   @@index([createdAt])
+  @@index([updatedAt])
+  @@index([areaDetail])
+  @@index([fptkReceiveDate])
+  @@index([areaDetail, currentStatus])
+  @@index([currentStatus, updatedAt])
   @@map("fptk")
 }
 
@@ -550,6 +555,8 @@ model Application {
   @@index([status])
   @@index([fptkId, status])
   @@index([appliedAt])
+  @@index([updatedAt])
+  @@index([status, updatedAt])
   @@index([joinDate])
   @@map("applications")
 }
@@ -981,6 +988,17 @@ model MasterOfficeLocation {
   @@index([pt])
   @@index([area])
   @@map("master_office_locations")
+}
+
+// ==================== INDONESIA HOLIDAYS (for SQL SLA calculation) ====================
+
+model IndonesiaHoliday {
+  date  DateTime @id @db.Date
+  name  String?
+  year  Int
+
+  @@index([year])
+  @@map("indonesia_holidays")
 }
 
 // ==================== MENU ACCESS MANAGEMENT ====================

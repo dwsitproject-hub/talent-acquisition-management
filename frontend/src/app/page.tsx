@@ -31,6 +31,7 @@ import {
 } from '@/utils/dashboardPeriod'
 import { useModalEscape } from '@/hooks/useModalEscape'
 import { usePositionEditOverlay } from '@/hooks/usePositionEditOverlay'
+import { useDebounce } from '@/hooks/useDebounce'
 
 const PRIORITY_FILTERS = ['ALL', 'P0', 'P1', 'P2'] as const
 
@@ -568,6 +569,13 @@ export default function Dashboard() {
     periodBounds,
   ])
 
+  /**
+   * Debounced version of currentParams — prevents a DB round-trip on every
+   * individual filter click when the user changes multiple filters in quick
+   * succession. The API call fires only after 350 ms of inactivity.
+   */
+  const debouncedParams = useDebounce(currentParams, 350)
+
   const buildDashboardDetailParams = useCallback(
     (extra: { detail: string; areaDetail?: string; slaBucket?: string }) => ({
       ...currentParams,
@@ -581,7 +589,7 @@ export default function Dashboard() {
 
   useEffect(() => {
     totalCandidatesItemsRef.current = null
-  }, [currentParams])
+  }, [debouncedParams])
 
   // Load Area Detail options when Site/HO is selected (master office locations)
   useEffect(() => {
@@ -658,7 +666,9 @@ export default function Dashboard() {
     }
   }, [isAuthenticated, isLoading, router])
 
-  // Re-fetch whenever filters or period change (skip the very first render)
+  // Re-fetch whenever debounced filters or period change (skip the very first render).
+  // Using debouncedParams (350 ms) avoids rapid-fire API calls when the user
+  // clicks several filter buttons in quick succession.
   useEffect(() => {
     if (!didInitialLoad.current || !isAuthenticated) return
     if (areaDetailSelectionEmpty) {
@@ -666,8 +676,8 @@ export default function Dashboard() {
       return
     }
     if (areaDetailFilterActive && areaDetailOptionsLoading) return
-    loadDashboardData(currentParams)
-  }, [currentParams, areaDetailSelectionEmpty, areaDetailFilterActive, areaDetailOptionsLoading, isAuthenticated, clearDashboardStats])
+    loadDashboardData(debouncedParams)
+  }, [debouncedParams, areaDetailSelectionEmpty, areaDetailFilterActive, areaDetailOptionsLoading, isAuthenticated, clearDashboardStats])
 
   // Sync dashboardStats from backend-provided data
   useEffect(() => {
