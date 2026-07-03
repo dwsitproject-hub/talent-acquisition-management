@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useAuth } from '@/contexts/AuthContext'
 import { FPTKAPI, MenuAccessAPI } from '@/lib/api'
 import { mapApiFptk } from '@/app/fptk/page'
-import { buildFptkUpdatePayload } from '@/utils/fptkUpdatePayload'
+import { buildFptkUpdatePayload, buildAppliedCandidatesOnlyPayload } from '@/utils/fptkUpdatePayload'
 import {
   resolveFptkEditPermissions,
   resolveRoleNameFromUser,
@@ -53,7 +53,7 @@ export function usePositionEditOverlay(onAfterSave?: () => void) {
   }, [isAuthenticated])
 
   const roleName = resolveRoleNameFromUser(user)
-  const { candidateStatusOnly } = useMemo(
+  const { candidateStatusOnly, canManagePositionCandidates, canOpenPositionEdit } = useMemo(
     () => resolveFptkEditPermissions(roleName, menuAccess),
     [roleName, menuAccess]
   )
@@ -80,18 +80,25 @@ export function usePositionEditOverlay(onAfterSave?: () => void) {
 
   const handleSave = useCallback(
     async (updatedData: any) => {
-      if (!jobPosting || candidateStatusOnly) return
+      if (!jobPosting) return
       try {
-        const payload = buildFptkUpdatePayload(jobPosting, updatedData)
-        await FPTKAPI.update(jobPosting.id, payload)
+        if (candidateStatusOnly && canManagePositionCandidates) {
+          const payload = buildAppliedCandidatesOnlyPayload(updatedData.appliedCandidates)
+          await FPTKAPI.updateAppliedCandidates(jobPosting.id, payload)
+        } else if (!candidateStatusOnly) {
+          const payload = buildFptkUpdatePayload(jobPosting, updatedData)
+          await FPTKAPI.update(jobPosting.id, payload)
+        } else {
+          return
+        }
         close()
         onAfterSave?.()
       } catch (error: any) {
         console.error('usePositionEditOverlay: save', error)
-        alert(error.response?.data?.message || 'Failed to update position. Please try again.')
+        throw error
       }
     },
-    [jobPosting, close, onAfterSave, candidateStatusOnly]
+    [jobPosting, close, onAfterSave, candidateStatusOnly, canManagePositionCandidates]
   )
 
   return {
@@ -100,6 +107,8 @@ export function usePositionEditOverlay(onAfterSave?: () => void) {
     loading,
     backLabel,
     candidateStatusOnly,
+    canManagePositionCandidates,
+    canOpenPositionEdit,
     open,
     close,
     handleSave,

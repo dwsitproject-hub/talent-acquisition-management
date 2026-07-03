@@ -219,6 +219,14 @@ const routes: Array<{
     },
   },
   {
+    path: '/audit-trail',
+    label: 'Audit Trail',
+    defaults: {
+      visibleRoles: ['SUPER_ADMIN'],
+      permissions: { create: [], edit: [] },
+    },
+  },
+  {
     path: '/masters/division',
     label: 'Master Division',
     defaults: {

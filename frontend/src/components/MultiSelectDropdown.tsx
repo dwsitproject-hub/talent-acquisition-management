@@ -82,7 +82,7 @@ export default function MultiSelectDropdown({
   return (
     <div className={className}>
       <label className="block text-xs font-medium text-gray-500 mb-1">{label}</label>
-      <Popover className="relative z-40">
+      <Popover className="relative">
         {({ open }) => (
           <>
             <Popover.Button
@@ -104,7 +104,7 @@ export default function MultiSelectDropdown({
               leaveFrom="opacity-100 translate-y-0"
               leaveTo="opacity-0 translate-y-1"
             >
-              <Popover.Panel className="absolute z-50 mt-2 w-full min-w-[16rem] rounded-md border bg-white shadow-lg p-2">
+              <Popover.Panel className="absolute z-[200] mt-2 w-full min-w-[16rem] rounded-md border bg-white shadow-lg p-2">
                 <div className="flex items-center justify-between gap-2 mb-2 px-0.5">
                   <div className="text-xs">
                     <button

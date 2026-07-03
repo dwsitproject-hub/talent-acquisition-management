@@ -3,6 +3,7 @@ const router = express.Router();
 const { authenticate, authorize } = require('../middleware/auth');
 const adminUserController = require('../controllers/adminUserController');
 const menuAccessController = require('../controllers/menuAccessController');
+const auditController = require('../controllers/auditController');
 
 // All endpoints require auth; restrict by role
 router.use(authenticate);
@@ -31,6 +32,10 @@ router.post('/users/:id/reset-password', authorize('SUPER_ADMIN'), adminUserCont
 // Menu Access Management (SUPER_ADMIN only)
 router.get('/menu-access', authorize('SUPER_ADMIN', 'TA_HO'), menuAccessController.getMenuAccess);
 router.put('/menu-access', authorize('SUPER_ADMIN'), menuAccessController.updateMenuAccess);
+
+// Audit Trail (SUPER_ADMIN only)
+router.get('/audit-logs', authorize('SUPER_ADMIN'), auditController.listAuditLogs);
+router.get('/audit-logs/:id', authorize('SUPER_ADMIN'), auditController.getAuditLog);
 
 module.exports = router;
 

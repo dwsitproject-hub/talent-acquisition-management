@@ -3,6 +3,8 @@
  * compound "A / B" or "A, B" division strings) for consistent matching and display prep.
  */
 
+import { candidateEligibleForPositionSuggestion } from '@/utils/candidateApplicationLock'
+
 const DIVISION_SEP = /[,;/|]|(?:\s+&\s+)|(?:\s+\/\s+)/
 
 function parseJsonObject(value: unknown): Record<string, any> | null {
@@ -136,4 +138,32 @@ export function candidateDivisionMatchesJob(
 
   const jobKey = jd.toLowerCase()
   return getCandidateDivisions(candidate).some((d) => d.toLowerCase() === jobKey)
+}
+
+/** Minimum matching job skills required for suggested-candidate lists (create + edit position). */
+export const SUGGESTED_CANDIDATE_MIN_MATCHING_SKILLS = 2
+
+export function candidateMeetsSuggestedSkillMatch(
+  jobSkills: string[] | undefined | null,
+  candidate: any
+): boolean {
+  const skills = jobSkills || []
+  if (skills.length === 0) return true
+  return countDistinctMatchingSkills(skills, candidate) >= SUGGESTED_CANDIDATE_MIN_MATCHING_SKILLS
+}
+
+export function isSuggestedCandidateForPosition(
+  candidate: any,
+  jobDivision: string | undefined | null,
+  jobSkills: string[] | undefined | null,
+  appliedCandidateIds: Set<string>,
+  options?: { excludeLocked?: boolean }
+): boolean {
+  if (!candidate?.id) return false
+  if (!candidateDivisionMatchesJob(jobDivision, candidate)) return false
+  if (appliedCandidateIds.has(candidate.id)) return false
+  if (options?.excludeLocked !== false) {
+    if (!candidateEligibleForPositionSuggestion(candidate)) return false
+  }
+  return candidateMeetsSuggestedSkillMatch(jobSkills, candidate)
 }

@@ -89,7 +89,10 @@ exports.refresh = asyncHandler(async (req, res) => {
 exports.logout = asyncHandler(async (req, res) => {
   const refreshToken = req.cookies.refreshToken || req.body.refreshToken;
 
-  await authService.logout(refreshToken);
+  await authService.logout(refreshToken, {
+    ipAddress: req.ip,
+    userAgent: req.headers['user-agent'],
+  });
 
   // Clear refresh token cookie
   res.clearCookie('refreshToken');

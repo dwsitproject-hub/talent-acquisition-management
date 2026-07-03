@@ -12,6 +12,8 @@ const {
   mapUiStatusToApplicationStatus,
 } = require('../utils/applicationStatus');
 const { getPositionSlaBucket } = require('../utils/positionSla');
+const { runWithAuditSuppressed } = require('../utils/auditContext');
+const auditService = require('./auditService');
 
 const FPTK_RELATION_INCLUDE = {
   creator: {
@@ -1596,7 +1598,8 @@ async function updateFPTK(fptkId, data, updaterId) {
   if (data.responsibilities !== undefined) updateData.responsibilities = data.responsibilities;
   if (data.qualifications !== undefined) updateData.qualifications = data.qualifications;
 
-  const updatedFptk = await prisma.$transaction(async (tx) => {
+  const updatedFptk = await runWithAuditSuppressed(async () =>
+    prisma.$transaction(async (tx) => {
     // Get current FPTK to check for status change
     const currentFptk = await tx.fPTK.findUnique({
       where: { id: fptkId },
@@ -1645,12 +1648,78 @@ async function updateFPTK(fptkId, data, updaterId) {
     }
 
     return fptk;
-  });
+  }));
+
+  const changedFields = Object.keys(updateData);
+  const { oldSnapshot, newSnapshot } = auditService.buildChangedFieldSnapshot(
+    current,
+    { ...current, ...updateData },
+    changedFields
+  );
+
+  const positionLabel = current.position || current.positionTitle || fptkId;
+  let summary = `Update position: ${positionLabel}`;
+  const auditNewValues = { ...newSnapshot };
+
+  if (appliedCandidatesProvided) {
+    auditNewValues.candidateCount = normalizedAppliedCandidates.length;
+    if (changedFields.length === 0) {
+      summary = `Update position candidates: ${positionLabel}`;
+    }
+  }
+
+  if (changedFields.length > 0 || appliedCandidatesProvided) {
+    await auditService.writeAuditLog({
+      action: 'UPDATE',
+      entity: 'FPTK',
+      entityId: fptkId,
+      oldValues: changedFields.length > 0 ? oldSnapshot : null,
+      newValues: auditNewValues,
+      userId: updaterId,
+      summary,
+    });
+  }
 
   logger.info(`FPTK updated: ${fptkId}`);
 
   const enriched = await getFptkWithRelations(updatedFptk.id);
   return enriched || updatedFptk;
+}
+
+/**
+ * Sync applied candidates on a position without changing other FPTK fields.
+ * Used by TA_SITE and other scoped roles that may manage candidates but not edit the position.
+ */
+async function syncFptkAppliedCandidates(fptkId, appliedCandidates, userId) {
+  const current = await prisma.fPTK.findUnique({
+    where: { id: fptkId },
+    select: { id: true, position: true, positionTitle: true },
+  });
+
+  if (!current) {
+    throw new Error('FPTK not found');
+  }
+
+  const normalized = normalizeAppliedCandidates(appliedCandidates);
+
+  await prisma.$transaction(async (tx) => {
+    await syncFptkApplicationsTx(tx, fptkId, normalized, { userId });
+  });
+
+  const positionLabel = current.position || current.positionTitle || fptkId;
+  await auditService.writeAuditLog({
+    action: 'UPDATE',
+    entity: 'FPTK',
+    entityId: fptkId,
+    newValues: { candidateCount: normalized.length },
+    userId,
+    summary: `Update position candidates: ${positionLabel}`,
+  });
+
+  logger.info(`FPTK applied candidates synced: ${fptkId}`);
+
+  const enriched = await getFptkWithRelations(fptkId);
+  return enriched || current;
 }
 
 /**
@@ -1878,6 +1947,7 @@ module.exports = {
   getFptkCurrentStatusCounts,
   getSummaryByPosition,
   updateFPTK,
+  syncFptkAppliedCandidates,
   deleteFPTK,
   deleteFPTKsBulk,
   publishFPTK,

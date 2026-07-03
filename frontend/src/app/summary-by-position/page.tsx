@@ -1083,6 +1083,7 @@ function SummaryByPositionContent() {
         onSave={positionEdit.handleSave}
         headerBackLabel={`Back to ${positionEdit.backLabel || 'Summary'}`}
         candidateStatusOnly={positionEdit.candidateStatusOnly}
+        canManagePositionCandidates={positionEdit.canManagePositionCandidates}
       />
     </Layout>
   )

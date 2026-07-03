@@ -233,6 +233,51 @@ export const MenuAccessAPI = {
   },
 }
 
+export interface AuditLogEntry {
+  id: string
+  userId?: string | null
+  requestId?: string | null
+  action: string
+  entity: string
+  entityId?: string | null
+  oldValues?: Record<string, unknown> | null
+  newValues?: Record<string, unknown> | null
+  ipAddress?: string | null
+  userAgent?: string | null
+  createdAt: string
+  user?: {
+    id: string
+    email: string
+    firstName: string
+    lastName: string
+    role: string
+  } | null
+}
+
+export const AuditLogAPI = {
+  async list(params?: {
+    page?: number
+    limit?: number
+    action?: string
+    entity?: string
+    entityId?: string
+    userId?: string
+    from?: string
+    to?: string
+    search?: string
+  }) {
+    const res = await api.get('/admin/audit-logs', { params })
+    return res.data.data as {
+      items: AuditLogEntry[]
+      pagination: { page: number; limit: number; total: number; totalPages: number }
+    }
+  },
+  async getById(id: string) {
+    const res = await api.get(`/admin/audit-logs/${id}`)
+    return res.data.data as AuditLogEntry
+  },
+}
+
 // Master Division APIs
 export const MasterDivisionAPI = {
   async getAll(search?: string, divisionName?: string) {
@@ -421,6 +466,10 @@ export const FPTKAPI = {
       const res = await api.put(`/fptk/${id}`, payload)
       return res.data.data
     }
+  },
+  async updateAppliedCandidates(id: string, payload: { appliedCandidates: any[] }) {
+    const res = await api.put(`/fptk/${id}/applied-candidates`, payload)
+    return res.data.data
   },
   async publish(id: string) {
     const res = await api.post(`/fptk/${id}/publish`)

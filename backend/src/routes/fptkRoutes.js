@@ -295,6 +295,47 @@ router.get(
 );
 
 /**
+ * @route   PUT /api/fptk/:id/applied-candidates
+ * @desc    Sync applied candidates on a position (no other FPTK field changes)
+ * @access  Private (TA, HRBP, Hiring Manager, Admin)
+ */
+router.put(
+  '/:id/applied-candidates',
+  authenticate,
+  authorize('TA_HO', 'TA_SITE', 'HRBP', 'SUPER_ADMIN', 'HIRING_MANAGER'),
+  validationRules.uuidParam('id'),
+  validate,
+  asyncHandler(async (req, res) => {
+    const { assertUserCanAccessFptk } = require('../utils/fptkAccess');
+    await assertUserCanAccessFptk(req.user, req.params.id);
+
+    let appliedCandidates = req.body.appliedCandidates;
+    if (typeof appliedCandidates === 'string') {
+      try {
+        appliedCandidates = JSON.parse(appliedCandidates);
+      } catch (e) {
+        return res.status(400).json({
+          success: false,
+          message: 'Invalid appliedCandidates payload',
+        });
+      }
+    }
+
+    const fptk = await fptkService.syncFptkAppliedCandidates(
+      req.params.id,
+      appliedCandidates,
+      req.user.id
+    );
+
+    res.json({
+      success: true,
+      message: 'Applied candidates updated successfully',
+      data: fptk,
+    });
+  })
+);
+
+/**
  * @route   PUT /api/fptk/:id
  * @desc    Update FPTK
  * @access  Private (Hiring Manager, TA, Admin)

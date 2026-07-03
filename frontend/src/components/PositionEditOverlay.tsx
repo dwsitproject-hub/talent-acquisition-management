@@ -12,6 +12,7 @@ interface PositionEditOverlayProps {
   headerBackLabel: string
   overlayZIndex?: number
   candidateStatusOnly?: boolean
+  canManagePositionCandidates?: boolean
 }
 
 export default function PositionEditOverlay({
@@ -23,6 +24,7 @@ export default function PositionEditOverlay({
   headerBackLabel,
   overlayZIndex = 10050,
   candidateStatusOnly = false,
+  canManagePositionCandidates = true,
 }: PositionEditOverlayProps) {
   return (
     <>
@@ -61,6 +63,7 @@ export default function PositionEditOverlay({
         overlayZIndex={overlayZIndex}
         headerBackLabel={headerBackLabel}
         candidateStatusOnly={candidateStatusOnly}
+        canManagePositionCandidates={canManagePositionCandidates}
       />
     </>
   )
