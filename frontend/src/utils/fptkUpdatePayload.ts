@@ -95,6 +95,12 @@ export function mapAppliedCandidatesForPayload(candidates?: any[]) {
     .filter(Boolean)
 }
 
+export function buildAppliedCandidatesOnlyPayload(appliedCandidates?: any[]) {
+  return {
+    appliedCandidates: mapAppliedCandidatesForPayload(appliedCandidates),
+  }
+}
+
 export function buildFptkUpdatePayload(selectedJobPosting: any, updatedData: any) {
   const current: any = selectedJobPosting
   const currentStatus = updatedData.status || current.currentStatus || DEFAULT_FPTK_CURRENT_STATUS

@@ -827,8 +827,17 @@ export default function Dashboard() {
     void positionEdit.open(id, backLabel)
   }
 
+  // Opens a position from the SLA detail drill-down list.
+  // Roles with canOpenPositionEdit (TA_SITE in candidateStatusOnly mode, and
+  // full-edit roles) go through the permission-aware EditJobPostingModal so
+  // TA_SITE can update candidate statuses. Roles without edit access fall back
+  // to the read-only ViewJobPostingModal.
   const openFptkView = async (id?: string) => {
     if (!id) return
+    if (positionEdit.canOpenPositionEdit) {
+      void openFptkEdit(id, 'Dashboard')
+      return
+    }
     setSlaPositionView({ isOpen: false, jobPosting: null, loading: true })
     try {
       const data = await FPTKAPI.getById(id)
@@ -1851,6 +1860,7 @@ export default function Dashboard() {
         onSave={positionEdit.handleSave}
         headerBackLabel={`Back to ${positionEdit.backLabel || 'Dashboard'}`}
         candidateStatusOnly={positionEdit.candidateStatusOnly}
+        canManagePositionCandidates={positionEdit.canManagePositionCandidates}
       />
 
       <ViewJobPostingModal

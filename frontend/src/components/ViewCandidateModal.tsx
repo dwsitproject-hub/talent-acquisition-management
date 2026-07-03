@@ -1507,6 +1507,7 @@ export default function ViewCandidateModal({ isOpen, onClose, candidate }: ViewC
       onSave={positionEdit.handleSave}
       headerBackLabel={`Back to ${positionEdit.backLabel || candidateDisplayName}`}
       candidateStatusOnly={positionEdit.candidateStatusOnly}
+      canManagePositionCandidates={positionEdit.canManagePositionCandidates}
     />
 
     <ApplicationHistoryModal

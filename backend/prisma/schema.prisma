@@ -906,6 +906,7 @@ model AuditLog {
   id              String      @id @default(uuid())
   userId          String?
   user            User?       @relation(fields: [userId], references: [id])
+  requestId       String?
   
   action          AuditAction
   entity          String      // Table/model name
@@ -920,6 +921,7 @@ model AuditLog {
   createdAt       DateTime    @default(now())
 
   @@index([userId])
+  @@index([requestId])
   @@index([entity, entityId])
   @@index([createdAt])
   @@map("audit_logs")
