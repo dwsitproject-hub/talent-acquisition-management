@@ -92,12 +92,14 @@ export default function AuditTrailPage() {
   const [fromDate, setFromDate] = useState('')
   const [toDate, setToDate] = useState('')
   const [selectedLog, setSelectedLog] = useState<AuditLogEntry | null>(null)
+  const [loadError, setLoadError] = useState<string | null>(null)
 
   const isSuperAdmin = roleName === 'SUPER_ADMIN'
 
   const loadLogs = useCallback(async () => {
     if (!isSuperAdmin) return
     setLoading(true)
+    setLoadError(null)
     try {
       const result = await AuditLogAPI.list({
         page,
@@ -111,8 +113,13 @@ export default function AuditTrailPage() {
       setItems(result.items)
       setTotalPages(result.pagination.totalPages)
       setTotal(result.pagination.total)
-    } catch (error) {
+    } catch (error: any) {
       console.error('Failed to load audit logs:', error)
+      const message =
+        error?.response?.data?.message ||
+        error?.message ||
+        'Failed to load audit logs.'
+      setLoadError(message)
       setItems([])
       setTotalPages(1)
       setTotal(0)
@@ -172,6 +179,12 @@ export default function AuditTrailPage() {
             Refresh
           </button>
         </div>
+
+        {loadError && (
+          <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">
+            {loadError}
+          </div>
+        )}
 
         <div className="rounded-lg border border-gray-200 bg-white p-4 shadow-sm">
           <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-5">

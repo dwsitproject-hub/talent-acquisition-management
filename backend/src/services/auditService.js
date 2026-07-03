@@ -2,6 +2,18 @@ const prismaBase = require('../config/prismaBase');
 const { getAuditContext } = require('../utils/auditContext');
 const logger = require('../utils/logger');
 
+const AUDIT_ACTIONS = new Set([
+  'CREATE',
+  'READ',
+  'UPDATE',
+  'DELETE',
+  'LOGIN',
+  'LOGOUT',
+  'APPROVE',
+  'REJECT',
+  'EXPORT',
+]);
+
 const SENSITIVE_KEYS = new Set([
   'password',
   'token',
@@ -134,11 +146,17 @@ async function listAuditLogs(filters = {}) {
   const where = {};
 
   if (filters.action) {
-    where.action = filters.action;
+    const action = String(filters.action).trim().toUpperCase();
+    if (!AUDIT_ACTIONS.has(action)) {
+      const err = new Error(`Invalid audit action filter: ${filters.action}`);
+      err.statusCode = 400;
+      throw err;
+    }
+    where.action = action;
   }
 
   if (filters.entity) {
-    where.entity = { contains: filters.entity, mode: 'insensitive' };
+    where.entity = { equals: String(filters.entity).trim(), mode: 'insensitive' };
   }
 
   if (filters.entityId) {
@@ -172,36 +190,60 @@ async function listAuditLogs(filters = {}) {
     ];
   }
 
-  const [items, total] = await Promise.all([
-    prismaBase.auditLog.findMany({
-      where,
-      skip,
-      take: limit,
-      orderBy: { createdAt: 'desc' },
-      include: {
-        user: {
-          select: {
-            id: true,
-            email: true,
-            firstName: true,
-            lastName: true,
-            role: true,
-          },
-        },
+  const listSelect = {
+    id: true,
+    userId: true,
+    requestId: true,
+    action: true,
+    entity: true,
+    entityId: true,
+    ipAddress: true,
+    userAgent: true,
+    createdAt: true,
+    newValues: true,
+    user: {
+      select: {
+        id: true,
+        email: true,
+        firstName: true,
+        lastName: true,
+        role: true,
       },
-    }),
-    prismaBase.auditLog.count({ where }),
-  ]);
-
-  return {
-    items,
-    pagination: {
-      page,
-      limit,
-      total,
-      totalPages: Math.ceil(total / limit) || 1,
     },
   };
+
+  try {
+    const [items, total] = await Promise.all([
+      prismaBase.auditLog.findMany({
+        where,
+        skip,
+        take: limit,
+        orderBy: { createdAt: 'desc' },
+        select: listSelect,
+      }),
+      prismaBase.auditLog.count({ where }),
+    ]);
+
+    return {
+      items,
+      pagination: {
+        page,
+        limit,
+        total,
+        totalPages: Math.ceil(total / limit) || 1,
+      },
+    };
+  } catch (error) {
+    if (error.code === 'P2021' || error.code === 'P2022') {
+      const err = new Error(
+        'Audit trail is not initialized. Run database migrations (npx prisma migrate deploy).'
+      );
+      err.statusCode = 503;
+      err.code = error.code;
+      throw err;
+    }
+    throw error;
+  }
 }
 
 async function getAuditLogById(id) {
