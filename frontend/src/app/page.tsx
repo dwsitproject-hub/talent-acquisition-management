@@ -49,7 +49,7 @@ const isClosedPositionStatus = (status?: string) => {
 
 const normalizeUiCurrentStatus = (value?: string) => (value || '').trim().toLowerCase()
 
-/** Open Positions card: Open | Pending FKTK | Re-Open */
+/** Open Positions card: Open | Pending FKTK | Re-Open (Internal Movement is treated as Closed, aligned with Close) */
 const isOpenCurrentStatusLabel = (value?: string) => {
   const s = normalizeUiCurrentStatus(value)
   if (!s) return true
@@ -57,8 +57,7 @@ const isOpenCurrentStatusLabel = (value?: string) => {
     s === 'open' ||
     s === 'pending fktk' ||
     s === 're-open' ||
-    s === 'reopen' ||
-    s === 'internal movement'
+    s === 'reopen'
   )
 }
 
