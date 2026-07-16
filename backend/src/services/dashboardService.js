@@ -4,7 +4,13 @@ const { applyExcludeHiredCandidates } = require('../utils/candidateApplicationLo
 const { buildHrbpFptkFilterFromUser, buildHrbpApplicationFptkFilterFromUser } = require('../utils/hrbpScope');
 const { isDepartmentHeadRole, buildHodFptkFilterFromUser, buildHodApplicationScopeFromUser, buildHodCandidateScopeFromUser } = require('../utils/hodScope');
 const { withActiveCandidateOnApplication } = require('../utils/candidateVisibility');
-const { getPositionSlaBucket, getPositionSlaWorkingDays } = require('../utils/positionSla');
+const {
+  CLOSED_CURRENT_STATUSES,
+  getPositionSlaBucket,
+  getPositionSlaWorkingDays,
+  isFptkClosedByCurrentStatus,
+  isFptkOpenByCurrentStatus,
+} = require('../utils/positionSla');
 
 function buildHiringManagerScopeFromUser(user = null) {
   if (!user) return null;
@@ -41,20 +47,16 @@ function endOfWeekSunday(date) {
   return end;
 }
 
-function normalizeCurrentStatus(value) {
-  return (value || '').trim().toLowerCase();
-}
-
-function isOpenCurrentStatus(value) {
-  const s = normalizeCurrentStatus(value);
-  if (!s) return true;
-  return s === 'open' || s === 'pending fktk' || s === 're-open' || s === 'reopen';
-}
-
-function isClosedCurrentStatus(value) {
-  const s = normalizeCurrentStatus(value);
-  return s === 'close' || s === 'internal movement';
-}
+/**
+ * Unified Open/Closed classification — delegates to the canonical helper in
+ * utils/positionSla.js (kept in sync with frontend utils/fptkPositionStatus.ts,
+ * which drives Summary by Position — the target of the dashboard drill-downs).
+ *
+ * Closed = Close | Cancel(led) | Internal Movement.
+ * Open = everything else, so Open + Closed always equals Total.
+ */
+const isOpenCurrentStatus = isFptkOpenByCurrentStatus;
+const isClosedCurrentStatus = isFptkClosedByCurrentStatus;
 
 
 /** Convert a Prisma groupBy result array to a plain { key: count } map. */
@@ -83,7 +85,14 @@ function addConditionToWhere(where, condition) {
   }
 }
 
-/** FPTK date window: updatedAt or createdAt within [start, end]. */
+/**
+ * FPTK period window with per-status anchors, so every position belongs to
+ * exactly ONE period and month-by-month counts always sum to all-time totals:
+ * - Open positions   → createdAt (raised in period, still open)
+ * - Closed positions → closedAt, falling back to updatedAt for legacy rows
+ * Used by the stat-card groupBy AND the Location Overview charts so both
+ * sections reconcile in compare mode.
+ */
 function buildFptkDateCondition(start, end) {
   if (!start || !end) return null;
   const ps = new Date(start);
@@ -91,8 +100,18 @@ function buildFptkDateCondition(start, end) {
   if (isNaN(ps.getTime()) || isNaN(pe.getTime())) return null;
   return {
     OR: [
-      { updatedAt: { gte: ps, lte: pe } },
-      { createdAt: { gte: ps, lte: pe } },
+      { AND: [OPEN_FPTK_STATUS_CONDITION, { createdAt: { gte: ps, lte: pe } }] },
+      {
+        AND: [
+          CLOSED_FPTK_STATUS_CONDITION,
+          {
+            OR: [
+              { closedAt: { gte: ps, lte: pe } },
+              { AND: [{ closedAt: null }, { updatedAt: { gte: ps, lte: pe } }] },
+            ],
+          },
+        ],
+      },
     ],
   };
 }
@@ -167,15 +186,53 @@ function cloneWhere(where) {
   return JSON.parse(JSON.stringify(where));
 }
 
-const OPEN_FPTK_STATUS_CONDITION = {
+/** Prisma condition matching CLOSED_CURRENT_STATUSES (Close | Cancel(led) | Internal Movement). */
+const CLOSED_FPTK_STATUS_CONDITION = {
   OR: [
-    { currentStatus: null },
-    { currentStatus: { equals: 'Open', mode: 'insensitive' } },
-    { currentStatus: { equals: 'Pending FKTK', mode: 'insensitive' } },
-    { currentStatus: { equals: 'Re-Open', mode: 'insensitive' } },
-    { currentStatus: { equals: 'Reopen', mode: 'insensitive' } },
+    { currentStatus: { equals: 'Close', mode: 'insensitive' } },
+    { currentStatus: { equals: 'Cancel', mode: 'insensitive' } },
+    { currentStatus: { equals: 'Cancelled', mode: 'insensitive' } },
+    { currentStatus: { equals: 'Internal Movement', mode: 'insensitive' } },
   ],
 };
+
+/** Open = complement of Closed, so Open + Closed always equals Total. */
+const OPEN_FPTK_STATUS_CONDITION = { NOT: CLOSED_FPTK_STATUS_CONDITION };
+
+/** Hired card: positions with currentStatus exactly Close. */
+const HIRED_FPTK_STATUS_CONDITION = { currentStatus: { equals: 'Close', mode: 'insensitive' } };
+
+/** Cancel/Internal Movement card: the Closed statuses that are NOT Hired. */
+const CANCEL_IM_FPTK_STATUS_CONDITION = {
+  OR: [
+    { currentStatus: { equals: 'Cancel', mode: 'insensitive' } },
+    { currentStatus: { equals: 'Cancelled', mode: 'insensitive' } },
+    { currentStatus: { equals: 'Internal Movement', mode: 'insensitive' } },
+  ],
+};
+
+/**
+ * Period window for "position exited the pipeline during [start, end]" —
+ * anchored on closedAt (the actual close moment) with updatedAt as fallback
+ * for legacy rows without closedAt. Unlike the touched-in-period window
+ * (updatedAt OR createdAt), each position matches exactly one period, so
+ * month-by-month Hired / Cancel-IM counts always sum to the all-time totals.
+ */
+function buildClosedInPeriodCondition(start, end) {
+  if (!start || !end) return null;
+  const ps = new Date(start);
+  const pe = new Date(end);
+  if (isNaN(ps.getTime()) || isNaN(pe.getTime())) return null;
+  return {
+    OR: [
+      { closedAt: { gte: ps, lte: pe } },
+      { AND: [{ closedAt: null }, { updatedAt: { gte: ps, lte: pe } }] },
+    ],
+  };
+}
+
+/** SQL set literal matching CLOSED_CURRENT_STATUSES — for $queryRawUnsafe filters. */
+const CLOSED_CURRENT_STATUS_SQL_SET = `(${CLOSED_CURRENT_STATUSES.map((s) => `'${s}'`).join(',')})`;
 
 const DETAIL_APPLICATION_STATUSES = {
   interview: ['INTERVIEW_SCHEDULED', 'INTERVIEW_COMPLETED', 'TECHNICAL_TEST'],
@@ -259,15 +316,18 @@ function buildDashboardScope(user = null, options = {}) {
       addConditionToWhere(applicationWhere, { fptk: { priority: options.priority } });
     }
   }
-  if (options.positionStatus === 'OPEN') {
-    addConditionToWhere(fptkWhere, OPEN_FPTK_STATUS_CONDITION);
-  } else if (options.positionStatus === 'CLOSED') {
-    addConditionToWhere(fptkWhere, {
-      OR: [
-        { currentStatus: { equals: 'Close', mode: 'insensitive' } },
-        { currentStatus: { equals: 'Internal Movement', mode: 'insensitive' } },
-      ],
-    });
+  if (options.positionStatus === 'OPEN' || options.positionStatus === 'CLOSED') {
+    const statusCondition =
+      options.positionStatus === 'OPEN' ? OPEN_FPTK_STATUS_CONDITION : CLOSED_FPTK_STATUS_CONDITION;
+    addConditionToWhere(fptkWhere, statusCondition);
+    // Mirror the Status filter into application scope (via the fptk relation),
+    // same as priority/area — keeps application-based cards (Interview,
+    // Offering, MCU, Offer Rejected, Rejected, Withdrawn) consistent with it.
+    if (applicationWhere.fptk) {
+      applicationWhere.fptk = { AND: [applicationWhere.fptk, statusCondition] };
+    } else {
+      addConditionToWhere(applicationWhere, { fptk: statusCondition });
+    }
   }
 
   const areaFilterCondition = buildAreaFilterCondition(options.area);
@@ -301,6 +361,7 @@ function buildDashboardScope(user = null, options = {}) {
 
   let fptkPeriodWhere = null;
   let appPeriodWhere = null;
+  let candidatePeriodWhere = null;
   if (options.periodStart && options.periodEnd) {
     const fptkDateCondition = buildFptkDateCondition(options.periodStart, options.periodEnd);
     if (fptkDateCondition) {
@@ -309,12 +370,19 @@ function buildDashboardScope(user = null, options = {}) {
 
       const ps = new Date(options.periodStart);
       const pe = new Date(options.periodEnd);
+      // Single anchor (updatedAt = when the application last moved) so each
+      // application belongs to exactly one period and monthly card values
+      // (Interview, Offering, MCU, Offer/Rejected, Withdrawn) sum to all-time.
       appPeriodWhere = cloneWhere(applicationWhere);
       addConditionToWhere(appPeriodWhere, {
-        OR: [
-          { updatedAt: { gte: ps, lte: pe } },
-          { appliedAt: { gte: ps, lte: pe } },
-        ],
+        updatedAt: { gte: ps, lte: pe },
+      });
+
+      // Single anchor (createdAt = candidate added in period) — powers the
+      // Total Candidates card in compare mode; disjoint periods sum to all-time.
+      candidatePeriodWhere = cloneWhere(candidateWhere);
+      addConditionToWhere(candidatePeriodWhere, {
+        createdAt: { gte: ps, lte: pe },
       });
     }
   }
@@ -326,6 +394,7 @@ function buildDashboardScope(user = null, options = {}) {
     fptkLocationWhere,
     fptkPeriodWhere,
     appPeriodWhere,
+    candidatePeriodWhere,
   };
 }
 
@@ -394,8 +463,10 @@ async function getDashboardDetailList(user = null, options = {}) {
   const usePeriod = options.usePeriod === 'true' || options.usePeriod === true;
 
   if (detail === 'candidates') {
+    // Match the Total Candidates card: period-scoped (createdAt anchor) in
+    // compare mode, all-time otherwise.
     const rows = await prisma.candidate.findMany({
-      where: scope.candidateWhere,
+      where: usePeriod && scope.candidatePeriodWhere ? scope.candidatePeriodWhere : scope.candidateWhere,
       take: DASHBOARD_DETAIL_LIMIT,
       orderBy: [{ user: { firstName: 'asc' } }, { user: { lastName: 'asc' } }],
       include: {
@@ -449,11 +520,22 @@ async function getDashboardDetailList(user = null, options = {}) {
     return { items: rows.map(formatApplicationDetailItem) };
   }
 
-  if (detail === 'hired' || detail === 'open_positions') {
-    const baseWhere = usePeriod && scope.fptkPeriodWhere ? scope.fptkPeriodWhere : scope.fptkWhere;
-    const where = cloneWhere(baseWhere);
+  if (detail === 'hired' || detail === 'open_positions' || detail === 'cancel_im') {
+    // Hired and Cancel/IM lists use closed-in-period semantics when a period is
+    // active (mirrors the card counts, anchored on closedAt); Open Positions
+    // keeps the touched-in-period window.
+    let where;
+    if (usePeriod && detail !== 'open_positions') {
+      const closedInPeriod = buildClosedInPeriodCondition(options.periodStart, options.periodEnd);
+      where = cloneWhere(scope.fptkWhere);
+      if (closedInPeriod) addConditionToWhere(where, closedInPeriod);
+    } else {
+      where = cloneWhere(usePeriod && scope.fptkPeriodWhere ? scope.fptkPeriodWhere : scope.fptkWhere);
+    }
     if (detail === 'hired') {
-      addConditionToWhere(where, { currentStatus: { equals: 'close', mode: 'insensitive' } });
+      addConditionToWhere(where, HIRED_FPTK_STATUS_CONDITION);
+    } else if (detail === 'cancel_im') {
+      addConditionToWhere(where, CANCEL_IM_FPTK_STATUS_CONDITION);
     } else {
       addConditionToWhere(where, OPEN_FPTK_STATUS_CONDITION);
     }
@@ -603,14 +685,14 @@ function buildFptkLocationSqlFilter(user, options) {
     conditions.push(`f."priority" = ${addParam(options.priority)}`);
   }
 
-  // --- Position status filter ---
+  // --- Position status filter (unified: Closed = Close|Cancel(led)|Internal Movement, Open = complement) ---
   if (options.positionStatus === 'OPEN') {
     conditions.push(
-      `(f."currentStatus" IS NULL OR LOWER(TRIM(f."currentStatus")) IN ('open','pending fktk','re-open','reopen'))`
+      `LOWER(TRIM(COALESCE(f."currentStatus",''))) NOT IN ${CLOSED_CURRENT_STATUS_SQL_SET}`
     );
   } else if (options.positionStatus === 'CLOSED') {
     conditions.push(
-      `LOWER(TRIM(COALESCE(f."currentStatus",''))) IN ('close','internal movement')`
+      `LOWER(TRIM(COALESCE(f."currentStatus",''))) IN ${CLOSED_CURRENT_STATUS_SQL_SET}`
     );
   }
 
@@ -638,18 +720,26 @@ function buildFptkLocationSqlFilter(user, options) {
     }
   }
 
-  // --- Period date window (mirrors fptkLocationWhere) ---
+  // --- Period date window (mirrors buildFptkDateCondition: per-status anchors
+  //     so the Location Overview reconciles with the stat cards in compare mode:
+  //     open → createdAt, closed → COALESCE(closedAt, updatedAt)) ---
   if (options.periodStart && options.periodEnd) {
     const ps = new Date(options.periodStart);
     const pe = new Date(options.periodEnd);
     if (!isNaN(ps.getTime()) && !isNaN(pe.getTime())) {
-      // Reuse same param indices for both columns
+      // Reuse same param indices for both anchors
       const psIdx = params.length + 1;
       params.push(ps);
       const peIdx = params.length + 1;
       params.push(pe);
       conditions.push(
-        `(f."updatedAt" BETWEEN $${psIdx} AND $${peIdx} OR f."createdAt" BETWEEN $${psIdx} AND $${peIdx})`
+        `(
+          (LOWER(TRIM(COALESCE(f."currentStatus",''))) NOT IN ${CLOSED_CURRENT_STATUS_SQL_SET}
+            AND f."createdAt" BETWEEN $${psIdx} AND $${peIdx})
+          OR
+          (LOWER(TRIM(COALESCE(f."currentStatus",''))) IN ${CLOSED_CURRENT_STATUS_SQL_SET}
+            AND COALESCE(f."closedAt", f."updatedAt") BETWEEN $${psIdx} AND $${peIdx})
+        )`
       );
     }
   }
@@ -685,7 +775,7 @@ async function getSlaByLocationSql(user, options) {
         LOWER(TRIM(COALESCE(f."statusFktk",'')))               AS status_fktk,
         COALESCE(f."fptkReceiveDate", f."requestDate", f."createdAt")::date AS sla_start,
         CASE
-          WHEN LOWER(TRIM(COALESCE(f."currentStatus",''))) IN ('close','cancel','internal movement')
+          WHEN LOWER(TRIM(COALESCE(f."currentStatus",''))) IN ${CLOSED_CURRENT_STATUS_SQL_SET}
           THEN COALESCE(f."closedAt", NOW())::date
           ELSE NOW()::date
         END AS sla_end
@@ -735,8 +825,12 @@ async function getSlaByLocationSql(user, options) {
     const entry = slaMap[row.area_detail];
     if (!entry.area && row.area) entry.area = row.area;
     if (row.sla_bucket && entry.buckets[row.sla_bucket]) {
-      entry.buckets[row.sla_bucket].received = Number(row.received_count);
-      entry.buckets[row.sla_bucket].pending  = Number(row.pending_count);
+      // Accumulate (+=), never assign — the SQL groups by (area_detail, area,
+      // sla_bucket), so mixed area resolution can emit two rows for the same
+      // detail+bucket; assignment would drop the first row's counts while
+      // total kept accumulating.
+      entry.buckets[row.sla_bucket].received += Number(row.received_count);
+      entry.buckets[row.sla_bucket].pending  += Number(row.pending_count);
       entry.total += Number(row.total);
     }
   });
@@ -746,8 +840,12 @@ async function getSlaByLocationSql(user, options) {
 
 /**
  * Position-status-by-location chart.
- * open  = currentStatus IS NULL or in the open-status list (mirrors isOpenCurrentStatus)
- * closed = everything else (mirrors the isClosed = !isOpenCurrentStatus check)
+ * closed = currentStatus in CLOSED_CURRENT_STATUSES (Close|Cancel(led)|Internal Movement)
+ * open   = everything else (mirrors isOpenCurrentStatus), so open + closed = total.
+ *
+ * Grouped by location only (area picked via MAX) — grouping by (location, area)
+ * used to emit two rows for the same location when area resolution was mixed,
+ * and the frontend .find() silently dropped the second row's counts.
  */
 async function getPositionStatusByLocationSql(user, options) {
   const { whereClause, params } = buildFptkLocationSqlFilter(user, options);
@@ -763,20 +861,18 @@ async function getPositionStatusByLocationSql(user, options) {
     )
     SELECT
       location,
-      area,
+      MAX(area) AS area,
       COUNT(*)::int AS total,
       SUM(CASE
-        WHEN "currentStatus" IS NULL
-          OR LOWER(TRIM("currentStatus")) IN ('open','pending fktk','re-open','reopen')
-        THEN 1 ELSE 0
+        WHEN LOWER(TRIM(COALESCE("currentStatus",''))) IN ${CLOSED_CURRENT_STATUS_SQL_SET}
+        THEN 0 ELSE 1
       END)::int AS open,
       SUM(CASE
-        WHEN "currentStatus" IS NOT NULL
-         AND LOWER(TRIM("currentStatus")) NOT IN ('open','pending fktk','re-open','reopen')
+        WHEN LOWER(TRIM(COALESCE("currentStatus",''))) IN ${CLOSED_CURRENT_STATUS_SQL_SET}
         THEN 1 ELSE 0
       END)::int AS closed
     FROM base
-    GROUP BY location, area
+    GROUP BY location
     ORDER BY location
   `;
 
@@ -876,6 +972,7 @@ async function getDashboardStats(user = null, options = {}) {
       candidateWhere,
       fptkPeriodWhere,
       appPeriodWhere,
+      candidatePeriodWhere,
     } = scope;
 
     // Compute all date ranges upfront (before any DB queries)
@@ -901,29 +998,50 @@ async function getDashboardStats(user = null, options = {}) {
       }
       return [
         prisma.fPTK.groupBy({ by: ['currentStatus'], where: fptkPeriodWhere, _count: { _all: true } }),
-        prisma.application.groupBy({ by: ['status'], where: appPeriodWhere, _count: { _all: true } }),
+        prisma.application.groupBy({ by: ['status'], where: withActiveCandidateOnApplication(appPeriodWhere), _count: { _all: true } }),
       ];
     };
     const [currentPeriodFptkQ, currentPeriodAppQ] = buildPeriodGroupBys();
-    const [previousPeriodFptkQ, previousPeriodAppQ] = options.previousStart && options.previousEnd && fptkPeriodWhere
+    const [previousPeriodFptkQ, previousPeriodAppQ, previousPeriodCandidateQ] = options.previousStart && options.previousEnd && fptkPeriodWhere
       ? (() => {
           const prevFptkWhere = cloneWhere(fptkWhere);
           addConditionToWhere(prevFptkWhere, buildFptkDateCondition(options.previousStart, options.previousEnd));
           const ps = new Date(options.previousStart);
           const pe = new Date(options.previousEnd);
+          // Same disjoint anchors as the current period (see buildDashboardScope).
           const prevAppWhere = cloneWhere(applicationWhere);
           addConditionToWhere(prevAppWhere, {
-            OR: [
-              { updatedAt: { gte: ps, lte: pe } },
-              { appliedAt: { gte: ps, lte: pe } },
-            ],
+            updatedAt: { gte: ps, lte: pe },
+          });
+          const prevCandidateWhere = cloneWhere(candidateWhere);
+          addConditionToWhere(prevCandidateWhere, {
+            createdAt: { gte: ps, lte: pe },
           });
           return [
             prisma.fPTK.groupBy({ by: ['currentStatus'], where: prevFptkWhere, _count: { _all: true } }),
-            prisma.application.groupBy({ by: ['status'], where: prevAppWhere, _count: { _all: true } }),
+            prisma.application.groupBy({ by: ['status'], where: withActiveCandidateOnApplication(prevAppWhere), _count: { _all: true } }),
+            prisma.candidate.count({ where: prevCandidateWhere }),
           ];
         })()
-      : [Promise.resolve([]), Promise.resolve([])];
+      : [Promise.resolve([]), Promise.resolve([]), Promise.resolve(null)];
+    const currentPeriodCandidateQ = candidatePeriodWhere
+      ? prisma.candidate.count({ where: candidatePeriodWhere })
+      : Promise.resolve(null);
+
+    // Closed-in-period counts (Hired and Cancel/Internal Movement cards).
+    // Anchored on closedAt so periods never double-count a position.
+    const buildClosedStatusPeriodCount = (statusCondition, start, end) => {
+      const periodCondition = buildClosedInPeriodCondition(start, end);
+      if (!periodCondition) return Promise.resolve(null);
+      const where = cloneWhere(fptkWhere);
+      addConditionToWhere(where, statusCondition);
+      addConditionToWhere(where, periodCondition);
+      return prisma.fPTK.count({ where });
+    };
+    const hiredCurrentPeriodQ = buildClosedStatusPeriodCount(HIRED_FPTK_STATUS_CONDITION, options.periodStart, options.periodEnd);
+    const hiredPreviousPeriodQ = buildClosedStatusPeriodCount(HIRED_FPTK_STATUS_CONDITION, options.previousStart, options.previousEnd);
+    const cancelImCurrentPeriodQ = buildClosedStatusPeriodCount(CANCEL_IM_FPTK_STATUS_CONDITION, options.periodStart, options.periodEnd);
+    const cancelImPreviousPeriodQ = buildClosedStatusPeriodCount(CANCEL_IM_FPTK_STATUS_CONDITION, options.previousStart, options.previousEnd);
 
     // Single parallel round-trip for scalar counts + groupBy queries.
     // Location chart data (SLA, position status, open progress) is fetched in a
@@ -946,6 +1064,12 @@ async function getDashboardStats(user = null, options = {}) {
       appGroupedCurrentPeriod,
       fptkGroupedPreviousPeriod,
       appGroupedPreviousPeriod,
+      candidatesCurrentPeriod,
+      candidatesPreviousPeriod,
+      hiredCurrentPeriod,
+      hiredPreviousPeriod,
+      cancelImCurrentPeriod,
+      cancelImPreviousPeriod,
     ] = await Promise.all([
       prisma.candidate.count({ where: candidateWhere }),
       prisma.fPTK.count({ where: fptkWhere }),
@@ -987,14 +1111,22 @@ async function getDashboardStats(user = null, options = {}) {
         orderBy: { createdAt: 'desc' },
         select: { id: true, positionTitle: true, position: true, createdAt: true },
       }),
-      // All-time grouped counts for stat card headlines
+      // All-time grouped counts for stat card headlines.
+      // Application counts exclude soft-deleted candidates — same visibility
+      // rule as the drill-down modals, so card numbers match their lists.
       prisma.fPTK.groupBy({ by: ['currentStatus'], where: fptkWhere, _count: { _all: true } }),
-      prisma.application.groupBy({ by: ['status'], where: applicationWhere, _count: { _all: true } }),
+      prisma.application.groupBy({ by: ['status'], where: withActiveCandidateOnApplication(applicationWhere), _count: { _all: true } }),
       // Optional period-filtered grouped counts for WoW comparison
       currentPeriodFptkQ,
       currentPeriodAppQ,
       previousPeriodFptkQ,
       previousPeriodAppQ,
+      currentPeriodCandidateQ,
+      previousPeriodCandidateQ,
+      hiredCurrentPeriodQ,
+      hiredPreviousPeriodQ,
+      cancelImCurrentPeriodQ,
+      cancelImPreviousPeriodQ,
     ]);
 
     // Convert groupBy results to plain { key: count } maps
@@ -1007,6 +1139,18 @@ async function getDashboardStats(user = null, options = {}) {
     const appPeriodCounts = {
       current: options.periodStart ? groupByToMap(appGroupedCurrentPeriod, 'status') : null,
       previous: options.previousStart ? groupByToMap(appGroupedPreviousPeriod, 'status') : null,
+    };
+    const candidatePeriodCounts = {
+      current: candidatesCurrentPeriod,
+      previous: candidatesPreviousPeriod,
+    };
+    const hiredPeriodCounts = {
+      current: hiredCurrentPeriod,
+      previous: hiredPreviousPeriod,
+    };
+    const cancelImPeriodCounts = {
+      current: cancelImCurrentPeriod,
+      previous: cancelImPreviousPeriod,
     };
 
     // Derive open/closed counts from the all-time fptkCountsByCurrentStatus groupBy
@@ -1088,6 +1232,9 @@ async function getDashboardStats(user = null, options = {}) {
       // Period-filtered counts for WoW comparison (null when period params not provided)
       fptkPeriodCounts,
       appPeriodCounts,
+      candidatePeriodCounts,
+      hiredPeriodCounts,
+      cancelImPeriodCounts,
     };
 
     logger.debug(`Dashboard: Result object keys: ${Object.keys(result).join(', ')}`);

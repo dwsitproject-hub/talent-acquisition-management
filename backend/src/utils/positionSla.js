@@ -1,8 +1,22 @@
 const { getSlaBucketIndonesiaWorkingDays, businessDaysDiffIndonesia } = require('./indoBusinessDays');
 
+/**
+ * Canonical Open/Closed classification — single source of truth for the backend.
+ * Keep in sync with frontend `src/utils/fptkPositionStatus.ts`.
+ *
+ * Closed = terminal / exited pipeline: Close, Cancel(led), Internal Movement.
+ * Open = all other currentStatus values (Open, Pending FKTK, Re-Open, Hold, empty, etc.)
+ * so Open + Closed always equals Total.
+ */
+const CLOSED_CURRENT_STATUSES = ['close', 'cancel', 'cancelled', 'internal movement'];
+
 function isFptkClosedByCurrentStatus(currentStatus) {
   const s = (currentStatus || '').trim().toLowerCase();
-  return s === 'close' || s === 'cancel' || s === 'internal movement';
+  return CLOSED_CURRENT_STATUSES.includes(s);
+}
+
+function isFptkOpenByCurrentStatus(currentStatus) {
+  return !isFptkClosedByCurrentStatus(currentStatus);
 }
 
 /**
@@ -42,7 +56,9 @@ function getPositionSlaWorkingDays(job, now = new Date()) {
 }
 
 module.exports = {
+  CLOSED_CURRENT_STATUSES,
   getPositionSlaBucket,
   getPositionSlaWorkingDays,
   isFptkClosedByCurrentStatus,
+  isFptkOpenByCurrentStatus,
 };
