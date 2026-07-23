@@ -48,8 +48,8 @@ export function resolveFptkEditPermissions(
   const visibleRoles =
     cfg.visibleRoles && cfg.visibleRoles.length ? cfg.visibleRoles : DEFAULT_FPTK_VISIBLE_ROLES
 
-  // TA_SITE is always candidateStatusOnly — they may only update candidate
-  // application statuses, never edit the FPTK position fields themselves.
+  // TA_SITE is always candidateStatusOnly — they may update candidate application
+  // statuses and join dates, but never edit the FPTK position fields themselves.
   // This is enforced unconditionally so a misconfigured menuAccess cannot
   // accidentally grant TA_SITE full edit access.
   const isTaSite = roleName === 'TA_SITE'

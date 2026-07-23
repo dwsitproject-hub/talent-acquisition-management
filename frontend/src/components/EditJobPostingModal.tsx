@@ -973,7 +973,6 @@ export default function EditJobPostingModal({
   }
 
   const handleCandidateJoinDateChange = (candidateId: string, dateValue: string) => {
-    if (candidateStatusOnly) return
     setAppliedCandidates(prev =>
       prev.map(candidate => {
         const matches =
@@ -1374,7 +1373,7 @@ export default function EditJobPostingModal({
             </h2>
             {candidateStatusOnly && (
               <p style={{ fontSize: '13px', color: '#6b7280', margin: 0 }}>
-                Update candidate status or add candidates to this position. New additions are saved when you click Save Candidates. Position details are read-only.
+                Update candidate status, join date, or add candidates to this position. New additions and join date changes are saved when you click Save Candidates. Position details are read-only.
               </p>
             )}
           </div>
@@ -2316,44 +2315,27 @@ export default function EditJobPostingModal({
                               >
                                 Join Date
                               </label>
-                              {candidateStatusOnly ? (
-                                <div
-                                  style={{
-                                    padding: '6px 8px',
-                                    border: '1px solid #e5e7eb',
-                                    borderRadius: '4px',
-                                    fontSize: '12px',
-                                    backgroundColor: '#f3f4f6',
-                                    color: '#374151',
-                                  }}
-                                >
-                                  {candidate.joinDate
-                                    ? formatDate(String(candidate.joinDate).slice(0, 10))
-                                    : '—'}
-                                </div>
-                              ) : (
-                                <input
-                                  type="date"
-                                  value={
-                                    candidate.joinDate
-                                      ? String(candidate.joinDate).slice(0, 10)
-                                      : ''
-                                  }
-                                  onChange={e =>
-                                    handleCandidateJoinDateChange(
-                                      candidate.id || candidate.candidateId,
-                                      e.target.value
-                                    )
-                                  }
-                                  style={{
-                                    padding: '6px 8px',
-                                    border: '1px solid #d1d5db',
-                                    borderRadius: '4px',
-                                    fontSize: '12px',
-                                    backgroundColor: 'white',
-                                  }}
-                                />
-                              )}
+                              <input
+                                type="date"
+                                value={
+                                  candidate.joinDate
+                                    ? String(candidate.joinDate).slice(0, 10)
+                                    : ''
+                                }
+                                onChange={e =>
+                                  handleCandidateJoinDateChange(
+                                    candidate.id || candidate.candidateId,
+                                    e.target.value
+                                  )
+                                }
+                                style={{
+                                  padding: '6px 8px',
+                                  border: '1px solid #d1d5db',
+                                  borderRadius: '4px',
+                                  fontSize: '12px',
+                                  backgroundColor: 'white',
+                                }}
+                              />
                             </div>
                           ) : null}
                         </div>

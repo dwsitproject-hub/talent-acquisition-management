@@ -18,6 +18,7 @@ import {
   XCircleIcon,
   NoSymbolIcon,
   ArrowLeftOnRectangleIcon,
+  MinusCircleIcon,
 } from '@heroicons/react/24/outline'
 import { DashboardStats, PositionStatusByLocation, OpenPositionProgress, SLALocation, FPTK } from '@/types'
 import { DashboardAPI, FPTKAPI, MasterOfficeLocationAPI } from '@/lib/api'
@@ -32,6 +33,12 @@ import {
 import { useModalEscape } from '@/hooks/useModalEscape'
 import { usePositionEditOverlay } from '@/hooks/usePositionEditOverlay'
 import { useDebounce } from '@/hooks/useDebounce'
+import {
+  isFptkCancelOrInternalMovement,
+  isFptkClosedByCurrentStatus,
+  isFptkOpenByCurrentStatus,
+  normalizeUiCurrentStatus,
+} from '@/utils/fptkPositionStatus'
 
 const PRIORITY_FILTERS = ['ALL', 'P0', 'P1', 'P2'] as const
 
@@ -41,31 +48,10 @@ type PositionStatusFilterType = typeof POSITION_STATUS_FILTERS[number]
 const LOCATION_AREA_FILTERS = ['ALL', 'Site', 'HO'] as const
 type LocationAreaFilterType = typeof LOCATION_AREA_FILTERS[number]
 
-/** Closed position: Close or Cancel (any status NOT in this set is treated as Open) */
-const isClosedPositionStatus = (status?: string) => {
-  const s = (status || '').trim().toLowerCase()
-  return s === 'close' || s === 'cancel' || s === 'cancelled'
-}
-
-const normalizeUiCurrentStatus = (value?: string) => (value || '').trim().toLowerCase()
-
-/** Open Positions card: Open | Pending FKTK | Re-Open (Internal Movement is treated as Closed, aligned with Close) */
-const isOpenCurrentStatusLabel = (value?: string) => {
-  const s = normalizeUiCurrentStatus(value)
-  if (!s) return true
-  return (
-    s === 'open' ||
-    s === 'pending fktk' ||
-    s === 're-open' ||
-    s === 'reopen'
-  )
-}
-
-/** Closed Positions card: Close | Internal Movement */
-const isClosedCurrentStatusLabel = (value?: string) => {
-  const s = normalizeUiCurrentStatus(value)
-  return s === 'close' || s === 'internal movement'
-}
+// Open/Closed classification comes from the canonical util
+// `@/utils/fptkPositionStatus` (also used by Summary by Position — the target
+// of the Location Overview drill-downs) so every section counts the same way:
+// Closed = Close | Cancel(led) | Internal Movement; Open = everything else.
 
 const isHoldCurrentStatusLabel = (value?: string) => normalizeUiCurrentStatus(value) === 'hold'
 
@@ -77,6 +63,7 @@ const CARD_DETAIL_MAP: Record<string, string> = {
   'Offer Rejected': 'offer_rejected',
   Rejected: 'rejected',
   Withdrawn: 'withdrawn',
+  'Cancel/Internal Movement': 'cancel_im',
   'Open Positions': 'open_positions',
 }
 
@@ -260,33 +247,58 @@ export default function Dashboard() {
     () => baseStats?.appPeriodCounts ?? { current: null, previous: null },
     [baseStats?.appPeriodCounts]
   )
+  const candidatePeriod = useMemo(
+    () => baseStats?.candidatePeriodCounts ?? { current: null, previous: null },
+    [baseStats?.candidatePeriodCounts]
+  )
+  // Closed-in-period counts (anchored on closedAt) — periods never double-count
+  // a position, so month-by-month values sum to the all-time totals.
+  const hiredPeriod = useMemo(
+    () => baseStats?.hiredPeriodCounts ?? { current: null, previous: null },
+    [baseStats?.hiredPeriodCounts]
+  )
+  const cancelImPeriod = useMemo(
+    () => baseStats?.cancelImPeriodCounts ?? { current: null, previous: null },
+    [baseStats?.cancelImPeriodCounts]
+  )
 
   // ── Headline counts derived from backend maps (O(n) over unique statuses) ──
   // When compareToPrevious is on and period data is available, show period-filtered counts
   // so the headline numbers match the selected time window. Otherwise show all-time totals.
-  const totalCandidateHeadline = useMemo(
-    () => baseStats?.totalCandidates ?? 0,
-    [baseStats?.totalCandidates]
-  )
+  // In compare mode the headline switches to the period-scoped candidate count
+  // so the number and its delta describe the same metric (same pattern as the
+  // other cards). All-time total otherwise.
+  const totalCandidateHeadline = useMemo(() => {
+    if (compareToPrevious && candidatePeriod.current != null) return candidatePeriod.current
+    return baseStats?.totalCandidates ?? 0
+  }, [compareToPrevious, candidatePeriod, baseStats?.totalCandidates])
   const openPositionsCount = useMemo(() => {
     const map = compareToPrevious && fptkPeriod.current ? fptkPeriod.current : fptkCounts
-    return sumFptkStatuses(map, isOpenCurrentStatusLabel)
+    return sumFptkStatuses(map, isFptkOpenByCurrentStatus)
   }, [compareToPrevious, fptkPeriod, fptkCounts])
   const closedPositionsCount = useMemo(() => {
     const map = compareToPrevious && fptkPeriod.current ? fptkPeriod.current : fptkCounts
-    return sumFptkStatuses(map, isClosedCurrentStatusLabel)
+    return sumFptkStatuses(map, isFptkClosedByCurrentStatus)
   }, [compareToPrevious, fptkPeriod, fptkCounts])
   const holdPositionsCount = useMemo(() => {
     const map = compareToPrevious && fptkPeriod.current ? fptkPeriod.current : fptkCounts
     const key = Object.keys(map).find((k) => k.toLowerCase() === 'hold')
     return key ? (map[key] ?? 0) : 0
   }, [compareToPrevious, fptkPeriod, fptkCounts])
-  // "Hired" = FPTKs with currentStatus exactly 'close'
+  // "Hired" = FPTKs with currentStatus exactly 'close'.
+  // In compare mode the count is closed-in-period (closedAt window) so summing
+  // months always reconciles with the all-time total.
   const hiredCount = useMemo(() => {
-    const map = compareToPrevious && fptkPeriod.current ? fptkPeriod.current : fptkCounts
-    const key = Object.keys(map).find((k) => k.toLowerCase() === 'close')
-    return key ? (map[key] ?? 0) : 0
-  }, [compareToPrevious, fptkPeriod, fptkCounts])
+    if (compareToPrevious && hiredPeriod.current != null) return hiredPeriod.current
+    const key = Object.keys(fptkCounts).find((k) => k.toLowerCase() === 'close')
+    return key ? (fptkCounts[key] ?? 0) : 0
+  }, [compareToPrevious, hiredPeriod, fptkCounts])
+  // "Cancel/Internal Movement" = the Closed statuses that are not Hired, so
+  // Open + Hired + Cancel/IM always equals the Location Overview total.
+  const cancelImCount = useMemo(() => {
+    if (compareToPrevious && cancelImPeriod.current != null) return cancelImPeriod.current
+    return sumFptkStatuses(fptkCounts, isFptkCancelOrInternalMovement)
+  }, [compareToPrevious, cancelImPeriod, fptkCounts])
 
   const interviewCount = useMemo(() => {
     const map = compareToPrevious && appPeriod.current ? appPeriod.current : appCounts
@@ -317,18 +329,18 @@ export default function Dashboard() {
   const wowOpenPositions = useMemo(() => {
     if (!compareToPrevious || !fptkPeriod.current || !fptkPeriod.previous) return DASHBOARD_COMPARE_OFF_DELTA
     return periodOverPeriodChange(
-      sumFptkStatuses(fptkPeriod.current, isOpenCurrentStatusLabel),
-      sumFptkStatuses(fptkPeriod.previous, isOpenCurrentStatusLabel)
+      sumFptkStatuses(fptkPeriod.current, isFptkOpenByCurrentStatus),
+      sumFptkStatuses(fptkPeriod.previous, isFptkOpenByCurrentStatus)
     )
   }, [compareToPrevious, fptkPeriod])
 
+  // Delta uses the same metric as the headline: period-scoped candidate counts.
   const wowTotalCandidateStatus = useMemo(() => {
-    if (!compareToPrevious || !appPeriod.current || !appPeriod.previous) return DASHBOARD_COMPARE_OFF_DELTA
-    return periodOverPeriodChange(
-      sumAppStatuses(appPeriod.current, ['SUBMITTED', 'SCREENING']),
-      sumAppStatuses(appPeriod.previous, ['SUBMITTED', 'SCREENING'])
-    )
-  }, [compareToPrevious, appPeriod])
+    if (!compareToPrevious || candidatePeriod.current == null || candidatePeriod.previous == null) {
+      return DASHBOARD_COMPARE_OFF_DELTA
+    }
+    return periodOverPeriodChange(candidatePeriod.current, candidatePeriod.previous)
+  }, [compareToPrevious, candidatePeriod])
 
   const wowInterviewStatus = useMemo(() => {
     if (!compareToPrevious || !appPeriod.current || !appPeriod.previous) return DASHBOARD_COMPARE_OFF_DELTA
@@ -379,13 +391,18 @@ export default function Dashboard() {
   }, [compareToPrevious, appPeriod])
 
   const wowHiredRolling = useMemo(() => {
-    if (!compareToPrevious || !fptkPeriod.current || !fptkPeriod.previous) return DASHBOARD_COMPARE_OFF_DELTA
-    const sumClosed = (m: Record<string, number>) => {
-      const key = Object.keys(m).find((k) => k.toLowerCase() === 'close')
-      return key ? (m[key] ?? 0) : 0
+    if (!compareToPrevious || hiredPeriod.current == null || hiredPeriod.previous == null) {
+      return DASHBOARD_COMPARE_OFF_DELTA
     }
-    return periodOverPeriodChange(sumClosed(fptkPeriod.current), sumClosed(fptkPeriod.previous))
-  }, [compareToPrevious, fptkPeriod])
+    return periodOverPeriodChange(hiredPeriod.current, hiredPeriod.previous)
+  }, [compareToPrevious, hiredPeriod])
+
+  const wowCancelIm = useMemo(() => {
+    if (!compareToPrevious || cancelImPeriod.current == null || cancelImPeriod.previous == null) {
+      return DASHBOARD_COMPARE_OFF_DELTA
+    }
+    return periodOverPeriodChange(cancelImPeriod.current, cancelImPeriod.previous)
+  }, [compareToPrevious, cancelImPeriod])
 
   const customRangeInvalid = timeMode === 'custom' && !periodBounds
 
@@ -512,6 +529,13 @@ export default function Dashboard() {
         change: wowWithdrawn.formattedChange,
         changeType: wowWithdrawn.sentiment,
       },
+      {
+        name: 'Cancel/Internal Movement',
+        value: cancelImCount.toString(),
+        icon: MinusCircleIcon,
+        change: wowCancelIm.formattedChange,
+        changeType: wowCancelIm.sentiment,
+      },
     ],
     [
       openPositionsCount,
@@ -532,6 +556,8 @@ export default function Dashboard() {
       wowRejected,
       withdrawnCount,
       wowWithdrawn,
+      cancelImCount,
+      wowCancelIm,
       compareToPrevious,
     ]
   )
@@ -652,6 +678,9 @@ export default function Dashboard() {
       applicationCountsByStatus: {},
       fptkPeriodCounts: { current: null, previous: null },
       appPeriodCounts: { current: null, previous: null },
+      candidatePeriodCounts: { current: null, previous: null },
+      hiredPeriodCounts: { current: null, previous: null },
+      cancelImPeriodCounts: { current: null, previous: null },
     })
   }, [])
 
@@ -761,6 +790,9 @@ export default function Dashboard() {
         applicationCountsByStatus: stats.applicationCountsByStatus ?? {},
         fptkPeriodCounts: stats.fptkPeriodCounts ?? { current: null, previous: null },
         appPeriodCounts: stats.appPeriodCounts ?? { current: null, previous: null },
+        candidatePeriodCounts: stats.candidatePeriodCounts ?? { current: null, previous: null },
+        hiredPeriodCounts: stats.hiredPeriodCounts ?? { current: null, previous: null },
+        cancelImPeriodCounts: stats.cancelImPeriodCounts ?? { current: null, previous: null },
       })
     } catch (error: any) {
       console.error('Error loading dashboard data:', error)
