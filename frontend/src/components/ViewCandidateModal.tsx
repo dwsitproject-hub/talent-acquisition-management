@@ -104,6 +104,17 @@ export default function ViewCandidateModal({ isOpen, onClose, candidate }: ViewC
     void loadPositionApplications(candidate.id)
   }, [isOpen, candidate?.id, applicationsRefreshKey, loadPositionApplications])
 
+  // Some documents have a stale `http://` URL baked in at upload time (e.g. an
+  // API_BASE_URL misconfigured without SSL). Loading that from an https:// page gets hard
+  // blocked by the browser as mixed content. Since this app is always served over the same
+  // host, it's safe to upgrade the scheme to match the current page before fetching.
+  const resolveFileUrl = (url: string): string => {
+    if (typeof window !== 'undefined' && window.location.protocol === 'https:' && url.startsWith('http://')) {
+      return `https://${url.slice('http://'.length)}`
+    }
+    return url
+  }
+
   // Opening `file.url` directly via `window.open` silently fails when the file is
   // missing/unreachable on the server: the browser briefly opens a blank tab and closes
   // it again (a "blink") with no visible error, since that request never appears in this
@@ -116,7 +127,7 @@ export default function ViewCandidateModal({ isOpen, onClose, candidate }: ViewC
 
     setDownloadingFileId(file.id)
     try {
-      const response = await fetch(file.url)
+      const response = await fetch(resolveFileUrl(file.url))
       if (!response.ok) {
         throw new Error(`Server responded with ${response.status} ${response.statusText}`)
       }
