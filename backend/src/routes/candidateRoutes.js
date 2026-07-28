@@ -17,6 +17,29 @@ const { assertUserCanAccessCandidate } = require('../utils/candidateAccess');
 const CANDIDATE_CREATE_FALLBACK = ['TA_HO', 'HRBP', 'TA_SITE', 'SUPER_ADMIN', 'CHRO'];
 const CANDIDATE_EDIT_FALLBACK = ['TA_HO', 'HRBP', 'TA_SITE', 'SUPER_ADMIN', 'CHRO'];
 
+/**
+ * Resolve the base URL used to build absolute document URLs (e.g. fileUrl).
+ * `API_BASE_URL` can be misconfigured with `http://`, which permanently bakes a
+ * mixed-content URL into the document record and gets hard-blocked by browsers once the
+ * app is served over HTTPS. `req.protocol` reflects the real incoming scheme (via the
+ * `trust proxy` setting + nginx's `X-Forwarded-Proto`), so never let it be downgraded.
+ */
+function resolveDocumentBaseUrl(req) {
+  const configured = process.env.API_BASE_URL;
+  if (!configured) {
+    return `${req.protocol}://${req.get('host')}`;
+  }
+  try {
+    const url = new URL(configured);
+    if (req.protocol === 'https' && url.protocol === 'http:') {
+      url.protocol = 'https:';
+    }
+    return url.origin;
+  } catch {
+    return `${req.protocol}://${req.get('host')}`;
+  }
+}
+
 function buildHiringManagerFptkScope(user = {}) {
   const firstName = String(user.firstName || '').trim();
   const lastName = String(user.lastName || '').trim();
@@ -324,7 +347,7 @@ router.post(
     }
 
     const documentType = req.body.type || 'RESUME';
-    const baseUrl = process.env.API_BASE_URL || `${req.protocol}://${req.get('host')}`;
+    const baseUrl = resolveDocumentBaseUrl(req);
 
     const uploadedDocument = await documentService.uploadCandidateDocument(candidateId, req.files.file, {
       documentType,
