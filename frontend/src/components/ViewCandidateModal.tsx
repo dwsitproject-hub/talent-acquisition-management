@@ -65,6 +65,7 @@ export default function ViewCandidateModal({ isOpen, onClose, candidate }: ViewC
   const [loadingPositionApplications, setLoadingPositionApplications] = useState(false)
   const [applicationsRefreshKey, setApplicationsRefreshKey] = useState(0)
   const [historyApplicationId, setHistoryApplicationId] = useState<string | null>(null)
+  const [downloadingFileId, setDownloadingFileId] = useState<string | null>(null)
 
   const positionEdit = usePositionEditOverlay(() => {
     if (candidate?.id) {
@@ -102,6 +103,39 @@ export default function ViewCandidateModal({ isOpen, onClose, candidate }: ViewC
     }
     void loadPositionApplications(candidate.id)
   }, [isOpen, candidate?.id, applicationsRefreshKey, loadPositionApplications])
+
+  // Opening `file.url` directly via `window.open` silently fails when the file is
+  // missing/unreachable on the server: the browser briefly opens a blank tab and closes
+  // it again (a "blink") with no visible error, since that request never appears in this
+  // tab's Network/Console. Fetch it first so failures are visible and reported to the user.
+  const downloadFileFromUrl = async (file: { id: string; url?: string; name?: string }) => {
+    if (!file.url) {
+      alert('File is not available for download.')
+      return
+    }
+
+    setDownloadingFileId(file.id)
+    try {
+      const response = await fetch(file.url)
+      if (!response.ok) {
+        throw new Error(`Server responded with ${response.status} ${response.statusText}`)
+      }
+
+      const blob = await response.blob()
+      const link = document.createElement('a')
+      link.href = URL.createObjectURL(blob)
+      link.download = file.name || 'download'
+      document.body.appendChild(link)
+      link.click()
+      document.body.removeChild(link)
+      URL.revokeObjectURL(link.href)
+    } catch (error) {
+      console.error('Failed to download file:', file.url, error)
+      alert(`Unable to download "${file.name || 'file'}". It may have been moved or deleted from the server.`)
+    } finally {
+      setDownloadingFileId(null)
+    }
+  }
 
   useEffect(() => {
     if (!isOpen) {
@@ -1333,7 +1367,7 @@ export default function ViewCandidateModal({ isOpen, onClose, candidate }: ViewC
                           fontWeight: '500',
                           cursor: candidate.files?.find(f => f.type === 'cv') ? 'pointer' : 'not-allowed'
                         }}
-                        disabled={!candidate.files?.find(f => f.type === 'cv')}
+                        disabled={!candidate.files?.find(f => f.type === 'cv') || downloadingFileId === candidate.files?.find(f => f.type === 'cv')?.id}
                         onClick={() => {
                           const cvFile = candidate.files?.find(f => f.type === 'cv')
                           if (!cvFile) {
@@ -1341,7 +1375,7 @@ export default function ViewCandidateModal({ isOpen, onClose, candidate }: ViewC
                           }
 
                           if (cvFile.url) {
-                            window.open(cvFile.url, '_blank')
+                            void downloadFileFromUrl(cvFile)
                             return
                           }
 
@@ -1375,7 +1409,11 @@ export default function ViewCandidateModal({ isOpen, onClose, candidate }: ViewC
                           alert('CV file is not available for download.')
                         }}
                       >
-                        {candidate.files?.find(f => f.type === 'cv') ? 'Download' : 'No File'}
+                        {!candidate.files?.find(f => f.type === 'cv')
+                          ? 'No File'
+                          : downloadingFileId === candidate.files?.find(f => f.type === 'cv')?.id
+                            ? 'Loading...'
+                            : 'Download'}
                       </button>
                     </div>
 
@@ -1418,18 +1456,19 @@ export default function ViewCandidateModal({ isOpen, onClose, candidate }: ViewC
                                 </div>
                                 <button
                                   style={{
-                                    backgroundColor: '#4F46E5',
+                                    backgroundColor: downloadingFileId === file.id ? '#9CA3AF' : '#4F46E5',
                                     color: 'white',
                                     border: 'none',
                                     padding: '6px 12px',
                                     borderRadius: '6px',
                                     fontSize: '12px',
                                     fontWeight: '500',
-                                    cursor: 'pointer'
+                                    cursor: downloadingFileId === file.id ? 'not-allowed' : 'pointer'
                                   }}
+                                  disabled={downloadingFileId === file.id}
                                   onClick={() => {
                                     if (file.url) {
-                                      window.open(file.url, '_blank')
+                                      void downloadFileFromUrl(file)
                                       return
                                     }
 
@@ -1463,7 +1502,7 @@ export default function ViewCandidateModal({ isOpen, onClose, candidate }: ViewC
                                     alert('File is not available for download.')
                                   }}
                                 >
-                                  Download
+                                  {downloadingFileId === file.id ? 'Loading...' : 'Download'}
                                 </button>
                               </div>
                             ))}

@@ -79,6 +79,7 @@ export default function EditCandidateModal({ isOpen, onClose, onSave, candidate 
 
   const [fileErrors, setFileErrors] = useState<{ [key: string]: string }>({})
   const [isCompressing, setIsCompressing] = useState(false)
+  const [downloadingFileId, setDownloadingFileId] = useState<string | null>(null)
   // Track existing additional files separately from new uploads
   const [existingAdditionalFiles, setExistingAdditionalFiles] = useState<any[]>([])
 
@@ -289,6 +290,39 @@ export default function EditCandidateModal({ isOpen, onClose, onSave, candidate 
       ...prev,
       skills: prev.skills.filter(skill => skill !== skillToRemove)
     }))
+  }
+
+  // Opening `file.url` directly via a plain <a target="_blank"> silently fails when the
+  // file is missing/unreachable on the server: the browser briefly opens a blank tab and
+  // closes it again (a "blink") with no visible error, since that request never appears
+  // in this tab's Network/Console. Fetch it first so failures are visible and reported.
+  const handleViewFile = async (file: { id: string; url?: string; name?: string }) => {
+    if (!file.url) {
+      alert('File is not available for download.')
+      return
+    }
+
+    setDownloadingFileId(file.id)
+    try {
+      const response = await fetch(file.url)
+      if (!response.ok) {
+        throw new Error(`Server responded with ${response.status} ${response.statusText}`)
+      }
+
+      const blob = await response.blob()
+      const link = document.createElement('a')
+      link.href = URL.createObjectURL(blob)
+      link.download = file.name || 'download'
+      document.body.appendChild(link)
+      link.click()
+      document.body.removeChild(link)
+      URL.revokeObjectURL(link.href)
+    } catch (error) {
+      console.error('Failed to download file:', file.url, error)
+      alert(`Unable to open "${file.name || 'file'}". It may have been moved or deleted from the server.`)
+    } finally {
+      setDownloadingFileId(null)
+    }
   }
 
   const handleToggleDivision = (divisionName: string) => {
@@ -1191,23 +1225,25 @@ export default function EditCandidateModal({ isOpen, onClose, onSave, candidate 
                                   </p>
                                 </div>
                                 {file.url && (
-                                  <a
-                                    href={file.url}
-                                    target="_blank"
-                                    rel="noopener noreferrer"
+                                  <button
+                                    type="button"
+                                    onClick={() => handleViewFile(file)}
+                                    disabled={downloadingFileId === file.id}
                                     style={{
                                       marginLeft: '8px',
                                       padding: '4px 12px',
-                                      backgroundColor: '#4F46E5',
+                                      backgroundColor: downloadingFileId === file.id ? '#9CA3AF' : '#4F46E5',
                                       color: 'white',
+                                      border: 'none',
                                       borderRadius: '4px',
                                       fontSize: '12px',
                                       textDecoration: 'none',
-                                      fontWeight: '500'
+                                      fontWeight: '500',
+                                      cursor: downloadingFileId === file.id ? 'not-allowed' : 'pointer'
                                     }}
                                   >
-                                    View
-                                  </a>
+                                    {downloadingFileId === file.id ? 'Loading...' : 'View'}
+                                  </button>
                                 )}
                               </div>
                             )
