@@ -61,7 +61,43 @@ function mapUiStatusToApplicationStatus(status, fallback = 'SUBMITTED') {
   return fallback;
 }
 
+// Mirrors the frontend's mapApplicationStatusToUi (frontend/src/app/summary-by-position/page.tsx)
+// so cumulative stage counts are deduped at the UI-status level, not the raw enum level.
+const APP_STATUS_TO_UI_STATUS_MAP = {
+  SUBMITTED: 'Applied',
+  SCREENING: 'Shortlisted',
+  PSYCHOMETRIC_TEST: 'Under Review',
+  TECHNICAL_TEST: 'Assessment',
+  INTERVIEW_SCHEDULED: 'Interview Scheduled',
+  INTERVIEW_COMPLETED: 'Interviewed',
+  DOCUMENT_VERIFICATION: 'Under Review',
+  OFFER_PROPOSED: 'Offering Creation',
+  OFFER_APPROVED: 'Pending Feedback',
+  OFFER_SENT: 'Under Review',
+  OFFER_ACCEPTED: 'Offer Accepted',
+  OFFER_REJECTED: 'Offer Rejected',
+  MEDICAL_CHECKUP_SCHEDULED: 'Under Review',
+  MEDICAL_CHECKUP_COMPLETED: 'MCU',
+  CONTRACT_SENT: 'Offer Accepted',
+  CONTRACT_SIGNED: 'Offer Accepted',
+  ONBOARDING: 'On Boarding',
+  HIRED: 'Offer Accepted',
+  REJECTED: 'Rejected (Failed Interview / Assessment)',
+  WITHDRAWN: 'Withdrawn',
+  KEEP_IN_VIEW: 'Keep In View',
+};
+
+/**
+ * Maps a raw Prisma ApplicationStatus enum string to its UI stage label.
+ * Falls back to "Applied" for unrecognized values, same as the frontend equivalent.
+ */
+function mapApplicationStatusToUi(status) {
+  const raw = (status || '').toString().toUpperCase().trim();
+  return APP_STATUS_TO_UI_STATUS_MAP[raw] || 'Applied';
+}
+
 module.exports = {
   PRISMA_APP_STATUS_STRINGS,
   mapUiStatusToApplicationStatus,
+  mapApplicationStatusToUi,
 };

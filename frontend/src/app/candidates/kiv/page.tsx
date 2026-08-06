@@ -7,6 +7,7 @@ import Link from 'next/link'
 import Layout from '@/components/Layout/Layout'
 import { MenuAccessAPI, ApplicationsAPI } from '@/lib/api'
 import { mapApplicationStatusToUi } from '@/utils/applicationStatusUi'
+import { resolveCandidatePermissions } from '@/utils/candidatePermissions'
 import { EyeIcon, MagnifyingGlassIcon } from '@heroicons/react/24/outline'
 
 const mapEnumToRole = (role: string): string => {
@@ -169,6 +170,7 @@ export default function KivPage() {
   }
   const canEditKiv =
     (permsKiv.edit || []).includes(roleName) || (permsKiv.edit || []).includes('*')
+  const { canViewDetails } = resolveCandidatePermissions(roleName, menuAccess)
 
   const formatDate = (d: string | null) => {
     if (!d) return '—'
@@ -375,7 +377,7 @@ export default function KivPage() {
                       </td>
                       <td className="whitespace-nowrap px-3 py-4 text-sm text-gray-500">{formatDate(row.appliedAt)}</td>
                       <td className="whitespace-nowrap py-4 pl-3 pr-4 text-right text-sm sm:pr-6">
-                        {canEditKiv ? (
+                        {canEditKiv && canViewDetails ? (
                           <Link
                             href={`/candidates?view=${encodeURIComponent(row.candidateId)}`}
                             className="text-indigo-600 hover:text-indigo-800 font-medium"
@@ -383,7 +385,16 @@ export default function KivPage() {
                             Open candidate
                           </Link>
                         ) : (
-                          <span className="text-gray-300 cursor-not-allowed">Open candidate</span>
+                          <span
+                            className="text-gray-300 cursor-not-allowed"
+                            title={
+                              !canViewDetails
+                                ? 'Candidate details are not available for your role'
+                                : undefined
+                            }
+                          >
+                            Open candidate
+                          </span>
                         )}
                       </td>
                     </tr>

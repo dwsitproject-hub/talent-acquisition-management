@@ -12,6 +12,7 @@ import PositionEditOverlay from '@/components/PositionEditOverlay'
 import { usePositionEditOverlay } from '@/hooks/usePositionEditOverlay'
 import ApplicationHistoryModal from '@/components/ApplicationHistoryModal'
 import {
+  displayCandidateEmail,
   formatCandidateSourceDetailLabel,
   formatCandidateSourceLabel,
   getCandidateSourceFields,
@@ -377,7 +378,7 @@ export default function ViewCandidateModal({ isOpen, onClose, candidate }: ViewC
               const bpjsNumber = (candidate as any).bpjsNumber || (candidate as any).bpjsHealthNumber || f.bpjsNumber || 'Not specified'
               const healthStatus = (candidate as any).healthStatus || f.healthStatus || 'Not specified'
               const bloodType = (candidate as any).bloodType || f.bloodType || 'Not specified'
-              const email = f.email || candidate.contactInfo.email
+              const email = displayCandidateEmail(f.email || candidate.contactInfo.email) || 'Not specified'
               const phone = f.phoneNumber || candidate.contactInfo.phone || 'Not specified'
               const currentAddress = (candidate as any).currentAddress || f.currentAddress || candidate.contactInfo.address || 'Not specified'
               const permanentAddress = (candidate as any).permanentAddress || f.permanentAddress || 'Not specified'

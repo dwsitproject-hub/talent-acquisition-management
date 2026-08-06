@@ -23,7 +23,12 @@ import { matchesTokenizedSearch } from '@/utils/search'
 import { CandidatesAPI, MenuAccessAPI } from '@/lib/api'
 import BulkUploadModal from '@/components/BulkUploadModal'
 import { getCandidateDivisions, getCandidateYearsOfExperience, getCandidateSkills, parseLanguagesData } from '@/utils/candidateProfileShape'
-import { getCandidateSourceFields } from '@/utils/candidateSource'
+import {
+  displayCandidateEmail,
+  getCandidateSourceFields,
+  isHeadHunterSource,
+} from '@/utils/candidateSource'
+import { resolveCandidatePermissions } from '@/utils/candidatePermissions'
 
 const mapEnumToRole = (role: string): string => {
   if (!role) return role
@@ -416,7 +421,7 @@ export default function CandidatesPage() {
     }
   }, [isAuthenticated, isLoading])
 
-  // Deep-link: /candidates?view=<id> opens View Candidate modal
+  // Deep-link: /candidates?view=<id> opens View Candidate modal (not for TA_SITE list-only)
   useEffect(() => {
     if (!isAuthenticated || isLoading) return
     if (autoViewHandledRef.current) return
@@ -426,8 +431,10 @@ export default function CandidatesPage() {
     const found = candidates.find((c) => c.id === viewId)
     if (!found) return
     autoViewHandledRef.current = true
+    const { canViewDetails } = resolveCandidatePermissions(roleName, menuAccess)
+    if (!canViewDetails) return
     handleViewCandidate(found)
-  }, [isAuthenticated, isLoading, candidates])
+  }, [isAuthenticated, isLoading, candidates, roleName, menuAccess])
 
   // Reload candidates when search term changes (debounced)
   useEffect(() => {
@@ -555,10 +562,13 @@ export default function CandidatesPage() {
     return null
   }
 
-  const cfg = menuAccess['/candidates'] || {}
-  const visibleRoles: string[] = cfg.visibleRoles && cfg.visibleRoles.length ? cfg.visibleRoles : [
-    'SUPER_ADMIN','Management','Head of Division','HRBP','TA_HO','TA_SITE','HIRING_MANAGER','INTERVIEWER'
-  ]
+  const {
+    visibleRoles,
+    canCreate,
+    canEdit,
+    canViewDetails,
+    canGenerateLink,
+  } = resolveCandidatePermissions(roleName, menuAccess)
   
   if (menuAccessLoading) {
     return (
@@ -572,10 +582,6 @@ export default function CandidatesPage() {
     router.push('/')
     return null
   }
-  const perms = cfg.permissions || { view: visibleRoles, create: ['SUPER_ADMIN','HRBP','TA_HO','TA_SITE'], edit: ['SUPER_ADMIN','HRBP','TA_HO','TA_SITE'] }
-  const canCreate = (perms.create || []).includes(roleName) || (perms.create || []).includes('*')
-  const canEdit = (perms.edit || []).includes(roleName) || (perms.edit || []).includes('*')
-  const canGenerateLink = ['SUPER_ADMIN', 'TA_HO', 'TA_SITE', 'HRBP'].includes(roleName)
 
   interface UploadFilesPayload {
     cvFile: File | null
@@ -587,8 +593,20 @@ export default function CandidatesPage() {
     console.log('New candidate data:', candidateData)
     
     try {
-      // Check if email is provided (required field)
-      if (!candidateData.email || !candidateData.email.trim()) {
+      if (String(candidateData.yearsOfExperience ?? '').trim() === '') {
+        alert('Years of Experience is required')
+        return
+      }
+      if (!String(candidateData.source || '').trim()) {
+        alert('Source is required')
+        return
+      }
+
+      // Email/phone optional only for Head hunter source
+      if (
+        !isHeadHunterSource(candidateData.source) &&
+        (!candidateData.email || !candidateData.email.trim())
+      ) {
         alert('Email is required to create a candidate')
         return
       }
@@ -606,7 +624,7 @@ export default function CandidatesPage() {
       const divisionValue = divisionArray.length > 0 ? divisionArray[0] : null
       
       const payload = {
-        email: candidateData.email.trim(),
+        email: candidateData.email?.trim() || null,
         firstName: firstName,
         lastName: lastName,
         phoneNumber: candidateData.phone || null,
@@ -804,14 +822,31 @@ export default function CandidatesPage() {
 
     console.log('Updating candidate data:', candidateData)
     try {
+      if (String(candidateData.yearsOfExperience ?? '').trim() === '') {
+        alert('Years of Experience is required')
+        return
+      }
+      if (!String(candidateData.source || '').trim()) {
+        alert('Source is required')
+        return
+      }
+      if (
+        !isHeadHunterSource(candidateData.source) &&
+        (!candidateData.email || !candidateData.email.trim())
+      ) {
+        alert('Email is required to update a candidate')
+        return
+      }
+
       const firstName = candidateData.fullName.split(' ')[0] || candidateData.fullName
       const lastName = candidateData.fullName.split(' ').slice(1).join(' ') || ''
       
       console.log('Building payload...')
 
       // Send all fields - convert empty strings to null, but always send the fields
+      // Empty email for Head hunter keeps existing (possibly placeholder) email on the backend
       const payload: any = {
-        email: candidateData.email,
+        email: candidateData.email?.trim() || null,
         firstName,
         lastName,
         phoneNumber: candidateData.phone || null,
@@ -1230,8 +1265,8 @@ export default function CandidatesPage() {
                           </div>
                         </td>
                         <td className="whitespace-nowrap px-3 py-4 text-sm text-gray-500">
-                          <div>{candidate.contactInfo.email}</div>
-                          <div>{candidate.contactInfo.phone}</div>
+                          <div>{displayCandidateEmail(candidate.contactInfo.email) || '—'}</div>
+                          <div>{candidate.contactInfo.phone || '—'}</div>
                         </td>
                         <td className="px-3 py-4 text-sm text-gray-500">
                           {(() => {
@@ -1306,8 +1341,10 @@ export default function CandidatesPage() {
                               </button>
                             )}
                             <button 
-                              onClick={() => handleViewCandidate(candidate)}
-                              className="text-indigo-600 hover:text-indigo-900"
+                              disabled={!canViewDetails}
+                              onClick={() => canViewDetails && handleViewCandidate(candidate)}
+                              className={`${canViewDetails ? 'text-indigo-600 hover:text-indigo-900' : 'text-gray-300 cursor-not-allowed'}`}
+                              title={canViewDetails ? 'View candidate' : 'Candidate details are not available for your role'}
                             >
                               View
                             </button>

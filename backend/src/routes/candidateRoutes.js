@@ -14,8 +14,20 @@ const { buildHrbpApplicationFptkFilterFromUser } = require('../utils/hrbpScope')
 const { isDepartmentHeadRole, buildHodCandidateScopeFromUser } = require('../utils/hodScope');
 const { assertUserCanAccessCandidate } = require('../utils/candidateAccess');
 
-const CANDIDATE_CREATE_FALLBACK = ['TA_HO', 'HRBP', 'TA_SITE', 'SUPER_ADMIN', 'CHRO'];
-const CANDIDATE_EDIT_FALLBACK = ['TA_HO', 'HRBP', 'TA_SITE', 'SUPER_ADMIN', 'CHRO'];
+const CANDIDATE_CREATE_FALLBACK = ['TA_HO', 'HRBP', 'SUPER_ADMIN', 'CHRO'];
+const CANDIDATE_EDIT_FALLBACK = ['TA_HO', 'HRBP', 'SUPER_ADMIN', 'CHRO'];
+
+/** TA_SITE: can list/view candidates, but hard deny create/update regardless of menuAccess. */
+function denyTaSiteCandidateWrite(req, res, next) {
+  if (req.user?.role === 'TA_SITE') {
+    return res.status(403).json({
+      success: false,
+      message:
+        'TA_SITE users can view candidates but cannot create or update candidate records',
+    });
+  }
+  return next();
+}
 
 /**
  * Resolve the base URL used to build absolute document URLs (e.g. fileUrl).
@@ -163,6 +175,7 @@ router.post('/me/reference', authenticate, authorize('CANDIDATE'), asyncHandler(
 router.post(
   '/',
   authenticate,
+  denyTaSiteCandidateWrite,
   requireMenuCreate('/candidates', CANDIDATE_CREATE_FALLBACK),
   asyncHandler(async (req, res) => {
     console.log('CREATE CANDIDATE - Received data:', JSON.stringify(req.body, null, 2));
@@ -199,7 +212,8 @@ router.post(
 router.get(
   '/bulk-template',
   authenticate,
-  authorize('TA_HO', 'HRBP', 'TA_SITE', 'SUPER_ADMIN', 'CHRO'),
+  denyTaSiteCandidateWrite,
+  authorize('TA_HO', 'HRBP', 'SUPER_ADMIN', 'CHRO'),
   asyncHandler(async (req, res) => {
     const format = (req.query.format || 'csv').toString();
     return sendTemplate(res, {
@@ -218,6 +232,7 @@ router.get(
 router.post(
   '/bulk-upload',
   authenticate,
+  denyTaSiteCandidateWrite,
   requireMenuCreate('/candidates', CANDIDATE_CREATE_FALLBACK),
   uploadLimiter,
   asyncHandler(async (req, res) => {
@@ -282,6 +297,7 @@ router.get(
 router.put(
   '/:id',
   authenticate,
+  denyTaSiteCandidateWrite,
   requireMenuEdit('/candidates', CANDIDATE_EDIT_FALLBACK),
   validationRules.uuidParam('id'),
   validate,
@@ -308,6 +324,7 @@ router.put(
 router.delete(
   '/:id',
   authenticate,
+  denyTaSiteCandidateWrite,
   requireMenuEdit('/candidates', CANDIDATE_EDIT_FALLBACK),
   validationRules.uuidParam('id'),
   validate,
@@ -330,6 +347,7 @@ router.delete(
 router.post(
   '/:id/documents',
   authenticate,
+  denyTaSiteCandidateWrite,
   requireMenuEdit('/candidates', CANDIDATE_EDIT_FALLBACK),
   uploadLimiter,
   validationRules.uuidParam('id'),
@@ -370,12 +388,15 @@ router.post(
 router.post(
   '/:id/form-link',
   authenticate,
+  denyTaSiteCandidateWrite,
   requireMenuEdit('/candidates', CANDIDATE_EDIT_FALLBACK),
   validationRules.uuidParam('id'),
   validate,
   asyncHandler(async (req, res) => {
     const candidateId = req.params.id;
     const expiresInDays = Number(req.body.expiresInDays) || 7;
+
+    await assertUserCanAccessCandidate(req.user, candidateId);
 
     const candidate = await candidateService.getCandidateProfile(candidateId);
     if (!candidate) {

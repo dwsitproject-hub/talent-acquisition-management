@@ -24,7 +24,9 @@ function buildHiringManagerFptkScope(user = {}) {
 
 /**
  * Ensures the user may access/modify the given candidate (scoped roles only).
- * Unrestricted roles (SUPER_ADMIN, TA_HO, CHRO) pass through.
+ * Unrestricted roles (SUPER_ADMIN, TA_HO, CHRO, TA_SITE) pass through.
+ *
+ * TA_SITE may list and view all candidates, but create/update are denied in routes.
  */
 async function assertUserCanAccessCandidate(user, candidateId) {
   if (!user) {
@@ -33,7 +35,7 @@ async function assertUserCanAccessCandidate(user, candidateId) {
 
   const userRole = user.role;
 
-  if (['SUPER_ADMIN', 'TA_HO', 'CHRO'].includes(userRole)) {
+  if (['SUPER_ADMIN', 'TA_HO', 'CHRO', 'TA_SITE'].includes(userRole)) {
     return;
   }
 
@@ -57,7 +59,7 @@ async function assertUserCanAccessCandidate(user, candidateId) {
     return;
   }
 
-  if (userRole === 'HRBP' || userRole === 'TA_SITE') {
+  if (userRole === 'HRBP') {
     const hrbpScope = buildHrbpApplicationFptkFilterFromUser(user);
     const allowed = await prisma.candidate.findFirst({
       where: {
