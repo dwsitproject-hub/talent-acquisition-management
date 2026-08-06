@@ -1,5 +1,34 @@
 /** Resolve candidate source fields from dedicated columns (with legacy fallbacks). */
 
+export const HEAD_HUNTER_SOURCE = 'Head hunter'
+export const PLACEHOLDER_EMAIL_DOMAIN = 'no-email.local'
+
+export const CANDIDATE_SOURCE_OPTIONS = [
+  'LinkedIn',
+  'Indeed',
+  'Jobstreet',
+  'Job Fair',
+  'Local Site',
+  'Referral',
+  'Head hunter',
+  'Others',
+] as const
+
+export function isHeadHunterSource(source: string | null | undefined): boolean {
+  return String(source || '').trim() === HEAD_HUNTER_SOURCE
+}
+
+/** Synthetic emails used when Head hunter candidates have no real contact email. */
+export function isPlaceholderCandidateEmail(email: string | null | undefined): boolean {
+  if (!email) return false
+  return String(email).trim().toLowerCase().endsWith(`@${PLACEHOLDER_EMAIL_DOMAIN}`)
+}
+
+export function displayCandidateEmail(email: string | null | undefined): string {
+  if (!email || isPlaceholderCandidateEmail(email)) return ''
+  return String(email).trim()
+}
+
 export function getCandidateSourceFields(candidate: unknown): {
   source: string
   sourceDetail: string

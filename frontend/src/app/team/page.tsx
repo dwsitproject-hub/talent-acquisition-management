@@ -169,8 +169,9 @@ const routes: Array<{
         'INTERVIEWER',
       ],
       permissions: {
-        create: ['SUPER_ADMIN', 'HRBP', 'TA_HO', 'TA_SITE'],
-        edit: ['SUPER_ADMIN', 'HRBP', 'TA_HO', 'TA_SITE'],
+        // TA_SITE: view allowed; create/edit hard-denied in candidatePermissions + API
+        create: ['SUPER_ADMIN', 'HRBP', 'TA_HO'],
+        edit: ['SUPER_ADMIN', 'HRBP', 'TA_HO'],
       },
     },
   },
@@ -190,6 +191,7 @@ const routes: Array<{
       ],
       permissions: {
         create: [],
+        // KIV is application-status management (allowed for TA_SITE, like position candidates)
         edit: ['SUPER_ADMIN', 'HRBP', 'TA_HO', 'TA_SITE'],
       },
     },

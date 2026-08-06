@@ -10,6 +10,7 @@ const { assertCandidateCanApplyToPosition } = require('../utils/candidateApplica
 const {
   PRISMA_APP_STATUS_STRINGS,
   mapUiStatusToApplicationStatus,
+  mapApplicationStatusToUi,
 } = require('../utils/applicationStatus');
 const { getPositionSlaBucket } = require('../utils/positionSla');
 const { runWithAuditSuppressed } = require('../utils/auditContext');
@@ -1267,7 +1268,7 @@ async function getSummaryByPosition(user = null) {
     updatedAt: true,
   };
 
-  let fptks, grouped, totalGrouped, onboardingApps;
+  let fptks, applications, totalGrouped, onboardingApps;
 
   // Shared select for ONBOARDING candidates (name + join date)
   const onboardingSelect = {
@@ -1282,20 +1283,26 @@ async function getSummaryByPosition(user = null) {
     },
   };
 
+  // Minimal per-application select used to compute cumulative "ever reached
+  // this stage" counts (see status-history aggregation below).
+  const applicationSelect = { id: true, fptkId: true, status: true };
+
   const isScopedRole = Object.keys(fptkWhere).length > 0;
 
   if (!isScopedRole) {
     // Unrestricted roles (SUPER_ADMIN, TA_HO, etc.): all queries are
     // independent — run them in parallel to halve round-trip latency.
-    [fptks, grouped, totalGrouped, onboardingApps] = await Promise.all([
+    [fptks, applications, totalGrouped, onboardingApps] = await Promise.all([
       prisma.fPTK.findMany({
         where: {},
         select: fptkSelect,
         orderBy: { createdAt: 'desc' },
       }),
-      prisma.application.groupBy({
-        by: ['fptkId', 'status'],
-        _count: { _all: true },
+      // Per-application current status — combined with ApplicationStatusHistory
+      // below to compute cumulative stage counts (a candidate can count toward
+      // several stage columns at once, since each represents "ever reached").
+      prisma.application.findMany({
+        select: applicationSelect,
       }),
       // Total applicants per FPTK regardless of current status — used for the
       // cumulative "Applied" count so it never decreases as candidates advance.
@@ -1311,8 +1318,8 @@ async function getSummaryByPosition(user = null) {
     ]);
   } else {
     // Scoped roles (HIRING_MANAGER, Head of Division, HRBP, TA_SITE): fetch the
-    // allowed FPTK IDs first, then use fptkId IN (...) for the groupBy so
-    // the application query uses the composite index instead of a JOIN.
+    // allowed FPTK IDs first, then use fptkId IN (...) for the queries so
+    // the application queries use the composite index instead of a JOIN.
     fptks = await prisma.fPTK.findMany({
       where: fptkWhere,
       select: fptkSelect,
@@ -1320,12 +1327,11 @@ async function getSummaryByPosition(user = null) {
     });
 
     const fptkIds = fptks.map((f) => f.id);
-    [grouped, totalGrouped, onboardingApps] = fptkIds.length > 0
+    [applications, totalGrouped, onboardingApps] = fptkIds.length > 0
       ? await Promise.all([
-          prisma.application.groupBy({
-            by: ['fptkId', 'status'],
+          prisma.application.findMany({
             where: { fptkId: { in: fptkIds } },
-            _count: { _all: true },
+            select: applicationSelect,
           }),
           prisma.application.groupBy({
             by: ['fptkId'],
@@ -1361,14 +1367,47 @@ async function getSummaryByPosition(user = null) {
     });
   });
 
+  // Cumulative "ever reached this stage" counts — a candidate contributes to
+  // every UI stage their status history (plus current status) has touched,
+  // not just their current status. Dedup happens at the UI-status level
+  // (mapApplicationStatusToUi) since several raw enum statuses collapse into
+  // the same UI label (e.g. OFFER_SENT and MEDICAL_CHECKUP_SCHEDULED both map
+  // to "Under Review") — without that, a single candidate could be counted
+  // twice in one column.
+  const applicationIds = applications.map((a) => a.id);
+  const statusHistoryRows = applicationIds.length > 0
+    ? await prisma.applicationStatusHistory.findMany({
+        where: { applicationId: { in: applicationIds } },
+        select: { applicationId: true, toStatus: true },
+      })
+    : [];
+
+  const rawStatusesByApplicationId = new Map();
+  statusHistoryRows.forEach((h) => {
+    if (!rawStatusesByApplicationId.has(h.applicationId)) {
+      rawStatusesByApplicationId.set(h.applicationId, new Set());
+    }
+    rawStatusesByApplicationId.get(h.applicationId).add(h.toStatus);
+  });
+
   const countsByFptkId = {};
   const allStatuses = new Set();
-  grouped.forEach((g) => {
-    if (!g.fptkId) return;
-    const status = (g.status || '').toString();
-    allStatuses.add(status);
-    if (!countsByFptkId[g.fptkId]) countsByFptkId[g.fptkId] = {};
-    countsByFptkId[g.fptkId][status] = g._count?._all || 0;
+  applications.forEach((app) => {
+    if (!app.fptkId) return;
+
+    const rawStatusesReached = rawStatusesByApplicationId.get(app.id) || new Set();
+    rawStatusesReached.add(app.status);
+
+    const uiStatusesReached = new Set();
+    rawStatusesReached.forEach((raw) => {
+      uiStatusesReached.add(mapApplicationStatusToUi(raw));
+    });
+
+    if (!countsByFptkId[app.fptkId]) countsByFptkId[app.fptkId] = {};
+    uiStatusesReached.forEach((uiStatus) => {
+      allStatuses.add(uiStatus);
+      countsByFptkId[app.fptkId][uiStatus] = (countsByFptkId[app.fptkId][uiStatus] || 0) + 1;
+    });
   });
 
   // Pre-compute SLA bucket server-side (uses memoised Indonesia holiday lookups).

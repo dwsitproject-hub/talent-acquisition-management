@@ -27,7 +27,7 @@ function formatJoinDateUtc(joinDate) {
  */
 async function resolveEmailDispatch(recipients, payload) {
   if (!recipients.length) {
-    logger.warn('[onboardingReminder] No active TA_HO emails; marking email leg as satisfied to avoid retry loops');
+    logger.warn('[onboardingReminder] No reminder recipient emails; marking email leg as satisfied to avoid retry loops');
     return { emailSentAt: new Date() };
   }
   const result = await emailService.sendOnboardingJoinReminderToTaTeam(payload);
@@ -62,8 +62,17 @@ async function processApplicationOffset(application, offsetDays) {
   const department = String(application.fptk?.department || '—');
   const candidateName = candidateDisplayName(application);
   const joinDateFormatted = formatJoinDateUtc(application.joinDate);
+  const positionArea = onboardingReminderRepository.resolveNormalizedArea(application.fptk);
 
-  const recipients = await onboardingReminderRepository.findTaTeamEmails();
+  const recipients = await onboardingReminderRepository.findReminderRecipientEmails(
+    application.fptk
+  );
+
+  logger.info('[onboardingReminder] Recipients resolved', {
+    applicationId: application.id,
+    positionArea: positionArea || '(unknown→HO)',
+    recipientCount: recipients.length,
+  });
 
   const emailPayload = {
     recipients,

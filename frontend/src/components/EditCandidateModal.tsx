@@ -18,7 +18,12 @@ import {
 } from '@/lib/fptkPositionOptions'
 import PositionAppliedForField, { type PositionPickerMeta } from '@/components/PositionAppliedForField'
 import { compressFile, formatFileSize } from '@/utils/fileCompression'
-import { getCandidateSourceFields } from '@/utils/candidateSource'
+import {
+  CANDIDATE_SOURCE_OPTIONS,
+  displayCandidateEmail,
+  getCandidateSourceFields,
+  isHeadHunterSource,
+} from '@/utils/candidateSource'
 
 interface FileSelection {
   cvFile: File | null
@@ -244,7 +249,7 @@ export default function EditCandidateModal({ isOpen, onClose, onSave, candidate 
         currentAddress: candidate.contactInfo.address || (candidate as any).currentAddress || '',
         permanentAddress: (candidate as any).permanentAddress || '',
         phone: candidate.contactInfo.phone || '',
-        email: candidate.contactInfo.email,
+        email: displayCandidateEmail(candidate.contactInfo.email),
         yearsOfExperience: (candidate as any).yearsOfExperience?.toString() || candidate.professionalInfo.experience?.toString() || '',
         source,
         sourceDetail,
@@ -435,6 +440,17 @@ export default function EditCandidateModal({ isOpen, onClose, onSave, candidate 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     e.stopPropagation()
+
+    if (String(formData.yearsOfExperience ?? '').trim() === '') {
+      alert('Years of Experience is required')
+      setActiveTab('personal')
+      return
+    }
+    if (!String(formData.source || '').trim()) {
+      alert('Source is required')
+      setActiveTab('personal')
+      return
+    }
     
     // Validate CV is uploaded (check if candidate already has CV or new one is uploaded)
     const hasExistingCV = candidate?.files?.find(f => f.type === 'cv')
@@ -992,11 +1008,11 @@ export default function EditCandidateModal({ isOpen, onClose, onSave, candidate 
                     </div>
                     <div>
                       <label style={{ display: 'block', fontSize: '14px', fontWeight: '500', color: '#374151', marginBottom: '4px' }}>
-                        Phone Number *
+                        Phone Number{isHeadHunterSource(formData.source) ? '' : ' *'}
                       </label>
                       <input
                         type="tel"
-                        required
+                        required={!isHeadHunterSource(formData.source)}
                         value={formData.phone}
                         onChange={(e) => handleInputChange('phone', e.target.value)}
                         style={{
@@ -1011,11 +1027,11 @@ export default function EditCandidateModal({ isOpen, onClose, onSave, candidate 
                     </div>
                     <div>
                       <label style={{ display: 'block', fontSize: '14px', fontWeight: '500', color: '#374151', marginBottom: '4px' }}>
-                        Email *
+                        Email{isHeadHunterSource(formData.source) ? '' : ' *'}
                       </label>
                       <input
                         type="email"
-                        required
+                        required={!isHeadHunterSource(formData.source)}
                         value={formData.email}
                         onChange={(e) => handleInputChange('email', e.target.value)}
                         style={{
@@ -1031,10 +1047,11 @@ export default function EditCandidateModal({ isOpen, onClose, onSave, candidate 
                     {/* Years of Experience */}
                     <div>
                       <label style={{ display: 'block', fontSize: '14px', fontWeight: '500', color: '#374151', marginBottom: '4px' }}>
-                        Years of Experience
+                        Years of Experience *
                       </label>
                       <input
                         type="number"
+                        required
                         value={formData.yearsOfExperience}
                         onChange={(e) => handleInputChange('yearsOfExperience', e.target.value)}
                         min="0"
@@ -1051,9 +1068,10 @@ export default function EditCandidateModal({ isOpen, onClose, onSave, candidate 
                     </div>
                     <div>
                       <label style={{ display: 'block', fontSize: '14px', fontWeight: '500', color: '#374151', marginBottom: '4px' }}>
-                        Source
+                        Source *
                       </label>
                       <select
+                        required
                         value={formData.source}
                         onChange={(e) => {
                           handleInputChange('source', e.target.value)
@@ -1070,13 +1088,11 @@ export default function EditCandidateModal({ isOpen, onClose, onSave, candidate 
                         }}
                       >
                         <option value="">Select Source</option>
-                        <option value="LinkedIn">LinkedIn</option>
-                        <option value="Indeed">Indeed</option>
-                        <option value="Jobstreet">Jobstreet</option>
-                        <option value="Job Fair">Job Fair</option>
-                        <option value="Local Site">Local Site</option>
-                        <option value="Referral">Referral</option>
-                        <option value="Others">Others</option>
+                        {CANDIDATE_SOURCE_OPTIONS.map((option) => (
+                          <option key={option} value={option}>
+                            {option}
+                          </option>
+                        ))}
                       </select>
                     </div>
                     {formData.source === 'Referral' && (
