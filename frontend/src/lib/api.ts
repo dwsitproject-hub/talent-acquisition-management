@@ -184,8 +184,8 @@ export default api
 
 // Admin Users APIs
 export const AdminUsersAPI = {
-  async list(search?: string, role?: string, area?: string) {
-    const res = await api.get('/admin/users', { params: { search, role, area } })
+  async list(search?: string, role?: string, area?: string, division?: string) {
+    const res = await api.get('/admin/users', { params: { search, role, area, division } })
     return res.data.data
   },
   async create(payload: any) {
