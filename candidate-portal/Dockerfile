@@ -10,6 +10,8 @@ RUN if [ -f package-lock.json ] || [ -f npm-shrinkwrap.json ]; then npm ci; else
 
 # Build
 FROM base AS build
+ARG NEXT_PUBLIC_API_URL
+ENV NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_URL}
 COPY --from=dependencies /app/node_modules ./node_modules
 COPY . .
 RUN npm run build
@@ -28,7 +30,6 @@ COPY --from=build --chown=nextjs:nodejs /app/.next/static ./.next/static
 USER nextjs
 EXPOSE 3000
 
-# Bind to 0.0.0.0 to allow connections from other Docker containers
-# Next.js standalone server.js uses HOSTNAME env var or defaults to localhost
-CMD ["sh", "-c", "HOSTNAME=0.0.0.0 PORT=3000 node server.js"]
+# Bind to 0.0.0.0; PORT comes from compose/env (default 3000)
+CMD ["sh", "-c", "HOSTNAME=${HOSTNAME:-0.0.0.0} PORT=${PORT:-3000} node server.js"]
 

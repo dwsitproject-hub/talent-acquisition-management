@@ -1,0 +1,108 @@
+# Staging — Frontend server only (Admin UI + Candidate Portal + Nginx)
+# Does NOT run backend, postgres, or redis.
+# Usage:
+#   cp .env.staging.frontend.example .env.staging.frontend
+#   # Set BACKEND_UPSTREAM_HOST in nginx config / env notes before first start
+#   docker compose -f docker-compose.staging.frontend.yml --env-file .env.staging.frontend up -d --build
+
+services:
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      target: production
+      args:
+        NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL}
+    container_name: tas_staging_frontend
+    restart: unless-stopped
+    environment:
+      NODE_ENV: ${NODE_ENV:-staging}
+      NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL}
+      NODE_OPTIONS: ${FRONTEND_NODE_OPTIONS:---max-old-space-size=512}
+      HOSTNAME: 0.0.0.0
+      PORT: ${FRONTEND_PORT}
+    ports:
+      - "${FRONTEND_HOST_PORT}:${FRONTEND_PORT}"
+    cpus: ${FRONTEND_CPUS:-1.0}
+    mem_limit: ${FRONTEND_MEM_LIMIT:-1g}
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "wget --quiet --tries=1 --spider http://127.0.0.1:$${PORT:-3000}/ || exit 1",
+        ]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+    networks:
+      tas_staging_network:
+        aliases:
+          - frontend
+          - tas_frontend
+
+  candidate-portal:
+    build:
+      context: ./candidate-portal
+      dockerfile: Dockerfile
+      target: production
+      args:
+        NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL}
+    container_name: tas_staging_candidate_portal
+    restart: unless-stopped
+    environment:
+      NODE_ENV: ${NODE_ENV:-staging}
+      NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL}
+      NODE_OPTIONS: ${CANDIDATE_NODE_OPTIONS:---max-old-space-size=512}
+      HOSTNAME: 0.0.0.0
+      PORT: ${CANDIDATE_PORTAL_PORT}
+    ports:
+      - "${CANDIDATE_PORTAL_HOST_PORT}:${CANDIDATE_PORTAL_PORT}"
+    cpus: ${CANDIDATE_CPUS:-1.0}
+    mem_limit: ${CANDIDATE_MEM_LIMIT:-1g}
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "wget --quiet --tries=1 --spider http://127.0.0.1:$${PORT:-3000}/ || exit 1",
+        ]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+    networks:
+      tas_staging_network:
+        aliases:
+          - candidate-portal
+          - tas_candidate_portal
+
+  nginx:
+    image: nginx:alpine
+    container_name: tas_staging_nginx
+    restart: unless-stopped
+    # Host ports from .env; container listens on 80/443 per nginx.network.conf
+    ports:
+      - "${HTTP_HOST_PORT}:80"
+      - "${HTTPS_HOST_PORT}:443"
+    volumes:
+      - ./nginx/nginx.network.conf:/etc/nginx/nginx.conf:ro
+      - ./ssl:/etc/nginx/ssl:ro
+    depends_on:
+      - frontend
+      - candidate-portal
+    networks:
+      - tas_staging_network
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "wget --quiet --tries=1 --spider http://127.0.0.1/health || exit 1",
+        ]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+
+networks:
+  tas_staging_network:
+    driver: bridge
