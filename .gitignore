@@ -12,6 +12,10 @@ ssl/*.pfx
 backend/logs/
 backend/coverage/
 backend/.env*
+.env.staging.backend
+.env.staging.frontend
+.env.staging.*
+!.env.staging.*.example
 *.sql
 !backend/prisma/migrations/**/migration.sql
 database/
