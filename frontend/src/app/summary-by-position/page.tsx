@@ -8,15 +8,16 @@ import PositionEditOverlay from '@/components/PositionEditOverlay'
 import { FPTKAPI } from '@/lib/api'
 import MultiSelectDropdown from '@/components/MultiSelectDropdown'
 import { usePositionEditOverlay } from '@/hooks/usePositionEditOverlay'
-import { getSlaBucketIndonesiaWorkingDays } from '@/utils/indoBusinessDays'
 import {
   displayFptkCurrentStatus,
   isFptkClosedByCurrentStatus,
   isFptkOpenByCurrentStatus,
 } from '@/utils/fptkPositionStatus'
+import { getPositionSlaWorkingDays } from '@/utils/positionSla'
 import {
   ExclamationCircleIcon,
   AdjustmentsHorizontalIcon,
+  InformationCircleIcon,
   XMarkIcon,
 } from '@heroicons/react/24/outline'
 import Spinner from '@/components/Spinner'
@@ -42,8 +43,18 @@ interface SummaryRow {
   statusFktk: string
   remark: string
   sla: string
+  slaDays: number | null
+  hiringManager: string
   counts: StatusCounts
   onboardingCandidates: OnboardingCandidate[]
+}
+
+function hiringManagerMatches(rowHm: string, selected: string[]): boolean {
+  if (selected.length === 0) return true
+  const normalized = (rowHm || '').trim().toLowerCase()
+  return selected.some(
+    (hm) => hm.trim().toLowerCase() === normalized
+  )
 }
 
 const DEFAULT_STATUSES: string[] = [
@@ -64,9 +75,11 @@ const DEFAULT_STATUSES: string[] = [
   'Keep In View',
 ]
 
+// Merged/compacted column set — Division/Section live as subtext under
+// Position, Area/Location combine into one cell, and Status/Status FKTK/
+// Remark combine into one cell. Kept as sortable keys on the underlying field.
 const FIXED_SORT_KEYS: string[] = [
-  'priority', 'division', 'area', 'location', 'section', 'position',
-  'currentStatus', 'statusFktk', 'remark', 'sla',
+  'priority', 'position', 'location', 'sla', 'currentStatus',
 ]
 
 const TERMINAL_STATUSES = new Set([
@@ -169,20 +182,63 @@ function getBadgeClass(status: string, count: number): string {
   return 'bg-indigo-100 text-indigo-800'
 }
 
-function SlaCell({ sla }: { sla: string }) {
-  const config: Record<string, { dot: string; text: string }> = {
-    '0-30 Days': { dot: 'bg-green-400', text: 'text-green-700' },
-    '31-60 Days': { dot: 'bg-yellow-400', text: 'text-yellow-700' },
-    '61-90 Days': { dot: 'bg-orange-400', text: 'text-orange-700' },
-    'Above 91 Days': { dot: 'bg-red-500', text: 'text-red-700' },
-  }
-  const c = config[sla]
-  if (!c) return <span className="text-gray-400">—</span>
+const SLA_BUCKET_TO_CARD_KEY: Record<string, SlaCardKey> = {
+  '0-30 Days': 'sla-0-30',
+  '31-60 Days': 'sla-31-60',
+  '61-90 Days': 'sla-61-90',
+  'Above 91 Days': 'sla-91',
+}
+
+/**
+ * Hero SLA badge — the persona's primary metric per position, so it's shown
+ * as a prominent colored pill with the exact working-day count (not just the
+ * bucket label), pinned right after the Position column.
+ */
+function SlaHeroBadge({ sla, slaDays }: { sla: string; slaDays: number | null }) {
+  const cardKey = SLA_BUCKET_TO_CARD_KEY[sla]
+  if (!cardKey) return <span className="text-gray-400 text-xs">—</span>
+  const cfg = CARD_CONFIG[cardKey]
   return (
-    <span className={`inline-flex items-center gap-1.5 ${c.text} font-medium text-xs whitespace-nowrap`}>
-      <span className={`h-2 w-2 rounded-full ${c.dot} shrink-0`} />
-      {sla}
+    <span
+      className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs font-semibold whitespace-nowrap ${cfg.bg} ${cfg.color} ${cfg.border}`}
+      title={`${sla} · ${cfg.sublabel}`}
+    >
+      <span className={`h-1.5 w-1.5 rounded-full ${cfg.dot} shrink-0`} />
+      {slaDays != null ? `${slaDays}d` : sla} · {cfg.sublabel}
     </span>
+  )
+}
+
+/** Combines Current Status + Status FKTK + Remark into one compact cell. */
+function StatusCell({
+  currentStatus,
+  statusFktk,
+  remark,
+}: {
+  currentStatus: string
+  statusFktk: string
+  remark: string
+}) {
+  const hasRemark = Boolean(remark) && remark !== '-'
+  const isReceived = statusFktk.trim().toLowerCase() === 'received'
+  return (
+    <div className="flex items-center gap-1.5 min-w-0">
+      <span className="truncate text-sm text-gray-900">{displayFptkCurrentStatus(currentStatus)}</span>
+      {statusFktk && statusFktk !== '-' && (
+        <span
+          className={`shrink-0 inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium ${
+            isReceived ? 'bg-green-50 text-green-700' : 'bg-gray-100 text-gray-500'
+          }`}
+        >
+          {statusFktk}
+        </span>
+      )}
+      {hasRemark && (
+        <span title={remark} className="shrink-0 cursor-default text-gray-400 hover:text-gray-600">
+          <InformationCircleIcon className="h-4 w-4" />
+        </span>
+      )}
+    </div>
   )
 }
 
@@ -353,7 +409,9 @@ function SummaryByPositionContent() {
   )
   const [areaFilter, setAreaFilter] = useState<string[]>([])
   const [statusFktkFilter, setStatusFktkFilter] = useState<string[]>([])
+  const [hiringManagerFilter, setHiringManagerFilter] = useState<string[]>([])
   const [divisions, setDivisions] = useState<string[]>([])
+  const [hiringManagers, setHiringManagers] = useState<string[]>([])
   const [locations, setLocations] = useState<string[]>([])
   const [areaToLocations, setAreaToLocations] = useState<Record<string, string[]>>({})
   const [hiddenStatuses, setHiddenStatuses] = useState<Set<string>>(new Set())
@@ -381,33 +439,6 @@ function SummaryByPositionContent() {
     loadSummaryData()
   }, [])
 
-  const mapApplicationStatusToUi = (status: string): string => {
-    const statusMap: Record<string, string> = {
-      'SUBMITTED': 'Applied',
-      'SCREENING': 'Shortlisted',
-      'PSYCHOMETRIC_TEST': 'Under Review',
-      'TECHNICAL_TEST': 'Assessment',
-      'INTERVIEW_SCHEDULED': 'Interview Scheduled',
-      'INTERVIEW_COMPLETED': 'Interviewed',
-      'DOCUMENT_VERIFICATION': 'Under Review',
-      'OFFER_PROPOSED': 'Offering Creation',
-      'OFFER_APPROVED': 'Pending Feedback',
-      'OFFER_SENT': 'Under Review',
-      'OFFER_ACCEPTED': 'Offer Accepted',
-      'OFFER_REJECTED': 'Offer Rejected',
-      'MEDICAL_CHECKUP_SCHEDULED': 'Under Review',
-      'MEDICAL_CHECKUP_COMPLETED': 'MCU',
-      'CONTRACT_SENT': 'Offer Accepted',
-      'CONTRACT_SIGNED': 'Offer Accepted',
-      'ONBOARDING': 'On Boarding',
-      'HIRED': 'Offer Accepted',
-      'REJECTED': 'Rejected (Failed Interview / Assessment)',
-      'WITHDRAWN': 'Withdrawn',
-      'KEEP_IN_VIEW': 'Keep In View',
-    }
-    return statusMap[status] || 'Applied'
-  }
-
   const loadSummaryData = async (options?: { silent?: boolean }) => {
     if (!options?.silent) {
       setLoading(true)
@@ -431,31 +462,31 @@ function SummaryByPositionContent() {
         const counts: StatusCounts = {}
         DEFAULT_STATUSES.forEach(s => { counts[s] = 0 })
 
+        // Backend already returns cumulative "ever reached this stage" counts,
+        // keyed and deduped by UI status label — no client-side re-mapping or
+        // re-summing needed (that used to risk double-counting a candidate who
+        // passed through several raw statuses that collapse into one UI label).
         const rawCounts = applicationCounts[job.id] || {}
-        Object.entries(rawCounts).forEach(([backendStatus, c]) => {
-          const uiStatus = mapApplicationStatusToUi((backendStatus || '').toString().toUpperCase())
-          if (uiStatus) {
-            counts[uiStatus] = (counts[uiStatus] || 0) + (Number(c) || 0)
-            collectedStatuses.add(uiStatus)
-          }
+        Object.entries(rawCounts).forEach(([uiStatus, c]) => {
+          counts[uiStatus] = Number(c) || 0
+          collectedStatuses.add(uiStatus)
         })
 
         // Override "Applied" with the cumulative total so it stays fixed
         // as candidates move through later stages.
         counts['Applied'] = totalApplicants[job.id] ?? counts['Applied'] ?? 0
 
-        const referenceDate = job.fptkReceiveDate || job.requestDate || job.createdAt
-        const isClosed = isFptkClosedByCurrentStatus(job.currentStatus)
-        const closeAnchorRaw = isClosed ? (job.closedAt || null) : null
-        const closeAnchorDate = closeAnchorRaw ? new Date(closeAnchorRaw) : null
-        const slaEndDate = closeAnchorDate && !isNaN(closeAnchorDate.getTime()) ? closeAnchorDate : new Date()
-        let slaBucket = '-'
-        if (referenceDate) {
-          const dateObj = new Date(referenceDate)
-          if (!isNaN(dateObj.getTime())) {
-            slaBucket = getSlaBucketIndonesiaWorkingDays(dateObj, slaEndDate)
-          }
-        }
+        // SLA bucket is pre-computed server-side using the memoised Indonesia
+        // holiday lookup (same logic as dashboard). Use it directly — no browser
+        // date-holidays calculation needed.
+        const slaBucket: string = job.sla || '-'
+        const slaDays = getPositionSlaWorkingDays({
+          fptkReceiveDate: job.fptkReceiveDate ?? null,
+          requestDate: job.requestDate ?? null,
+          createdAt: job.createdAt ?? null,
+          currentStatus: job.currentStatus ?? null,
+          closedAt: job.closedAt ?? null,
+        })
 
         return {
           id: job.id,
@@ -472,6 +503,8 @@ function SummaryByPositionContent() {
           statusFktk: job.statusFktk || '-',
           remark: job.remark || '-',
           sla: slaBucket,
+          slaDays,
+          hiringManager: (job.hiringManager || '').trim() || '—',
           counts,
           onboardingCandidates: onboardingCandidatesMap[job.id] ?? [],
         }
@@ -479,6 +512,15 @@ function SummaryByPositionContent() {
 
       setAllStatuses(Array.from(collectedStatuses))
       setRows(result)
+
+      const hmOpts =
+        Array.isArray(payload?.hiringManagers) && payload.hiringManagers.length
+          ? payload.hiringManagers
+          : Array.from(
+              new Set(result.map((r) => r.hiringManager).filter((hm) => hm && hm !== '—'))
+            ).sort((a, b) => a.localeCompare(b, undefined, { sensitivity: 'base' }))
+      setHiringManagers(hmOpts)
+      setHiringManagerFilter((prev) => prev.filter((hm) => hmOpts.includes(hm)))
 
       const divOpts = Array.isArray(payload?.divisions) && payload.divisions.length
         ? payload.divisions
@@ -509,6 +551,8 @@ function SummaryByPositionContent() {
       setAllStatuses([...DEFAULT_STATUSES])
       setDivisions([])
       setLocations([])
+      setHiringManagers([])
+      setHiringManagerFilter([])
       setAreaToLocations({})
     } finally {
       if (!options?.silent) {
@@ -529,9 +573,10 @@ function SummaryByPositionContent() {
         const locationOk = locationFilter.length === 0 || locationFilter.includes(r.location)
         const divisionOk = divisionFilter.length === 0 || divisionFilter.includes(r.division)
         const statusFktkOk = statusFktkFilter.length === 0 || statusFktkFilter.includes(r.statusFktk)
-        return priorityOk && areaOk && locationOk && divisionOk && statusFktkOk
+        const hiringManagerOk = hiringManagerMatches(r.hiringManager, hiringManagerFilter)
+        return priorityOk && areaOk && locationOk && divisionOk && statusFktkOk && hiringManagerOk
       }),
-    [rows, priorityFilter, areaFilter, locationFilter, divisionFilter, statusFktkFilter]
+    [rows, priorityFilter, areaFilter, locationFilter, divisionFilter, statusFktkFilter, hiringManagerFilter]
   )
 
   // Location options visible in the dropdown, narrowed to the selected area(s)
@@ -589,6 +634,14 @@ function SummaryByPositionContent() {
       if (!isFixedKey) {
         const av = a.counts[sortKey] ?? 0
         const bv = b.counts[sortKey] ?? 0
+        return (av - bv) * dir
+      }
+
+      // Sort by exact working days rather than the bucket label string, so
+      // "ascending" reads as least-urgent-first / most-urgent-first.
+      if (sortKey === 'sla') {
+        const av = a.slaDays ?? -1
+        const bv = b.slaDays ?? -1
         return (av - bv) * dir
       }
 
@@ -710,7 +763,7 @@ function SummaryByPositionContent() {
         )}
 
         {/* Filters */}
-        <div className="bg-white shadow rounded-lg p-4 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
+        <div className="bg-white shadow rounded-lg p-4 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
           <MultiSelectDropdown
             label="Priority"
             options={priorities}
@@ -719,6 +772,16 @@ function SummaryByPositionContent() {
             placeholder="All priorities"
             searchPlaceholder="Search priority..."
           />
+          {hiringManagers.length > 1 && (
+            <MultiSelectDropdown
+              label="Hiring Manager"
+              options={hiringManagers}
+              value={hiringManagerFilter}
+              onChange={setHiringManagerFilter}
+              placeholder="All hiring managers"
+              searchPlaceholder="Search hiring manager..."
+            />
+          )}
           <MultiSelectDropdown
             label="Area"
             options={['HO', 'Site']}
@@ -905,15 +968,10 @@ function SummaryByPositionContent() {
                   {(
                     [
                       { key: 'priority', label: 'Priority' },
-                      { key: 'area', label: 'Area' },
-                      { key: 'location', label: 'Location' },
-                      { key: 'division', label: 'Division' },
-                      { key: 'section', label: 'Section' },
                       { key: 'position', label: 'Position', stickyLeft: true },
-                      { key: 'currentStatus', label: 'Current Status' },
-                      { key: 'statusFktk', label: 'Status FKTK' },
-                      { key: 'remark', label: 'Remark' },
+                      { key: 'location', label: 'Location' },
                       { key: 'sla', label: 'SLA' },
+                      { key: 'currentStatus', label: 'Status' },
                     ] as { key: string; label: string; stickyLeft?: boolean }[]
                   ).map(col => (
                     <th
@@ -954,11 +1012,10 @@ function SummaryByPositionContent() {
                 {sortedRows.map((row) => (
                   <tr key={row.id} className="group hover:bg-gray-50 transition-colors">
                     <td className="px-3 py-1 whitespace-nowrap text-sm text-gray-900">{row.priority}</td>
-                    <td className="px-3 py-1 whitespace-nowrap text-sm text-gray-900">{row.area}</td>
-                    <td className="px-3 py-1 whitespace-nowrap text-sm text-gray-900">{row.location}</td>
-                    <td className="px-3 py-1 text-sm text-gray-900 max-w-[9rem] truncate" title={row.division}>{row.division}</td>
-                    <td className="px-3 py-1 text-sm text-gray-900 max-w-[12rem] truncate" title={row.section}>{row.section}</td>
-                    <td className="px-3 py-1 text-sm text-gray-900 max-w-[16rem] sticky left-0 z-10 bg-white group-hover:bg-gray-50 border-r-2 border-indigo-100 shadow-[2px_0_4px_-2px_rgba(0,0,0,0.08)] transition-colors" title={row.position}>
+                    <td
+                      className="px-3 py-1 text-sm text-gray-900 max-w-[16rem] sticky left-0 z-10 bg-white group-hover:bg-gray-50 border-r-2 border-indigo-100 shadow-[2px_0_4px_-2px_rgba(0,0,0,0.08)] transition-colors"
+                      title={row.position}
+                    >
                       {row.id ? (
                         <button
                           type="button"
@@ -970,19 +1027,28 @@ function SummaryByPositionContent() {
                       ) : (
                         <span className="truncate block">{row.position}</span>
                       )}
+                      {(row.division !== '-' || row.section !== '-') && (
+                        <div className="text-xs text-gray-400 truncate">
+                          {row.division !== '-' ? row.division : ''}
+                          {row.division !== '-' && row.section !== '-' ? ' › ' : ''}
+                          {row.section !== '-' ? row.section : ''}
+                        </div>
+                      )}
                     </td>
-                    <td className="px-3 py-1 whitespace-nowrap text-sm text-gray-900">
-                      {displayFptkCurrentStatus(row.currentStatus)}
-                    </td>
-                    <td className="px-3 py-1 whitespace-nowrap text-sm text-gray-900">{row.statusFktk}</td>
-                    <td
-                      className="px-3 py-1 text-sm text-gray-900 max-w-[10rem] truncate"
-                      title={row.remark}
-                    >
-                      {row.remark}
+                    <td className="px-3 py-1 text-sm text-gray-900 max-w-[12rem] truncate" title={`${row.area} · ${row.location}`}>
+                      {row.area !== '-' ? row.area : ''}
+                      {row.area !== '-' && row.location !== '-' ? ' · ' : ''}
+                      {row.location !== '-' ? row.location : ''}
                     </td>
                     <td className="px-3 py-1 whitespace-nowrap">
-                      <SlaCell sla={row.sla} />
+                      <SlaHeroBadge sla={row.sla} slaDays={row.slaDays} />
+                    </td>
+                    <td className="px-3 py-1 max-w-[14rem]">
+                      <StatusCell
+                        currentStatus={row.currentStatus}
+                        statusFktk={row.statusFktk}
+                        remark={row.remark}
+                      />
                     </td>
                     {visibleStatuses.map((status) => {
                       const count = row.counts[status] ?? 0
@@ -1019,7 +1085,7 @@ function SummaryByPositionContent() {
                 {rows.length === 0 && !error && (
                   <tr>
                     <td
-                      colSpan={10 + visibleStatuses.length}
+                      colSpan={5 + visibleStatuses.length}
                       className="px-4 py-10 text-center text-sm text-gray-500"
                     >
                       No data available. Create some positions and applications to see the summary.
@@ -1029,7 +1095,7 @@ function SummaryByPositionContent() {
                 {rows.length > 0 && sortedRows.length === 0 && (
                   <tr>
                     <td
-                      colSpan={10 + visibleStatuses.length}
+                      colSpan={5 + visibleStatuses.length}
                       className="px-4 py-10 text-center text-sm text-gray-500"
                     >
                       No rows match the selected filter.{' '}
@@ -1057,6 +1123,8 @@ function SummaryByPositionContent() {
         onClose={positionEdit.close}
         onSave={positionEdit.handleSave}
         headerBackLabel={`Back to ${positionEdit.backLabel || 'Summary'}`}
+        candidateStatusOnly={positionEdit.candidateStatusOnly}
+        canManagePositionCandidates={positionEdit.canManagePositionCandidates}
       />
     </Layout>
   )

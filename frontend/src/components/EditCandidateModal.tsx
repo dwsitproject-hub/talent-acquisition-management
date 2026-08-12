@@ -2,13 +2,28 @@
 
 import { useState, useRef, useEffect, useMemo } from 'react'
 import { useModalEscape } from '@/hooks/useModalEscape'
+import { useAuth } from '@/contexts/AuthContext'
 import { XMarkIcon, CloudArrowUpIcon, DocumentArrowUpIcon, XCircleIcon } from '@heroicons/react/24/outline'
 import { Candidate } from '@/types'
 import { MasterDivisionAPI } from '@/lib/api'
-import { loadSelectablePositionOptions, filterPositionOptionsByDivisions, prunePositionAppliedFor, type PositionOption } from '@/lib/fptkPositionOptions'
+import {
+  loadSelectablePositionOptions,
+  filterPositionOptionsByDivisions,
+  filterPositionOptionsByTaSiteScope,
+  parseScopeValues,
+  isTaSiteAuthUser,
+  prunePositionAppliedFor,
+  resolvePositionAppliedFptkIds,
+  type PositionOption,
+} from '@/lib/fptkPositionOptions'
 import PositionAppliedForField, { type PositionPickerMeta } from '@/components/PositionAppliedForField'
 import { compressFile, formatFileSize } from '@/utils/fileCompression'
-import { getCandidateSourceFields } from '@/utils/candidateSource'
+import {
+  CANDIDATE_SOURCE_OPTIONS,
+  displayCandidateEmail,
+  getCandidateSourceFields,
+  isHeadHunterSource,
+} from '@/utils/candidateSource'
 
 interface FileSelection {
   cvFile: File | null
@@ -24,6 +39,12 @@ interface EditCandidateModalProps {
 }
 
 export default function EditCandidateModal({ isOpen, onClose, onSave, candidate }: EditCandidateModalProps) {
+  const { user } = useAuth()
+  const isTaSiteUser = isTaSiteAuthUser(user)
+  const taSitePts = useMemo(() => parseScopeValues((user as any)?.pt), [user])
+  const taSiteAreaDetails = useMemo(() => parseScopeValues((user as any)?.areaDetail), [user])
+  const taSiteScopeReady = taSitePts.length > 0 && taSiteAreaDetails.length > 0
+
   const [activeTab, setActiveTab] = useState('personal')
   const [formData, setFormData] = useState({
     // Personal Information
@@ -63,6 +84,7 @@ export default function EditCandidateModal({ isOpen, onClose, onSave, candidate 
 
   const [fileErrors, setFileErrors] = useState<{ [key: string]: string }>({})
   const [isCompressing, setIsCompressing] = useState(false)
+  const [downloadingFileId, setDownloadingFileId] = useState<string | null>(null)
   // Track existing additional files separately from new uploads
   const [existingAdditionalFiles, setExistingAdditionalFiles] = useState<any[]>([])
 
@@ -82,10 +104,12 @@ export default function EditCandidateModal({ isOpen, onClose, onSave, candidate 
     [divisions]
   )
 
-  const positionOptionsForPicker = useMemo(
-    () => filterPositionOptionsByDivisions(activeJobPostings, formData.division),
-    [activeJobPostings, formData.division]
-  )
+  const positionOptionsForPicker = useMemo(() => {
+    if (isTaSiteUser) {
+      return filterPositionOptionsByTaSiteScope(activeJobPostings, taSitePts, taSiteAreaDetails)
+    }
+    return filterPositionOptionsByDivisions(activeJobPostings, formData.division)
+  }, [activeJobPostings, formData.division, isTaSiteUser, taSitePts, taSiteAreaDetails])
 
   const filteredPickerMeta = useMemo(
     () =>
@@ -98,7 +122,10 @@ export default function EditCandidateModal({ isOpen, onClose, onSave, candidate 
     [positionOptionsForPicker, positionPickerMeta]
   )
 
-  const divisionSelected = formData.division.length > 0
+  const divisionSelected = isTaSiteUser ? taSiteScopeReady : formData.division.length > 0
+  const taSitePickerNotReadyMessage =
+    'Your account has no PT or Area Detail assigned. Contact an administrator.'
+  const taSiteNoOptionsMessage = 'No open positions for your PT / Area Detail scope'
 
   const cvInputRef = useRef<HTMLInputElement>(null)
   const formInputRef = useRef<HTMLInputElement>(null)
@@ -222,7 +249,7 @@ export default function EditCandidateModal({ isOpen, onClose, onSave, candidate 
         currentAddress: candidate.contactInfo.address || (candidate as any).currentAddress || '',
         permanentAddress: (candidate as any).permanentAddress || '',
         phone: candidate.contactInfo.phone || '',
-        email: candidate.contactInfo.email,
+        email: displayCandidateEmail(candidate.contactInfo.email),
         yearsOfExperience: (candidate as any).yearsOfExperience?.toString() || candidate.professionalInfo.experience?.toString() || '',
         source,
         sourceDetail,
@@ -268,6 +295,50 @@ export default function EditCandidateModal({ isOpen, onClose, onSave, candidate 
       ...prev,
       skills: prev.skills.filter(skill => skill !== skillToRemove)
     }))
+  }
+
+  // Some documents have a stale `http://` URL baked in at upload time (e.g. an
+  // API_BASE_URL misconfigured without SSL). Loading that from an https:// page gets hard
+  // blocked by the browser as mixed content. Since this app is always served over the same
+  // host, it's safe to upgrade the scheme to match the current page before fetching.
+  const resolveFileUrl = (url: string): string => {
+    if (typeof window !== 'undefined' && window.location.protocol === 'https:' && url.startsWith('http://')) {
+      return `https://${url.slice('http://'.length)}`
+    }
+    return url
+  }
+
+  // Opening `file.url` directly via a plain <a target="_blank"> silently fails when the
+  // file is missing/unreachable on the server: the browser briefly opens a blank tab and
+  // closes it again (a "blink") with no visible error, since that request never appears
+  // in this tab's Network/Console. Fetch it first so failures are visible and reported.
+  const handleViewFile = async (file: { id: string; url?: string; name?: string }) => {
+    if (!file.url) {
+      alert('File is not available for download.')
+      return
+    }
+
+    setDownloadingFileId(file.id)
+    try {
+      const response = await fetch(resolveFileUrl(file.url))
+      if (!response.ok) {
+        throw new Error(`Server responded with ${response.status} ${response.statusText}`)
+      }
+
+      const blob = await response.blob()
+      const link = document.createElement('a')
+      link.href = URL.createObjectURL(blob)
+      link.download = file.name || 'download'
+      document.body.appendChild(link)
+      link.click()
+      document.body.removeChild(link)
+      URL.revokeObjectURL(link.href)
+    } catch (error) {
+      console.error('Failed to download file:', file.url, error)
+      alert(`Unable to open "${file.name || 'file'}". It may have been moved or deleted from the server.`)
+    } finally {
+      setDownloadingFileId(null)
+    }
   }
 
   const handleToggleDivision = (divisionName: string) => {
@@ -369,6 +440,17 @@ export default function EditCandidateModal({ isOpen, onClose, onSave, candidate 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     e.stopPropagation()
+
+    if (String(formData.yearsOfExperience ?? '').trim() === '') {
+      alert('Years of Experience is required')
+      setActiveTab('personal')
+      return
+    }
+    if (!String(formData.source || '').trim()) {
+      alert('Source is required')
+      setActiveTab('personal')
+      return
+    }
     
     // Validate CV is uploaded (check if candidate already has CV or new one is uploaded)
     const hasExistingCV = candidate?.files?.find(f => f.type === 'cv')
@@ -392,7 +474,15 @@ export default function EditCandidateModal({ isOpen, onClose, onSave, candidate 
     console.log('Additional files to upload:', formData.additionalFiles.length)
     try {
       await Promise.resolve(
-        onSave(formData, {
+        onSave(
+          {
+            ...formData,
+            positionAppliedFptkIds: resolvePositionAppliedFptkIds(
+              formData.positionAppliedFor,
+              activeJobPostings
+            ),
+          },
+          {
           cvFile: formData.cvFile,
           formDataFile: formData.formDataFile,
           additionalFiles: formData.additionalFiles,
@@ -611,8 +701,19 @@ export default function EditCandidateModal({ isOpen, onClose, onSave, candidate 
                       meta={filteredPickerMeta}
                       divisionSelected={divisionSelected}
                       disabled={!divisionSelected}
+                      pickerNotReadyMessage={isTaSiteUser ? taSitePickerNotReadyMessage : undefined}
+                      noOptionsMessage={isTaSiteUser ? taSiteNoOptionsMessage : undefined}
                       onChange={(positionAppliedFor) =>
-                        setFormData((prev) => ({ ...prev, positionAppliedFor }))
+                        setFormData((prev) => {
+                          const next: typeof prev = { ...prev, positionAppliedFor }
+                          if (isTaSiteUser) {
+                            const divisionsFromPositions = positionAppliedFor
+                              .map((title) => activeJobPostings.find((opt) => opt.title === title)?.division?.trim())
+                              .filter((div): div is string => !!div)
+                            next.division = [...new Set(divisionsFromPositions)]
+                          }
+                          return next
+                        })
                       }
                     />
                     <div>
@@ -907,11 +1008,11 @@ export default function EditCandidateModal({ isOpen, onClose, onSave, candidate 
                     </div>
                     <div>
                       <label style={{ display: 'block', fontSize: '14px', fontWeight: '500', color: '#374151', marginBottom: '4px' }}>
-                        Phone Number *
+                        Phone Number{isHeadHunterSource(formData.source) ? '' : ' *'}
                       </label>
                       <input
                         type="tel"
-                        required
+                        required={!isHeadHunterSource(formData.source)}
                         value={formData.phone}
                         onChange={(e) => handleInputChange('phone', e.target.value)}
                         style={{
@@ -926,11 +1027,11 @@ export default function EditCandidateModal({ isOpen, onClose, onSave, candidate 
                     </div>
                     <div>
                       <label style={{ display: 'block', fontSize: '14px', fontWeight: '500', color: '#374151', marginBottom: '4px' }}>
-                        Email *
+                        Email{isHeadHunterSource(formData.source) ? '' : ' *'}
                       </label>
                       <input
                         type="email"
-                        required
+                        required={!isHeadHunterSource(formData.source)}
                         value={formData.email}
                         onChange={(e) => handleInputChange('email', e.target.value)}
                         style={{
@@ -946,10 +1047,11 @@ export default function EditCandidateModal({ isOpen, onClose, onSave, candidate 
                     {/* Years of Experience */}
                     <div>
                       <label style={{ display: 'block', fontSize: '14px', fontWeight: '500', color: '#374151', marginBottom: '4px' }}>
-                        Years of Experience
+                        Years of Experience *
                       </label>
                       <input
                         type="number"
+                        required
                         value={formData.yearsOfExperience}
                         onChange={(e) => handleInputChange('yearsOfExperience', e.target.value)}
                         min="0"
@@ -966,9 +1068,10 @@ export default function EditCandidateModal({ isOpen, onClose, onSave, candidate 
                     </div>
                     <div>
                       <label style={{ display: 'block', fontSize: '14px', fontWeight: '500', color: '#374151', marginBottom: '4px' }}>
-                        Source
+                        Source *
                       </label>
                       <select
+                        required
                         value={formData.source}
                         onChange={(e) => {
                           handleInputChange('source', e.target.value)
@@ -985,13 +1088,11 @@ export default function EditCandidateModal({ isOpen, onClose, onSave, candidate 
                         }}
                       >
                         <option value="">Select Source</option>
-                        <option value="LinkedIn">LinkedIn</option>
-                        <option value="Indeed">Indeed</option>
-                        <option value="Jobstreet">Jobstreet</option>
-                        <option value="Job Fair">Job Fair</option>
-                        <option value="Local Site">Local Site</option>
-                        <option value="Referral">Referral</option>
-                        <option value="Others">Others</option>
+                        {CANDIDATE_SOURCE_OPTIONS.map((option) => (
+                          <option key={option} value={option}>
+                            {option}
+                          </option>
+                        ))}
                       </select>
                     </div>
                     {formData.source === 'Referral' && (
@@ -1151,23 +1252,25 @@ export default function EditCandidateModal({ isOpen, onClose, onSave, candidate 
                                   </p>
                                 </div>
                                 {file.url && (
-                                  <a
-                                    href={file.url}
-                                    target="_blank"
-                                    rel="noopener noreferrer"
+                                  <button
+                                    type="button"
+                                    onClick={() => handleViewFile(file)}
+                                    disabled={downloadingFileId === file.id}
                                     style={{
                                       marginLeft: '8px',
                                       padding: '4px 12px',
-                                      backgroundColor: '#4F46E5',
+                                      backgroundColor: downloadingFileId === file.id ? '#9CA3AF' : '#4F46E5',
                                       color: 'white',
+                                      border: 'none',
                                       borderRadius: '4px',
                                       fontSize: '12px',
                                       textDecoration: 'none',
-                                      fontWeight: '500'
+                                      fontWeight: '500',
+                                      cursor: downloadingFileId === file.id ? 'not-allowed' : 'pointer'
                                     }}
                                   >
-                                    View
-                                  </a>
+                                    {downloadingFileId === file.id ? 'Loading...' : 'View'}
+                                  </button>
                                 )}
                               </div>
                             )

@@ -10,6 +10,7 @@ const path = require('path');
 const logger = require('./utils/logger');
 const { errorHandler, notFoundHandler } = require('./middleware/errorHandler');
 const { generalLimiter } = require('./middleware/rateLimiter');
+const auditContextMiddleware = require('./middleware/auditContext');
 
 // Import routes
 const authRoutes = require('./routes/authRoutes');
@@ -30,6 +31,9 @@ const app = express();
 app.set('trust proxy', 1);
 // Disable ETag to avoid 304 on frequently refreshed stats
 app.set('etag', false);
+
+// Request-scoped audit context (IP, user agent, authenticated user id)
+app.use(auditContextMiddleware);
 
 // Security middleware
 app.use(helmet({

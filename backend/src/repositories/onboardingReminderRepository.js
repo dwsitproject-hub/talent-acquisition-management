@@ -1,4 +1,5 @@
 const prisma = require('../config/database');
+const { parseMulti, isTaSiteRole, TA_SITE_FIXED_AREA } = require('../utils/hrbpScope');
 
 /** @param {Date} date */
 function startOfUtcDay(date) {
@@ -11,6 +12,71 @@ function addUtcDays(utcDayStart, n) {
   const x = new Date(utcDayStart.getTime());
   x.setUTCDate(x.getUTCDate() + n);
   return x;
+}
+
+/**
+ * Canonical FPTK area label: HO | Site | '' (unknown).
+ * Matches dashboard/summary conventions (area column, then location fallback).
+ */
+function resolveNormalizedArea(fptk) {
+  const area = (fptk?.area || '').trim();
+  if (area) {
+    const lower = area.toLowerCase();
+    if (lower === 'ho') return 'HO';
+    if (lower === 'site') return 'Site';
+    return area;
+  }
+  const loc = (fptk?.location || '').trim().toLowerCase();
+  if (loc === 'head office' || loc === 'ho') return 'HO';
+  if (loc === 'site') return 'Site';
+  return '';
+}
+
+/**
+ * Roles that should receive onboarding join reminders for this FPTK area.
+ * - HO: TA_HO, HRBP
+ * - Site: TA_SITE, TA_HO, HRBP
+ * Unknown area defaults to HO recipients.
+ */
+function reminderRolesForArea(normalizedArea) {
+  if (String(normalizedArea || '').toLowerCase() === 'site') {
+    return ['TA_SITE', 'TA_HO', 'HRBP'];
+  }
+  return ['TA_HO', 'HRBP'];
+}
+
+function norm(s) {
+  return String(s || '').trim().toLowerCase();
+}
+
+function listIncludes(values, target) {
+  const t = norm(target);
+  if (!t) return false;
+  return values.some((v) => norm(v) === t);
+}
+
+function areasForUser(user) {
+  if (isTaSiteRole(user?.role)) return [TA_SITE_FIXED_AREA];
+  return parseMulti(user?.area);
+}
+
+/**
+ * HRBP / TA_SITE: only users whose PT / Area / Area Detail scope covers the FPTK.
+ * TA_HO: all active users with that role (org-wide).
+ */
+function userMatchesFptkScope(user, fptk) {
+  if (user.role === 'TA_HO') return true;
+
+  const pts = parseMulti(user.pt);
+  const areas = areasForUser(user);
+  const details = parseMulti(user.areaDetail);
+  if (!pts.length || !areas.length || !details.length) return false;
+
+  return (
+    listIncludes(pts, fptk?.pt) &&
+    listIncludes(areas, resolveNormalizedArea(fptk)) &&
+    listIncludes(details, fptk?.areaDetail)
+  );
 }
 
 /**
@@ -46,6 +112,10 @@ async function findApplicationsJoiningBetween(utcDayStart, utcDayEndExclusive) {
           department: true,
           positionTitle: true,
           position: true,
+          pt: true,
+          area: true,
+          areaDetail: true,
+          location: true,
         },
       },
     },
@@ -82,23 +152,51 @@ async function markEmailSent(dispatchId, emailSentAt) {
   });
 }
 
-async function findTaTeamEmails() {
+/**
+ * Resolve reminder recipient emails for a position (FPTK).
+ * @param {{ pt?: string|null, area?: string|null, areaDetail?: string|null, location?: string|null }} fptk
+ * @returns {Promise<string[]>}
+ */
+async function findReminderRecipientEmails(fptk) {
+  const normalizedArea = resolveNormalizedArea(fptk);
+  const roles = reminderRolesForArea(normalizedArea);
+
   const users = await prisma.user.findMany({
     where: {
-      role: 'TA_HO',
+      role: { in: roles },
       isActive: true,
     },
-    select: { email: true },
+    select: {
+      email: true,
+      role: true,
+      pt: true,
+      area: true,
+      areaDetail: true,
+    },
   });
-  return users.map((u) => String(u.email || '').trim()).filter(Boolean);
+
+  const emails = users
+    .filter((u) => userMatchesFptkScope(u, fptk))
+    .map((u) => String(u.email || '').trim())
+    .filter(Boolean);
+
+  return [...new Set(emails)];
+}
+
+/** @deprecated Use findReminderRecipientEmails(fptk) */
+async function findTaTeamEmails() {
+  return findReminderRecipientEmails({ area: 'HO' });
 }
 
 module.exports = {
   startOfUtcDay,
   addUtcDays,
+  resolveNormalizedArea,
+  reminderRolesForArea,
   findApplicationsJoiningBetween,
   findDispatch,
   createDispatch,
   markEmailSent,
+  findReminderRecipientEmails,
   findTaTeamEmails,
 };

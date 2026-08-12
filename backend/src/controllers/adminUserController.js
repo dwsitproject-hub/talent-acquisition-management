@@ -7,20 +7,21 @@ exports.listUsers = asyncHandler(async (req, res) => {
   const search = (req.query.search || '').toString();
   const role = req.query.role || null;
   const area = req.query.area || null;
-  const users = await adminUserService.listUsers(search, role, area);
+  const division = req.query.division || null;
+  const users = await adminUserService.listUsers(search, role, area, division);
   res.json({ success: true, data: users });
 });
 
 exports.createUser = asyncHandler(async (req, res) => {
   const data = req.body;
-  const result = await adminUserService.createUser(data);
+  const result = await adminUserService.createUser(data, req.user);
   res.status(201).json({ success: true, data: result });
 });
 
 exports.updateUser = asyncHandler(async (req, res) => {
   const id = req.params.id;
   const data = req.body;
-  const result = await adminUserService.updateUser(id, data);
+  const result = await adminUserService.updateUser(id, data, req.user);
   res.json({ success: true, data: result });
 });
 

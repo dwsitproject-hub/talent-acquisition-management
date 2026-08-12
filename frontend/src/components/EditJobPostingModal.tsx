@@ -15,16 +15,22 @@ import {
   type FptkRequiredKey,
 } from '@/utils/fptkFormRequired'
 import {
-  candidateDivisionMatchesJob,
-  getCandidateDivisions,
+  isSuggestedCandidateForPosition,
   parseLanguagesData,
+  SUGGESTED_CANDIDATE_MIN_MATCHING_SKILLS,
 } from '@/utils/candidateProfileShape'
+import { extractCandidateLockFields } from '@/utils/candidateApplicationLock'
 import {
-  candidateEligibleForPositionSuggestion,
-  extractCandidateLockFields,
-  getCandidateLockMessage,
-} from '@/utils/candidateApplicationLock'
-import { mapApplicationStatusToUi, mapUiStatusToApplicationStatus } from '@/utils/applicationStatusUi'
+  getCandidateSaveErrorMessage,
+  isCandidateLockSaveError,
+} from '@/utils/candidateSaveErrors'
+import {
+  mapApplicationStatusToUi,
+  mapUiStatusToApplicationStatus,
+  getAllowedNextStatuses,
+  isInterviewResultRequired,
+  ALL_APPLICATION_UI_STATUSES,
+} from '@/utils/applicationStatusUi'
 
 interface EditJobPostingModalProps {
   isOpen: boolean
@@ -38,6 +44,8 @@ interface EditJobPostingModalProps {
   headerBackLabel?: string
   /** When true, position fields are read-only and candidate status saves immediately via API (TA Site). */
   candidateStatusOnly?: boolean
+  /** When true, user can add suggested/manual candidates and save them to the position. */
+  canManagePositionCandidates?: boolean
 }
 
 export default function EditJobPostingModal({ 
@@ -49,6 +57,7 @@ export default function EditJobPostingModal({
   overlayZIndex = 1000,
   headerBackLabel,
   candidateStatusOnly = false,
+  canManagePositionCandidates = true,
 }: EditJobPostingModalProps) {
   const { user } = useAuth()
   const userRole = (user as any)?.role?.name || (user as any)?.role || ''
@@ -87,6 +96,7 @@ export default function EditJobPostingModal({
   const [statusChangeReason, setStatusChangeReason] = useState('')
   const [statusChangeBlacklist, setStatusChangeBlacklist] = useState(false)
   const [statusSaving, setStatusSaving] = useState(false)
+  const [candidatesSaving, setCandidatesSaving] = useState(false)
   const [suggestedCandidates, setSuggestedCandidates] = useState<any[]>([])
   const [allCandidates, setAllCandidates] = useState<any[]>([])
   const [showCandidatePicker, setShowCandidatePicker] = useState(false)
@@ -250,17 +260,6 @@ export default function EditJobPostingModal({
       }
     }
 
-    const loadHiringManagers = async () => {
-      try {
-        const users = await AdminUsersAPI.list('', 'HIRING_MANAGER')
-        if (isMounted) {
-          setHiringManagerOptions(users.map((u: any) => ({ firstName: u.firstName, lastName: u.lastName })))
-        }
-      } catch (error) {
-        console.error('Error loading hiring managers:', error)
-      }
-    }
-
     const loadTeamMembers = async () => {
       try {
         const users = await AdminUsersAPI.list('', '') // Load all users
@@ -279,13 +278,49 @@ export default function EditJobPostingModal({
     }
 
     loadDivisions()
-    loadHiringManagers()
     loadTeamMembers()
 
     return () => {
       isMounted = false
     }
   }, [])
+
+  // Load hiring managers filtered by selected position division (A–Z)
+  useEffect(() => {
+    let isMounted = true
+    const division = (formData.division || '').trim()
+
+    if (!division) {
+      setHiringManagerOptions([])
+      return () => {
+        isMounted = false
+      }
+    }
+
+    const loadHiringManagers = async () => {
+      try {
+        const users = await AdminUsersAPI.list('', 'HIRING_MANAGER', undefined, division)
+        if (!isMounted) return
+        const options = (users || [])
+          .map((u: any) => ({ firstName: u.firstName || '', lastName: u.lastName || '' }))
+          .sort((a: { firstName: string; lastName: string }, b: { firstName: string; lastName: string }) => {
+            const nameA = `${a.firstName} ${a.lastName}`.trim().toLowerCase()
+            const nameB = `${b.firstName} ${b.lastName}`.trim().toLowerCase()
+            return nameA.localeCompare(nameB)
+          })
+        setHiringManagerOptions(options)
+      } catch (error) {
+        console.error('Error loading hiring managers:', error)
+        if (isMounted) setHiringManagerOptions([])
+      }
+    }
+
+    loadHiringManagers()
+
+    return () => {
+      isMounted = false
+    }
+  }, [formData.division])
 
   const ptOptions = useMemo(() => {
     const set = new Set<string>()
@@ -383,7 +418,7 @@ export default function EditJobPostingModal({
         pt: (jobPosting as any).pt || '',
         noFktk: (jobPosting as any).noFktk || '',
         statusFktk: (jobPosting as any).statusFktk || '',
-        division: jobPosting.department || '',
+        division: (jobPosting as any).division || jobPosting.department || '',
         section: (jobPosting as any).section || '',
         hiringManager: jobPosting.hiringManager || '',
         position: jobPosting.title || '',
@@ -434,7 +469,7 @@ export default function EditJobPostingModal({
         pt: (jobPosting as any).pt || '',
         noFktk: (jobPosting as any).noFktk || '',
         statusFktk: (jobPosting as any).statusFktk || '',
-        division: jobPosting.department || '',
+        division: (jobPosting as any).division || jobPosting.department || '',
         section: (jobPosting as any).section || '',
         hiringManager: jobPosting.hiringManager || '',
         position: jobPosting.title || '',
@@ -607,16 +642,14 @@ export default function EditJobPostingModal({
         // Map candidates to frontend structure
         const mappedCandidates = candidates.map(mapApiCandidate).filter((c: any) => c !== null)
         
-        const suggested = mappedCandidates.filter((candidate: any) => {
-          const allDivisions = getCandidateDivisions(candidate)
-          const hasMatchingDivision = candidateDivisionMatchesJob(jobDivision, candidate)
-          const notApplied = !appliedIds.has(candidate.id)
-          const eligible = candidateEligibleForPositionSuggestion(candidate)
-          if (hasMatchingDivision && notApplied && eligible) {
-            console.log('[EditJobPostingModal] Initial suggested candidate:', candidate.id, 'divisions:', allDivisions)
-          }
-          return hasMatchingDivision && notApplied && eligible
-        }).slice(0, 10) // Limit to 10 suggestions
+        const suggested = mappedCandidates.filter((candidate: any) =>
+          isSuggestedCandidateForPosition(
+            candidate,
+            jobDivision,
+            formData.skills,
+            appliedIds
+          )
+        ).slice(0, 10)
         
         setSuggestedCandidates(suggested)
       })()
@@ -738,21 +771,16 @@ export default function EditJobPostingModal({
         const candidates = rawCandidates.map(mapApiCandidate).filter((c: any) => c !== null)
           const jobDivision = formData.division
           
-          const suggested = candidates.filter((candidate: any) => {
-            const allDivisions = getCandidateDivisions(candidate)
-            console.log('[EditJobPostingModal] Candidate divisions:', allDivisions, 'for candidate:', candidate.id)
-
-            const hasMatchingDivision = candidateDivisionMatchesJob(jobDivision, candidate)
-            const notApplied = !appliedCandidates.find((applied: any) => applied.id === candidate.id)
-            const eligible = candidateEligibleForPositionSuggestion(candidate)
-
-            const shouldInclude = hasMatchingDivision && notApplied && eligible
-            if (shouldInclude) {
-              console.log('[EditJobPostingModal] Including candidate:', candidate.id, 'with divisions:', allDivisions)
-            }
-
-            return shouldInclude
-          }).slice(0, 10) // Limit to 10 suggestions
+          const suggested = candidates.filter((candidate: any) =>
+            isSuggestedCandidateForPosition(
+              candidate,
+              jobDivision,
+              formData.skills,
+              new Set(
+                appliedCandidates.map((applied: any) => applied.id || applied.candidateId).filter(Boolean)
+              )
+            )
+          ).slice(0, 10)
           
           console.log('[EditJobPostingModal] Suggested candidates:', suggested.length)
           setSuggestedCandidates(suggested)
@@ -766,7 +794,7 @@ export default function EditJobPostingModal({
     } else if (!formData.division) {
       setSuggestedCandidates([])
     }
-  }, [formData.division, appliedCandidates, jobPosting?.id])
+  }, [formData.division, formData.skills, appliedCandidates, jobPosting?.id])
 
   // Simple localStorage logger
   const appendOpenPositionLog = (entry: any) => {
@@ -863,6 +891,16 @@ export default function EditJobPostingModal({
       c => c.id === candidateId || c.candidateId === candidateId
     )
     const oldStatus = target ? target.status : undefined
+
+    if (isInterviewResultRequired(oldStatus, newStatus)) {
+      const hasInterviewResult = (target?.interviews || []).some(
+        (iv: any) => (iv?.results || '').toString().trim().length > 0
+      )
+      if (!hasInterviewResult) {
+        alert(`Interview Result is required before moving this candidate from "${oldStatus}" to "${newStatus}". Please fill in the Interview Results field first.`)
+        return
+      }
+    }
 
     if (candidateStatusOnly) {
       const applicationId = target?.applicationId
@@ -976,7 +1014,6 @@ export default function EditJobPostingModal({
   }
 
   const handleCandidateJoinDateChange = (candidateId: string, dateValue: string) => {
-    if (candidateStatusOnly) return
     setAppliedCandidates(prev =>
       prev.map(candidate => {
         const matches =
@@ -995,11 +1032,6 @@ export default function EditJobPostingModal({
   }
 
   const handleAddSuggestedCandidate = (candidate: any) => {
-    if (!candidateEligibleForPositionSuggestion(candidate)) {
-      alert(getCandidateLockMessage(candidate))
-      return
-    }
-
     const newAppliedCandidate = mergeAppliedCandidateData(
       {
         ...candidate,
@@ -1026,11 +1058,6 @@ export default function EditJobPostingModal({
   }
 
   const handleAddManualCandidate = (candidate: any) => {
-    if (!candidateEligibleForPositionSuggestion(candidate)) {
-      alert(getCandidateLockMessage(candidate))
-      return
-    }
-
     const newAppliedCandidate = mergeAppliedCandidateData(
       {
         ...candidate,
@@ -1156,7 +1183,8 @@ export default function EditJobPostingModal({
       setFormData(prev => ({
         ...prev,
         division: value,
-        section: '' // Reset section when division changes
+        section: '', // Reset section when division changes
+        hiringManager: '', // HM options are scoped to division
       }))
       return
     }
@@ -1167,10 +1195,44 @@ export default function EditJobPostingModal({
     }))
   }
 
+  const refreshAppliedCandidatesFromServer = async () => {
+    if (!jobPosting?.id) return
+    try {
+      const jobAppliedRaw = await fetchApplicationsForFptk(jobPosting.id)
+      const candidateMap = new Map<string, any>(
+        allCandidates.map((candidate: any) => [candidate.id, candidate])
+      )
+      const enrichedFromJob = jobAppliedRaw.map((candidate: any) => {
+        const info = candidateMap.get(candidate.candidateId || candidate.id)
+        return mergeAppliedCandidateData(candidate, info)
+      })
+      setAppliedCandidates(enrichedFromJob)
+    } catch (error) {
+      console.error('EditJobPostingModal: refresh applied candidates', error)
+    }
+  }
+
+  const handleAppliedCandidatesSaveError = async (error: unknown) => {
+    console.error('Failed to save applied candidates:', error)
+    alert(getCandidateSaveErrorMessage(error))
+    if (isCandidateLockSaveError(error)) {
+      await refreshAppliedCandidatesFromServer()
+    }
+  }
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
 
     if (candidateStatusOnly) {
+      if (!canManagePositionCandidates) return
+      try {
+        setCandidatesSaving(true)
+        await Promise.resolve(onSave({ appliedCandidates }))
+      } catch (error) {
+        await handleAppliedCandidatesSaveError(error)
+      } finally {
+        setCandidatesSaving(false)
+      }
       return
     }
 
@@ -1258,7 +1320,11 @@ export default function EditJobPostingModal({
       milestones: milestones
     }
     
-    await Promise.resolve(onSave(payload))
+    try {
+      await Promise.resolve(onSave(payload))
+    } catch (error) {
+      await handleAppliedCandidatesSaveError(error)
+    }
   }
 
   useModalEscape(isOpen && !!jobPosting, onClose)
@@ -1345,11 +1411,11 @@ export default function EditJobPostingModal({
               color: '#111827',
               margin: 0
             }}>
-              {candidateStatusOnly ? 'Update Candidate Status' : 'Edit Position'} - {jobPosting.title}
+              {candidateStatusOnly ? 'Update Candidate' : 'Edit Position'} - {jobPosting.title}
             </h2>
             {candidateStatusOnly && (
               <p style={{ fontSize: '13px', color: '#6b7280', margin: 0 }}>
-                You can update applied candidate status only. Position details are read-only.
+                Update candidate status, join date, or add candidates to this position. New additions and join date changes are saved when you click Save Candidates. Position details are read-only.
               </p>
             )}
           </div>
@@ -1494,6 +1560,7 @@ export default function EditJobPostingModal({
                     name="hiringManager"
                     value={formData.hiringManager}
                     onChange={handleInputChange}
+                    disabled={!formData.division}
                     aria-invalid={fInv('hiringManager')}
                     style={{
                       width: '100%',
@@ -1501,10 +1568,13 @@ export default function EditJobPostingModal({
                       border: '1px solid #d1d5db',
                       borderRadius: '6px',
                       fontSize: '14px',
+                      backgroundColor: formData.division ? 'white' : '#f9fafb',
                       ...fptkRequiredFieldHighlightStyle(fInv('hiringManager'))
                     }}
                   >
-                    <option value="">Select Hiring Manager</option>
+                    <option value="">
+                      {formData.division ? 'Select Hiring Manager' : 'Select Division first'}
+                    </option>
                     {hiringManagerOptions.map((user, index) => {
                       const fullName = `${user.firstName} ${user.lastName}`.trim()
                       return (
@@ -1513,6 +1583,12 @@ export default function EditJobPostingModal({
                         </option>
                       )
                     })}
+                    {formData.hiringManager &&
+                      !hiringManagerOptions.some(
+                        (u) => `${u.firstName} ${u.lastName}`.trim() === formData.hiringManager
+                      ) && (
+                        <option value={formData.hiringManager}>{formData.hiringManager}</option>
+                      )}
                   </select>
                 </div>
 
@@ -2200,7 +2276,7 @@ export default function EditJobPostingModal({
                             ))}
                           </div>
                         </div>
-                        <div>
+                        <div style={{ flexShrink: 0, marginLeft: '16px', display: 'flex', flexDirection: 'column', alignItems: 'flex-end' }}>
                           <label style={{ fontSize: '12px', fontWeight: '500', color: '#374151', marginBottom: '4px', display: 'block' }}>
                             Status
                           </label>
@@ -2221,21 +2297,9 @@ export default function EditJobPostingModal({
                               backgroundColor: 'white'
                             }}
                           >
-                            <option value="Applied">Applied</option>
-                            <option value="Under Review">Under Review</option>
-                            <option value="Shortlisted">Shortlisted</option>
-                            <option value="Interview Scheduled">Interview Scheduled</option>
-                            <option value="Interviewed">Interviewed</option>
-                            <option value="Assessment">Assessment</option>
-                            <option value="Offering Creation">Offering Creation</option>
-                            <option value="Pending Feedback">Pending Feedback</option>
-                            <option value="Offer Accepted">Offer Accepted</option>
-                            <option value="MCU">MCU</option>
-                            <option value="On Boarding">On Boarding</option>
-                            <option value="Offer Rejected">Offer Rejected</option>
-                            <option value="Rejected (Failed Interview / Assessment)">Rejected (Failed Interview / Assessment)</option>
-                            <option value="Withdrawn">Withdrawn</option>
-                            <option value="Keep In View">Keep In View</option>
+                            {(getAllowedNextStatuses(candidate.status) || ALL_APPLICATION_UI_STATUSES).map((statusOption) => (
+                              <option key={statusOption} value={statusOption}>{statusOption}</option>
+                            ))}
                           </select>
                           {candidate.applicationId && (
                             <button
@@ -2278,11 +2342,6 @@ export default function EditJobPostingModal({
                               Withdraw Date: {formatDate(candidate.withdrawDate)}
                             </div>
                           ) : null}
-                          {candidate.rejectionReason && (
-                            <div style={{ marginTop: '6px', padding: '6px 8px', backgroundColor: '#fef9c3', border: '1px solid #fde68a', borderRadius: '4px', fontSize: '11px', color: '#92400e' }}>
-                              <span style={{ fontWeight: '600' }}>Reason: </span>{candidate.rejectionReason}
-                            </div>
-                          )}
                           {['MCU', 'On Boarding'].includes(candidate.status) ? (
                             <div style={{ marginTop: '10px' }}>
                               <label
@@ -2296,48 +2355,36 @@ export default function EditJobPostingModal({
                               >
                                 Join Date
                               </label>
-                              {candidateStatusOnly ? (
-                                <div
-                                  style={{
-                                    padding: '6px 8px',
-                                    border: '1px solid #e5e7eb',
-                                    borderRadius: '4px',
-                                    fontSize: '12px',
-                                    backgroundColor: '#f3f4f6',
-                                    color: '#374151',
-                                  }}
-                                >
-                                  {candidate.joinDate
-                                    ? formatDate(String(candidate.joinDate).slice(0, 10))
-                                    : '—'}
-                                </div>
-                              ) : (
-                                <input
-                                  type="date"
-                                  value={
-                                    candidate.joinDate
-                                      ? String(candidate.joinDate).slice(0, 10)
-                                      : ''
-                                  }
-                                  onChange={e =>
-                                    handleCandidateJoinDateChange(
-                                      candidate.id || candidate.candidateId,
-                                      e.target.value
-                                    )
-                                  }
-                                  style={{
-                                    padding: '6px 8px',
-                                    border: '1px solid #d1d5db',
-                                    borderRadius: '4px',
-                                    fontSize: '12px',
-                                    backgroundColor: 'white',
-                                  }}
-                                />
-                              )}
+                              <input
+                                type="date"
+                                value={
+                                  candidate.joinDate
+                                    ? String(candidate.joinDate).slice(0, 10)
+                                    : ''
+                                }
+                                onChange={e =>
+                                  handleCandidateJoinDateChange(
+                                    candidate.id || candidate.candidateId,
+                                    e.target.value
+                                  )
+                                }
+                                style={{
+                                  padding: '6px 8px',
+                                  border: '1px solid #d1d5db',
+                                  borderRadius: '4px',
+                                  fontSize: '12px',
+                                  backgroundColor: 'white',
+                                }}
+                              />
                             </div>
                           ) : null}
                         </div>
                       </div>
+                      {candidate.rejectionReason && (
+                        <div style={{ marginBottom: '12px', padding: '6px 8px', backgroundColor: '#fef9c3', border: '1px solid #fde68a', borderRadius: '4px', fontSize: '11px', color: '#92400e' }}>
+                          <span style={{ fontWeight: '600' }}>Reason: </span>{candidate.rejectionReason}
+                        </div>
+                      )}
                       
                       {/* Interview Details Section - Show when status is Interview Scheduled, Interviewed, or any subsequent status with interviews filled */}
                       {(() => {
@@ -2798,14 +2845,14 @@ export default function EditJobPostingModal({
                 )}
               </div>
 
-              {!candidateStatusOnly && (
+              {canManagePositionCandidates && (
               <>
               <div style={{ marginBottom: '20px' }}>
                 <h4 style={{ fontSize: '14px', fontWeight: '500', color: '#374151', marginBottom: '8px' }}>
                   Suggested Candidates ({suggestedCandidates.length})
                 </h4>
                 <p style={{ fontSize: '12px', color: '#6b7280', marginBottom: '12px' }}>
-                  Candidates with more than 3 matching required skills
+                  Candidates with matching division and at least {SUGGESTED_CANDIDATE_MIN_MATCHING_SKILLS} matching required skills
                 </p>
                 {suggestedCandidates.length > 0 ? (
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
@@ -2871,7 +2918,7 @@ export default function EditJobPostingModal({
                     textAlign: 'center'
                   }}>
                     <p style={{ fontSize: '14px', color: '#6b7280', margin: 0 }}>
-                      No candidates found with more than 3 matching required skills.
+                      No candidates found with matching division and at least {SUGGESTED_CANDIDATE_MIN_MATCHING_SKILLS} matching required skills.
                     </p>
                   </div>
                 )}
@@ -2905,7 +2952,6 @@ export default function EditJobPostingModal({
                   const searchLower = candidatePickerSearch.toLowerCase()
                   const pickerCandidates = allCandidates.filter((c: any) => {
                     if (alreadyAppliedIds.has(c.id)) return false
-                    if (!candidateEligibleForPositionSuggestion(c)) return false
                     if (!searchLower) return true
                     const name = (c.fullName || c.name || [c.personalInfo?.firstName, c.personalInfo?.lastName].filter(Boolean).join(' ') || '').toLowerCase()
                     const email = (c.email || c.contactInfo?.email || '').toLowerCase()
@@ -3021,12 +3067,12 @@ export default function EditJobPostingModal({
                   cursor: 'pointer'
                 }}
               >
-                {candidateStatusOnly ? 'Close' : 'Cancel'}
+                {candidateStatusOnly ? 'Cancel' : 'Cancel'}
               </button>
-              {!candidateStatusOnly && (
+              {canManagePositionCandidates && (
               <button
                 type="submit"
-                disabled={isEditingDisabled}
+                disabled={isEditingDisabled || candidatesSaving || statusSaving}
                 style={{
                   padding: '8px 16px',
                   border: 'none',
@@ -3034,12 +3080,12 @@ export default function EditJobPostingModal({
                   fontSize: '14px',
                   fontWeight: '500',
                   color: 'white',
-                  backgroundColor: isEditingDisabled ? '#9ca3af' : '#4f46e5',
-                  cursor: isEditingDisabled ? 'not-allowed' : 'pointer',
-                  opacity: isEditingDisabled ? 0.6 : 1
+                  backgroundColor: (isEditingDisabled || candidatesSaving || statusSaving) ? '#9ca3af' : '#4f46e5',
+                  cursor: (isEditingDisabled || candidatesSaving || statusSaving) ? 'not-allowed' : 'pointer',
+                  opacity: (isEditingDisabled || candidatesSaving || statusSaving) ? 0.6 : 1
                 }}
               >
-                Save Changes
+                {candidatesSaving ? 'Saving…' : candidateStatusOnly ? 'Save Candidates' : 'Save Changes'}
               </button>
               )}
               {candidateStatusOnly && statusSaving && (

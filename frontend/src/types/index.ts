@@ -8,6 +8,9 @@ export interface User {
   isActive: boolean
   division?: string
   department?: string
+  pt?: string
+  area?: string
+  areaDetail?: string
   lastLoginAt?: string
   createdAt: string
   updatedAt: string
@@ -385,6 +388,10 @@ export interface DashboardStats {
   applicationCountsByStatus?: Record<string, number>
   fptkPeriodCounts?: { current: Record<string, number> | null; previous: Record<string, number> | null }
   appPeriodCounts?: { current: Record<string, number> | null; previous: Record<string, number> | null }
+  candidatePeriodCounts?: { current: number | null; previous: number | null }
+  // Closed-in-period counts (anchored on closedAt) for Hired and Cancel/IM cards
+  hiredPeriodCounts?: { current: number | null; previous: number | null }
+  cancelImPeriodCounts?: { current: number | null; previous: number | null }
 }
 
 export interface PositionStatusByLocation {

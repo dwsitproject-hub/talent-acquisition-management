@@ -12,6 +12,7 @@ import PositionEditOverlay from '@/components/PositionEditOverlay'
 import { usePositionEditOverlay } from '@/hooks/usePositionEditOverlay'
 import ApplicationHistoryModal from '@/components/ApplicationHistoryModal'
 import {
+  displayCandidateEmail,
   formatCandidateSourceDetailLabel,
   formatCandidateSourceLabel,
   getCandidateSourceFields,
@@ -65,6 +66,7 @@ export default function ViewCandidateModal({ isOpen, onClose, candidate }: ViewC
   const [loadingPositionApplications, setLoadingPositionApplications] = useState(false)
   const [applicationsRefreshKey, setApplicationsRefreshKey] = useState(0)
   const [historyApplicationId, setHistoryApplicationId] = useState<string | null>(null)
+  const [downloadingFileId, setDownloadingFileId] = useState<string | null>(null)
 
   const positionEdit = usePositionEditOverlay(() => {
     if (candidate?.id) {
@@ -102,6 +104,50 @@ export default function ViewCandidateModal({ isOpen, onClose, candidate }: ViewC
     }
     void loadPositionApplications(candidate.id)
   }, [isOpen, candidate?.id, applicationsRefreshKey, loadPositionApplications])
+
+  // Some documents have a stale `http://` URL baked in at upload time (e.g. an
+  // API_BASE_URL misconfigured without SSL). Loading that from an https:// page gets hard
+  // blocked by the browser as mixed content. Since this app is always served over the same
+  // host, it's safe to upgrade the scheme to match the current page before fetching.
+  const resolveFileUrl = (url: string): string => {
+    if (typeof window !== 'undefined' && window.location.protocol === 'https:' && url.startsWith('http://')) {
+      return `https://${url.slice('http://'.length)}`
+    }
+    return url
+  }
+
+  // Opening `file.url` directly via `window.open` silently fails when the file is
+  // missing/unreachable on the server: the browser briefly opens a blank tab and closes
+  // it again (a "blink") with no visible error, since that request never appears in this
+  // tab's Network/Console. Fetch it first so failures are visible and reported to the user.
+  const downloadFileFromUrl = async (file: { id: string; url?: string; name?: string }) => {
+    if (!file.url) {
+      alert('File is not available for download.')
+      return
+    }
+
+    setDownloadingFileId(file.id)
+    try {
+      const response = await fetch(resolveFileUrl(file.url))
+      if (!response.ok) {
+        throw new Error(`Server responded with ${response.status} ${response.statusText}`)
+      }
+
+      const blob = await response.blob()
+      const link = document.createElement('a')
+      link.href = URL.createObjectURL(blob)
+      link.download = file.name || 'download'
+      document.body.appendChild(link)
+      link.click()
+      document.body.removeChild(link)
+      URL.revokeObjectURL(link.href)
+    } catch (error) {
+      console.error('Failed to download file:', file.url, error)
+      alert(`Unable to download "${file.name || 'file'}". It may have been moved or deleted from the server.`)
+    } finally {
+      setDownloadingFileId(null)
+    }
+  }
 
   useEffect(() => {
     if (!isOpen) {
@@ -332,7 +378,7 @@ export default function ViewCandidateModal({ isOpen, onClose, candidate }: ViewC
               const bpjsNumber = (candidate as any).bpjsNumber || (candidate as any).bpjsHealthNumber || f.bpjsNumber || 'Not specified'
               const healthStatus = (candidate as any).healthStatus || f.healthStatus || 'Not specified'
               const bloodType = (candidate as any).bloodType || f.bloodType || 'Not specified'
-              const email = f.email || candidate.contactInfo.email
+              const email = displayCandidateEmail(f.email || candidate.contactInfo.email) || 'Not specified'
               const phone = f.phoneNumber || candidate.contactInfo.phone || 'Not specified'
               const currentAddress = (candidate as any).currentAddress || f.currentAddress || candidate.contactInfo.address || 'Not specified'
               const permanentAddress = (candidate as any).permanentAddress || f.permanentAddress || 'Not specified'
@@ -1333,7 +1379,7 @@ export default function ViewCandidateModal({ isOpen, onClose, candidate }: ViewC
                           fontWeight: '500',
                           cursor: candidate.files?.find(f => f.type === 'cv') ? 'pointer' : 'not-allowed'
                         }}
-                        disabled={!candidate.files?.find(f => f.type === 'cv')}
+                        disabled={!candidate.files?.find(f => f.type === 'cv') || downloadingFileId === candidate.files?.find(f => f.type === 'cv')?.id}
                         onClick={() => {
                           const cvFile = candidate.files?.find(f => f.type === 'cv')
                           if (!cvFile) {
@@ -1341,7 +1387,7 @@ export default function ViewCandidateModal({ isOpen, onClose, candidate }: ViewC
                           }
 
                           if (cvFile.url) {
-                            window.open(cvFile.url, '_blank')
+                            void downloadFileFromUrl(cvFile)
                             return
                           }
 
@@ -1375,7 +1421,11 @@ export default function ViewCandidateModal({ isOpen, onClose, candidate }: ViewC
                           alert('CV file is not available for download.')
                         }}
                       >
-                        {candidate.files?.find(f => f.type === 'cv') ? 'Download' : 'No File'}
+                        {!candidate.files?.find(f => f.type === 'cv')
+                          ? 'No File'
+                          : downloadingFileId === candidate.files?.find(f => f.type === 'cv')?.id
+                            ? 'Loading...'
+                            : 'Download'}
                       </button>
                     </div>
 
@@ -1418,18 +1468,19 @@ export default function ViewCandidateModal({ isOpen, onClose, candidate }: ViewC
                                 </div>
                                 <button
                                   style={{
-                                    backgroundColor: '#4F46E5',
+                                    backgroundColor: downloadingFileId === file.id ? '#9CA3AF' : '#4F46E5',
                                     color: 'white',
                                     border: 'none',
                                     padding: '6px 12px',
                                     borderRadius: '6px',
                                     fontSize: '12px',
                                     fontWeight: '500',
-                                    cursor: 'pointer'
+                                    cursor: downloadingFileId === file.id ? 'not-allowed' : 'pointer'
                                   }}
+                                  disabled={downloadingFileId === file.id}
                                   onClick={() => {
                                     if (file.url) {
-                                      window.open(file.url, '_blank')
+                                      void downloadFileFromUrl(file)
                                       return
                                     }
 
@@ -1463,7 +1514,7 @@ export default function ViewCandidateModal({ isOpen, onClose, candidate }: ViewC
                                     alert('File is not available for download.')
                                   }}
                                 >
-                                  Download
+                                  {downloadingFileId === file.id ? 'Loading...' : 'Download'}
                                 </button>
                               </div>
                             ))}
@@ -1506,6 +1557,8 @@ export default function ViewCandidateModal({ isOpen, onClose, candidate }: ViewC
       onClose={positionEdit.close}
       onSave={positionEdit.handleSave}
       headerBackLabel={`Back to ${positionEdit.backLabel || candidateDisplayName}`}
+      candidateStatusOnly={positionEdit.candidateStatusOnly}
+      canManagePositionCandidates={positionEdit.canManagePositionCandidates}
     />
 
     <ApplicationHistoryModal

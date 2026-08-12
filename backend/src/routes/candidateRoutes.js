@@ -3,15 +3,54 @@ const router = express.Router();
 const { authenticate, authorize, checkOwnership } = require('../middleware/auth');
 const { asyncHandler } = require('../middleware/errorHandler');
 const candidateService = require('../services/candidateService');
-const prisma = require('../config/database');
 const { validationRules, validate } = require('../middleware/validator');
 const { uploadLimiter } = require('../middleware/rateLimiter');
+const { requireMenuCreate, requireMenuEdit } = require('../middleware/menuAccessAuth');
 const documentService = require('../services/documentService');
 const candidateFormTokenService = require('../services/candidateFormTokenService');
 const { parseSpreadsheet, sendTemplate } = require('../utils/spreadsheet');
 const bulkImportService = require('../services/bulkImportService');
 const { buildHrbpApplicationFptkFilterFromUser } = require('../utils/hrbpScope');
 const { isDepartmentHeadRole, buildHodCandidateScopeFromUser } = require('../utils/hodScope');
+const { assertUserCanAccessCandidate } = require('../utils/candidateAccess');
+
+const CANDIDATE_CREATE_FALLBACK = ['TA_HO', 'HRBP', 'SUPER_ADMIN', 'CHRO'];
+const CANDIDATE_EDIT_FALLBACK = ['TA_HO', 'HRBP', 'SUPER_ADMIN', 'CHRO'];
+
+/** TA_SITE: can list/view candidates, but hard deny create/update regardless of menuAccess. */
+function denyTaSiteCandidateWrite(req, res, next) {
+  if (req.user?.role === 'TA_SITE') {
+    return res.status(403).json({
+      success: false,
+      message:
+        'TA_SITE users can view candidates but cannot create or update candidate records',
+    });
+  }
+  return next();
+}
+
+/**
+ * Resolve the base URL used to build absolute document URLs (e.g. fileUrl).
+ * `API_BASE_URL` can be misconfigured with `http://`, which permanently bakes a
+ * mixed-content URL into the document record and gets hard-blocked by browsers once the
+ * app is served over HTTPS. `req.protocol` reflects the real incoming scheme (via the
+ * `trust proxy` setting + nginx's `X-Forwarded-Proto`), so never let it be downgraded.
+ */
+function resolveDocumentBaseUrl(req) {
+  const configured = process.env.API_BASE_URL;
+  if (!configured) {
+    return `${req.protocol}://${req.get('host')}`;
+  }
+  try {
+    const url = new URL(configured);
+    if (req.protocol === 'https' && url.protocol === 'http:') {
+      url.protocol = 'https:';
+    }
+    return url.origin;
+  } catch {
+    return `${req.protocol}://${req.get('host')}`;
+  }
+}
 
 function buildHiringManagerFptkScope(user = {}) {
   const firstName = String(user.firstName || '').trim();
@@ -136,11 +175,12 @@ router.post('/me/reference', authenticate, authorize('CANDIDATE'), asyncHandler(
 router.post(
   '/',
   authenticate,
-  authorize('TA_HO', 'HRBP', 'TA_SITE', 'SUPER_ADMIN', 'CHRO'),
+  denyTaSiteCandidateWrite,
+  requireMenuCreate('/candidates', CANDIDATE_CREATE_FALLBACK),
   asyncHandler(async (req, res) => {
     console.log('CREATE CANDIDATE - Received data:', JSON.stringify(req.body, null, 2));
     try {
-      const candidate = await candidateService.createCandidate(req.body);
+      const candidate = await candidateService.createCandidate(req.body, req.user);
       console.log('CREATE CANDIDATE - Created candidate:', JSON.stringify({
         id: candidate.id,
         division: candidate.user?.division,
@@ -172,7 +212,8 @@ router.post(
 router.get(
   '/bulk-template',
   authenticate,
-  authorize('TA_HO', 'HRBP', 'TA_SITE', 'SUPER_ADMIN', 'CHRO'),
+  denyTaSiteCandidateWrite,
+  authorize('TA_HO', 'HRBP', 'SUPER_ADMIN', 'CHRO'),
   asyncHandler(async (req, res) => {
     const format = (req.query.format || 'csv').toString();
     return sendTemplate(res, {
@@ -191,7 +232,8 @@ router.get(
 router.post(
   '/bulk-upload',
   authenticate,
-  authorize('TA_HO', 'HRBP', 'TA_SITE', 'SUPER_ADMIN', 'CHRO'),
+  denyTaSiteCandidateWrite,
+  requireMenuCreate('/candidates', CANDIDATE_CREATE_FALLBACK),
   uploadLimiter,
   asyncHandler(async (req, res) => {
     if (!req.files || !req.files.file) {
@@ -255,12 +297,14 @@ router.get(
 router.put(
   '/:id',
   authenticate,
-  authorize('TA_HO', 'HRBP', 'TA_SITE', 'SUPER_ADMIN', 'CHRO'),
+  denyTaSiteCandidateWrite,
+  requireMenuEdit('/candidates', CANDIDATE_EDIT_FALLBACK),
   validationRules.uuidParam('id'),
   validate,
   asyncHandler(async (req, res) => {
+    await assertUserCanAccessCandidate(req.user, req.params.id);
     console.log('UPDATE CANDIDATE - Received data:', JSON.stringify(req.body, null, 2));
-    const updated = await candidateService.updateCandidate(req.params.id, req.body);
+    const updated = await candidateService.updateCandidate(req.params.id, req.body, req.user);
     console.log('UPDATE CANDIDATE - Updated candidate:', JSON.stringify({
       id: updated.id,
       division: updated.user?.division,
@@ -280,10 +324,12 @@ router.put(
 router.delete(
   '/:id',
   authenticate,
-  authorize('TA_HO', 'HRBP', 'TA_SITE', 'SUPER_ADMIN', 'CHRO'),
+  denyTaSiteCandidateWrite,
+  requireMenuEdit('/candidates', CANDIDATE_EDIT_FALLBACK),
   validationRules.uuidParam('id'),
   validate,
   asyncHandler(async (req, res) => {
+    await assertUserCanAccessCandidate(req.user, req.params.id);
     const result = await candidateService.softDeleteCandidate(req.params.id, req.user.id);
     res.json({
       success: true,
@@ -301,12 +347,15 @@ router.delete(
 router.post(
   '/:id/documents',
   authenticate,
-  authorize('TA_HO', 'HRBP', 'TA_SITE', 'SUPER_ADMIN', 'CHRO'),
+  denyTaSiteCandidateWrite,
+  requireMenuEdit('/candidates', CANDIDATE_EDIT_FALLBACK),
   uploadLimiter,
   validationRules.uuidParam('id'),
   validate,
   asyncHandler(async (req, res) => {
     const candidateId = req.params.id;
+
+    await assertUserCanAccessCandidate(req.user, candidateId);
 
     if (!req.files || !req.files.file) {
       return res.status(400).json({
@@ -316,7 +365,7 @@ router.post(
     }
 
     const documentType = req.body.type || 'RESUME';
-    const baseUrl = process.env.API_BASE_URL || `${req.protocol}://${req.get('host')}`;
+    const baseUrl = resolveDocumentBaseUrl(req);
 
     const uploadedDocument = await documentService.uploadCandidateDocument(candidateId, req.files.file, {
       documentType,
@@ -339,12 +388,15 @@ router.post(
 router.post(
   '/:id/form-link',
   authenticate,
-  authorize('TA_HO', 'HRBP', 'TA_SITE', 'SUPER_ADMIN', 'CHRO'),
+  denyTaSiteCandidateWrite,
+  requireMenuEdit('/candidates', CANDIDATE_EDIT_FALLBACK),
   validationRules.uuidParam('id'),
   validate,
   asyncHandler(async (req, res) => {
     const candidateId = req.params.id;
     const expiresInDays = Number(req.body.expiresInDays) || 7;
+
+    await assertUserCanAccessCandidate(req.user, candidateId);
 
     const candidate = await candidateService.getCandidateProfile(candidateId);
     if (!candidate) {
@@ -486,68 +538,7 @@ router.get(
   validationRules.uuidParam('id'),
   validate,
   asyncHandler(async (req, res) => {
-    const userRole = req.user.role;
-    if (isDepartmentHeadRole(userRole)) {
-      const hodScope = buildHodCandidateScopeFromUser(req.user);
-      const allowed = await prisma.candidate.findFirst({
-        where: {
-          id: req.params.id,
-          isDeleted: false,
-          ...(hodScope || { id: '00000000-0000-0000-0000-000000000000' }),
-        },
-        select: { id: true },
-      });
-      if (!allowed) {
-        return res.status(403).json({
-          success: false,
-          message: 'You can only access candidates in your assigned division and section',
-        });
-      }
-    } else if (userRole === 'HRBP' || userRole === 'TA_SITE') {
-      const hrbpScope = buildHrbpApplicationFptkFilterFromUser(req.user);
-      const allowed = await prisma.candidate.findFirst({
-        where: {
-          id: req.params.id,
-          isDeleted: false,
-          applications: {
-            some: hrbpScope || { fptk: { id: '00000000-0000-0000-0000-000000000000' } },
-          },
-        },
-        select: { id: true },
-      });
-      if (!allowed) {
-        return res.status(403).json({
-          success: false,
-          message: 'You can only access candidates linked to your assigned PT and area',
-        });
-      }
-    } else if (userRole === 'HIRING_MANAGER') {
-      const hmScope = buildHiringManagerFptkScope(req.user);
-      if (!hmScope) {
-        return res.status(403).json({
-          success: false,
-          message: 'Missing hiring manager identity for candidate access',
-        });
-      }
-      const allowed = await prisma.candidate.findFirst({
-        where: {
-          id: req.params.id,
-          isDeleted: false,
-          applications: {
-            some: {
-              fptk: hmScope,
-            },
-          },
-        },
-        select: { id: true },
-      });
-      if (!allowed) {
-        return res.status(403).json({
-          success: false,
-          message: 'You can only access candidates linked to your positions',
-        });
-      }
-    }
+    await assertUserCanAccessCandidate(req.user, req.params.id);
 
     const candidate = await candidateService.getCandidateProfile(req.params.id, {
       forFptkId: req.query.forFptkId || undefined,

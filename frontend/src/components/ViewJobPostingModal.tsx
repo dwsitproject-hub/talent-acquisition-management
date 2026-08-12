@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { useModalEscape } from '@/hooks/useModalEscape'
+import { useAuth } from '@/contexts/AuthContext'
 import { XMarkIcon } from '@heroicons/react/24/outline'
 import { FPTK, Candidate } from '@/types'
 import ViewCandidateModal from './ViewCandidateModal'
@@ -10,6 +11,10 @@ import { CandidatesAPI } from '@/lib/api'
 import { fetchApplicationsForFptk } from '@/utils/mapFptkApplication'
 import { mapApiCandidate } from '@/app/candidates/page'
 import { mapApplicationStatusToUi } from '@/utils/applicationStatusUi'
+import {
+  resolveCandidatePermissions,
+  resolveRoleNameFromUser,
+} from '@/utils/candidatePermissions'
 
 // Helper to get API base URL without /api
 const getApiBaseUrl = (): string => {
@@ -38,6 +43,9 @@ const formatEmploymentType = (value?: string) => {
 }
 
 export default function ViewJobPostingModal({ isOpen, onClose, jobPosting, onStatusUpdate }: ViewJobPostingModalProps) {
+  const { user } = useAuth()
+  const roleName = resolveRoleNameFromUser(user)
+  const { canViewDetails } = resolveCandidatePermissions(roleName)
   const [appliedCandidates, setAppliedCandidates] = useState<any[]>([])
   const [expandedInterviewSections, setExpandedInterviewSections] = useState<Set<string>>(new Set())
   const [selectedCandidate, setSelectedCandidate] = useState<Candidate | null>(null)
@@ -572,6 +580,10 @@ export default function ViewJobPostingModal({ isOpen, onClose, jobPosting, onSta
                         <div>
                           <h4 
                             onClick={async () => {
+                              if (!canViewDetails) {
+                                alert('Candidate details are not available for your role')
+                                return
+                              }
                               try {
                                 setLoadingCandidate(true)
                                 const candidateId = candidate.id || candidate.candidateId
@@ -593,18 +605,19 @@ export default function ViewJobPostingModal({ isOpen, onClose, jobPosting, onSta
                             style={{ 
                               fontSize: '14px', 
                               fontWeight: '600', 
-                              color: '#4f46e5', 
+                              color: canViewDetails ? '#4f46e5' : '#111827', 
                               margin: '0 0 4px 0',
-                              cursor: 'pointer',
-                              textDecoration: 'underline'
+                              cursor: canViewDetails ? 'pointer' : 'default',
+                              textDecoration: canViewDetails ? 'underline' : 'none'
                             }}
                             onMouseEnter={(e) => {
+                              if (!canViewDetails) return
                               e.currentTarget.style.color = '#4338ca'
                               e.currentTarget.style.textDecoration = 'underline'
                             }}
                             onMouseLeave={(e) => {
-                              e.currentTarget.style.color = '#4f46e5'
-                              e.currentTarget.style.textDecoration = 'underline'
+                              e.currentTarget.style.color = canViewDetails ? '#4f46e5' : '#111827'
+                              e.currentTarget.style.textDecoration = canViewDetails ? 'underline' : 'none'
                             }}
                           >
                             {loadingCandidate ? 'Loading...' : (candidate.fullName || candidate.name || `Candidate ${candidate.id?.substring(0, 6)}`)}
@@ -724,7 +737,7 @@ export default function ViewJobPostingModal({ isOpen, onClose, jobPosting, onSta
                           }}>
                             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: isExpanded ? '8px' : '0' }}>
                               <div style={{ fontSize: '12px', fontWeight: '600', color: '#374151' }}>
-                                Interview Details {statusLabel === 'Interviewed' || ['Assessment', 'Offering Creation', 'Pending Feedback', 'Offer Sent', 'Offer Accepted', 'Offer Rejected', 'Medical Checkup Scheduled', 'MCU', 'Contract Sent', 'Contract Signed', 'On Boarding', 'Hired'].includes(statusLabel) ? '(Interview Results)' : ''}
+                                Interview Details {statusLabel === 'Interviewed' || ['Document Verification', 'Assessment', 'Offering Creation', 'Pending Feedback', 'Offer Sent', 'Offer Accepted', 'Offer Rejected', 'Medical Checkup Scheduled', 'MCU', 'Contract Sent', 'Contract Signed', 'On Boarding', 'Hired'].includes(statusLabel) ? '(Interview Results)' : ''}
                               </div>
                               <button
                                 type="button"

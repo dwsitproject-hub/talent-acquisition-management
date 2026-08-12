@@ -144,6 +144,20 @@ function handlePrismaError(err, res) {
         message: 'Invalid relation in query',
       });
 
+    case 'P2021':
+      return res.status(503).json({
+        success: false,
+        message: 'Database table not found. Run prisma migrate deploy.',
+        code: err.code,
+      });
+
+    case 'P2022':
+      return res.status(503).json({
+        success: false,
+        message: 'Database schema is out of date. Run prisma migrate deploy.',
+        code: err.code,
+      });
+
     default:
       return res.status(500).json({
         success: false,

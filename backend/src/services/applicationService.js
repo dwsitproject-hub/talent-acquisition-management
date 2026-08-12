@@ -5,7 +5,7 @@ const { withActiveCandidateOnApplication } = require('../utils/candidateVisibili
 const { assertCandidateCanApplyToPosition } = require('../utils/candidateApplicationLock');
 const { buildHrbpApplicationFptkFilterFromUser } = require('../utils/hrbpScope');
 const { isDepartmentHeadRole, buildHodApplicationScopeFromUser } = require('../utils/hodScope');
-const { mapUiStatusToApplicationStatus } = require('../utils/applicationStatus');
+const { mapUiStatusToApplicationStatus, assertAllowedStatusTransition } = require('../utils/applicationStatus');
 
 function forbidden(message) {
   const err = new Error(message || 'Insufficient permissions');
@@ -453,6 +453,18 @@ async function updateApplicationStatus(applicationId, newStatus, userId, reason 
 
   newStatus = mapUiStatusToApplicationStatus(newStatus, oldStatus);
 
+  if (options.enforceTransitionRules) {
+    let hasInterviewResult = false;
+    if (oldStatus !== newStatus) {
+      const interviews = await prisma.interview.findMany({
+        where: { applicationId },
+        select: { notes: true },
+      });
+      hasInterviewResult = interviews.some((iv) => (iv.notes || '').trim().length > 0);
+    }
+    assertAllowedStatusTransition(oldStatus, newStatus, { hasInterviewResult });
+  }
+
   // Determine stage based on status
   const stageMapping = {
     'SUBMITTED': 1,
@@ -606,8 +618,8 @@ async function shortlistApplication(applicationId, userId) {
 /**
  * Reject application
  */
-async function rejectApplication(applicationId, userId, reason) {
-  return await updateApplicationStatus(applicationId, 'REJECTED', userId, reason);
+async function rejectApplication(applicationId, userId, reason, options = {}) {
+  return await updateApplicationStatus(applicationId, 'REJECTED', userId, reason, options);
 }
 
 /**

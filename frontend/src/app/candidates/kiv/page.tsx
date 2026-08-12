@@ -7,6 +7,7 @@ import Link from 'next/link'
 import Layout from '@/components/Layout/Layout'
 import { MenuAccessAPI, ApplicationsAPI } from '@/lib/api'
 import { mapApplicationStatusToUi } from '@/utils/applicationStatusUi'
+import { resolveCandidatePermissions } from '@/utils/candidatePermissions'
 import { EyeIcon, MagnifyingGlassIcon } from '@heroicons/react/24/outline'
 
 const mapEnumToRole = (role: string): string => {
@@ -149,7 +150,7 @@ export default function KivPage() {
     }
   }, [isAuthenticated, isLoading, debouncedSearch, divisionFilter])
 
-  const cfgKiv = menuAccess['/candidates/kiv'] || menuAccess['/candidates'] || {}
+  const cfgKiv = menuAccess['/candidates/kiv'] || {}
   const visibleRoles: string[] =
     cfgKiv.visibleRoles && cfgKiv.visibleRoles.length
       ? cfgKiv.visibleRoles
@@ -163,6 +164,13 @@ export default function KivPage() {
           'HIRING_MANAGER',
           'INTERVIEWER',
         ]
+  const permsKiv = cfgKiv.permissions || {
+    create: [],
+    edit: ['SUPER_ADMIN', 'HRBP', 'TA_HO', 'TA_SITE'],
+  }
+  const canEditKiv =
+    (permsKiv.edit || []).includes(roleName) || (permsKiv.edit || []).includes('*')
+  const { canViewDetails } = resolveCandidatePermissions(roleName, menuAccess)
 
   const formatDate = (d: string | null) => {
     if (!d) return '—'
@@ -369,12 +377,25 @@ export default function KivPage() {
                       </td>
                       <td className="whitespace-nowrap px-3 py-4 text-sm text-gray-500">{formatDate(row.appliedAt)}</td>
                       <td className="whitespace-nowrap py-4 pl-3 pr-4 text-right text-sm sm:pr-6">
-                        <Link
-                          href={`/candidates?view=${encodeURIComponent(row.candidateId)}`}
-                          className="text-indigo-600 hover:text-indigo-800 font-medium"
-                        >
-                          Open candidate
-                        </Link>
+                        {canEditKiv && canViewDetails ? (
+                          <Link
+                            href={`/candidates?view=${encodeURIComponent(row.candidateId)}`}
+                            className="text-indigo-600 hover:text-indigo-800 font-medium"
+                          >
+                            Open candidate
+                          </Link>
+                        ) : (
+                          <span
+                            className="text-gray-300 cursor-not-allowed"
+                            title={
+                              !canViewDetails
+                                ? 'Candidate details are not available for your role'
+                                : undefined
+                            }
+                          >
+                            Open candidate
+                          </span>
+                        )}
                       </td>
                     </tr>
                   ))}

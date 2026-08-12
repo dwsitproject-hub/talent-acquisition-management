@@ -11,16 +11,11 @@ import {
   type FptkRequiredKey,
 } from '@/utils/fptkFormRequired'
 import {
-  candidateDivisionMatchesJob,
-  countDistinctMatchingSkills,
-  getCandidateDivisions,
+  isSuggestedCandidateForPosition,
   parseLanguagesData,
+  SUGGESTED_CANDIDATE_MIN_MATCHING_SKILLS,
 } from '@/utils/candidateProfileShape'
-import {
-  candidateEligibleForPositionSuggestion,
-  extractCandidateLockFields,
-  getCandidateLockMessage,
-} from '@/utils/candidateApplicationLock'
+import { extractCandidateLockFields } from '@/utils/candidateApplicationLock'
 
 interface CreateJobPostingModalProps {
   isOpen: boolean
@@ -113,24 +108,49 @@ export default function CreateJobPostingModal({ isOpen, onClose, onSave, editing
       }
     }
 
-    const loadHiringManagers = async () => {
-      try {
-        const users = await AdminUsersAPI.list('', 'HIRING_MANAGER')
-        if (isMounted) {
-          setHiringManagerOptions(users.map((u: any) => ({ firstName: u.firstName, lastName: u.lastName })))
-        }
-      } catch (error) {
-        console.error('Error loading hiring managers:', error)
-      }
-    }
-
     loadDivisions()
-    loadHiringManagers()
 
     return () => {
       isMounted = false
     }
   }, [])
+
+  // Load hiring managers filtered by selected position division (A–Z)
+  useEffect(() => {
+    let isMounted = true
+    const division = (formData.division || '').trim()
+
+    if (!division) {
+      setHiringManagerOptions([])
+      return () => {
+        isMounted = false
+      }
+    }
+
+    const loadHiringManagers = async () => {
+      try {
+        const users = await AdminUsersAPI.list('', 'HIRING_MANAGER', undefined, division)
+        if (!isMounted) return
+        const options = (users || [])
+          .map((u: any) => ({ firstName: u.firstName || '', lastName: u.lastName || '' }))
+          .sort((a: { firstName: string; lastName: string }, b: { firstName: string; lastName: string }) => {
+            const nameA = `${a.firstName} ${a.lastName}`.trim().toLowerCase()
+            const nameB = `${b.firstName} ${b.lastName}`.trim().toLowerCase()
+            return nameA.localeCompare(nameB)
+          })
+        setHiringManagerOptions(options)
+      } catch (error) {
+        console.error('Error loading hiring managers:', error)
+        if (isMounted) setHiringManagerOptions([])
+      }
+    }
+
+    loadHiringManagers()
+
+    return () => {
+      isMounted = false
+    }
+  }, [formData.division])
 
   // Load office locations from Master Office Location
   useEffect(() => {
@@ -363,30 +383,16 @@ export default function CreateJobPostingModal({ isOpen, onClose, onSave, editing
           // Map candidates to frontend structure
           const candidates = rawCandidates.map(mapApiCandidate).filter((c: any) => c !== null)
           
-          const suggested = candidates.filter((candidate: any) => {
-            const allDivisions = getCandidateDivisions(candidate)
-            console.log('[CreateJobPostingModal] Candidate divisions:', allDivisions, 'for candidate:', candidate.id)
-
-            const hasMatchingDivision = candidateDivisionMatchesJob(formData.division, candidate)
-
-            const matchingSkillsCount =
-              formData.skills.length > 0
-                ? countDistinctMatchingSkills(formData.skills, candidate)
-                : 0
-
-            const hasMinMatchingSkills =
-              formData.skills.length === 0 || matchingSkillsCount >= 2
-
-            const notApplied = !appliedCandidates.find((applied) => applied.id === candidate.id)
-            const eligible = candidateEligibleForPositionSuggestion(candidate)
-
-            const shouldInclude = hasMatchingDivision && hasMinMatchingSkills && notApplied && eligible
-            if (shouldInclude) {
-              console.log('[CreateJobPostingModal] Including candidate:', candidate.id, 'with divisions:', allDivisions)
-            }
-
-            return shouldInclude
-          }).slice(0, 10) // Limit to 10 suggestions
+          const suggested = candidates.filter((candidate: any) =>
+            isSuggestedCandidateForPosition(
+              candidate,
+              formData.division,
+              formData.skills,
+              new Set(
+                appliedCandidates.map((applied: any) => applied.id || applied.candidateId).filter(Boolean)
+              )
+            )
+          ).slice(0, 10)
           
           console.log('[CreateJobPostingModal] Suggested candidates:', suggested.length)
           setSuggestedCandidates(suggested)
@@ -410,7 +416,7 @@ export default function CreateJobPostingModal({ isOpen, onClose, onSave, editing
         pt: editingJobPosting.pt || '',
         noFktk: editingJobPosting.noFktk || '',
         statusFktk: editingJobPosting.statusFktk || '',
-        division: editingJobPosting.department || '',
+        division: editingJobPosting.division || editingJobPosting.department || '',
         section: editingJobPosting.section || '',
         hiringManager: editingJobPosting.hiringManager || '',
         position: editingJobPosting.title || '',
@@ -588,7 +594,8 @@ export default function CreateJobPostingModal({ isOpen, onClose, onSave, editing
       setFormData(prev => ({
         ...prev,
         division: value,
-        section: '' // Reset section when division changes
+        section: '', // Reset section when division changes
+        hiringManager: '', // HM options are scoped to division
       }))
       return
     }
@@ -600,11 +607,6 @@ export default function CreateJobPostingModal({ isOpen, onClose, onSave, editing
   }
 
   const handleAddSuggestedCandidate = (candidate: any) => {
-    if (!candidateEligibleForPositionSuggestion(candidate)) {
-      alert(getCandidateLockMessage(candidate))
-      return
-    }
-
     const newAppliedCandidate = {
       ...candidate,
        fullName:
@@ -984,6 +986,7 @@ export default function CreateJobPostingModal({ isOpen, onClose, onSave, editing
                 value={formData.hiringManager}
                 onChange={handleInputChange}
                 required
+                disabled={!formData.division}
                 aria-invalid={fInv('hiringManager')}
                 style={{
                   width: '100%',
@@ -991,10 +994,13 @@ export default function CreateJobPostingModal({ isOpen, onClose, onSave, editing
                   border: '1px solid #d1d5db',
                   borderRadius: '6px',
                   fontSize: '14px',
+                  backgroundColor: formData.division ? 'white' : '#f9fafb',
                   ...fptkRequiredFieldHighlightStyle(fInv('hiringManager'))
                 }}
               >
-                <option value="">Select Hiring Manager</option>
+                <option value="">
+                  {formData.division ? 'Select Hiring Manager' : 'Select Division first'}
+                </option>
                 {hiringManagerOptions.map((user, index) => {
                   const fullName = `${user.firstName} ${user.lastName}`.trim()
                   return (
@@ -1003,6 +1009,12 @@ export default function CreateJobPostingModal({ isOpen, onClose, onSave, editing
                     </option>
                   )
                 })}
+                {formData.hiringManager &&
+                  !hiringManagerOptions.some(
+                    (u) => `${u.firstName} ${u.lastName}`.trim() === formData.hiringManager
+                  ) && (
+                    <option value={formData.hiringManager}>{formData.hiringManager}</option>
+                  )}
               </select>
             </div>
 
@@ -1502,7 +1514,7 @@ export default function CreateJobPostingModal({ isOpen, onClose, onSave, editing
                 Suggested Candidates ({suggestedCandidates.length})
               </h4>
               <p style={{ fontSize: '12px', color: '#6b7280', marginBottom: '12px' }}>
-                Candidates with at least 2 matching skills and matching division
+                Candidates with matching division and at least {SUGGESTED_CANDIDATE_MIN_MATCHING_SKILLS} matching required skills
               </p>
               <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
                 {suggestedCandidates.map((candidate) => (

@@ -14,6 +14,7 @@ const {
 } = require('../utils/candidateApplicationLock');
 const { buildHrbpApplicationFptkFilterFromUser } = require('../utils/hrbpScope');
 const { isDepartmentHeadRole, buildHodCandidateScopeFromUser } = require('../utils/hodScope');
+const { syncCandidateApplicationsFromPositions } = require('../utils/candidatePositionSync');
 
 function buildHiringManagerScopeFromUser(user = null) {
   if (!user) return null;
@@ -81,6 +82,17 @@ function normalizeOptionalString(value) {
   return value && String(value).trim() ? String(value).trim() : null;
 }
 
+const HEAD_HUNTER_SOURCE = 'Head hunter';
+const PLACEHOLDER_EMAIL_DOMAIN = 'no-email.local';
+
+function isHeadHunterSource(source) {
+  return normalizeOptionalString(source) === HEAD_HUNTER_SOURCE;
+}
+
+function buildHeadHunterPlaceholderEmail() {
+  return `headhunter+${require('crypto').randomUUID()}@${PLACEHOLDER_EMAIL_DOMAIN}`;
+}
+
 function stripLegacySourceFromLanguages(languagesData) {
   if (!languagesData || typeof languagesData !== 'object') return;
   delete languagesData.source;
@@ -133,7 +145,7 @@ function enrichCandidateFromLanguages(candidate) {
 /**
  * Create candidate (for TA/HR)
  */
-async function createCandidate(data) {
+async function createCandidate(data, actorUser = null) {
   logger.info(`CREATE CANDIDATE - Received data:`, JSON.stringify(data, null, 2));
   
   const { 
@@ -144,6 +156,7 @@ async function createCandidate(data) {
     division, 
     divisionList,
     positionAppliedFor, 
+    positionAppliedFptkIds,
     yearsOfExperience, 
     height, 
     weight, 
@@ -180,9 +193,33 @@ async function createCandidate(data) {
     idNumber
   }, null, 2));
 
+  // Years of experience and source are required for TA-created candidates.
+  const hasYearsOfExperience =
+    yearsOfExperience !== undefined &&
+    yearsOfExperience !== null &&
+    String(yearsOfExperience).trim() !== '';
+  if (!hasYearsOfExperience) {
+    throw new Error('Years of Experience is required');
+  }
+
+  const normalizedSourceForCreate = source !== undefined ? normalizeOptionalString(source) : null;
+  if (!normalizedSourceForCreate) {
+    throw new Error('Source is required');
+  }
+
+  // Head hunter candidates may be created without email/phone; User.email is still NOT NULL UNIQUE.
+  let resolvedEmail = normalizeOptionalString(email);
+  if (!resolvedEmail) {
+    if (isHeadHunterSource(normalizedSourceForCreate)) {
+      resolvedEmail = buildHeadHunterPlaceholderEmail();
+    } else {
+      throw new Error('Email is required');
+    }
+  }
+
   // Check if user already exists
   const existingUser = await prisma.user.findUnique({
-    where: { email },
+    where: { email: resolvedEmail },
   });
 
   if (existingUser) {
@@ -221,7 +258,7 @@ async function createCandidate(data) {
       INSERT INTO users (id, email, password, "firstName", "lastName", "phoneNumber", role, division, "isEmailVerified", "emailVerifiedAt", "isActive", "createdAt", "updatedAt")
       VALUES (
         '${userId}',
-        '${escapeSql(email)}',
+        '${escapeSql(resolvedEmail)}',
         '${escapeSql(hashedPassword)}',
         '${escapeSql(firstName)}',
         '${escapeSql(lastName)}',
@@ -413,6 +450,45 @@ async function createCandidate(data) {
   enrichCandidateFromLanguages(candidateWithUser);
 
   parseFormDataDiri(candidateWithUser);
+
+  if (positionAppliedFor !== undefined || positionAppliedFptkIds !== undefined) {
+    await syncCandidateApplicationsFromPositions(candidateWithUser.id, {
+      positionAppliedFor,
+      positionAppliedFptkIds,
+      actorUserId: actorUser?.id || null,
+      actorUser,
+    });
+    const refreshed = await prisma.candidate.findUnique({
+      where: { id: candidateWithUser.id },
+      include: {
+        user: {
+          select: {
+            id: true,
+            email: true,
+            firstName: true,
+            lastName: true,
+            phoneNumber: true,
+            division: true,
+          },
+        },
+        documents: {
+          orderBy: { uploadedAt: 'desc' },
+        },
+      },
+    });
+    if (refreshed) {
+      if (refreshed.nationalId) {
+        try {
+          refreshed.nationalId = decrypt(refreshed.nationalId);
+        } catch (e) {
+          refreshed.nationalId = null;
+        }
+      }
+      enrichCandidateFromLanguages(refreshed);
+      parseFormDataDiri(refreshed);
+      return refreshed;
+    }
+  }
   
   return candidateWithUser;
 }
@@ -537,7 +613,7 @@ async function updateCandidateProfile(candidateId, data) {
 /**
  * Update candidate (admin/TA side)
  */
-async function updateCandidate(candidateId, data) {
+async function updateCandidate(candidateId, data, actorUser = null) {
   // Log incoming data for debugging
   logger.info(`Updating candidate ${candidateId} with data:`, JSON.stringify(data, null, 2));
   
@@ -550,6 +626,7 @@ async function updateCandidate(candidateId, data) {
     division,
     divisionList,
     positionAppliedFor,
+    positionAppliedFptkIds,
     height,
     weight,
     taxNumber,
@@ -578,6 +655,17 @@ async function updateCandidate(candidateId, data) {
   });
   if (!existing) throw new Error('Candidate not found');
 
+  if (yearsOfExperience !== undefined) {
+    const hasYearsOfExperience =
+      yearsOfExperience !== null && String(yearsOfExperience).trim() !== '';
+    if (!hasYearsOfExperience) {
+      throw new Error('Years of Experience is required');
+    }
+  }
+  if (source !== undefined && !normalizeOptionalString(source)) {
+    throw new Error('Source is required');
+  }
+
   // Update user if provided
   if (email || firstName || lastName || phoneNumber || division !== undefined || divisionList !== undefined) {
     const escapeSql = (str) => (str || '').replace(/'/g, "''");
@@ -605,10 +693,13 @@ async function updateCandidate(candidateId, data) {
     } else {
       divisionValue = existing.user.division;
     }
+
+    // Only update email when a real (non-empty, non-placeholder-clear) value is provided
+    const nextEmail = normalizeOptionalString(email);
     
     await prisma.$queryRawUnsafe(
       `UPDATE users SET 
-         email = ${email ? `'${escapeSql(email)}'` : 'email'},
+         email = ${nextEmail ? `'${escapeSql(nextEmail)}'` : 'email'},
          "firstName" = ${firstName ? `'${escapeSql(firstName)}'` : '"firstName"'},
          "lastName" = ${lastName ? `'${escapeSql(lastName)}'` : '"lastName"'},
          "phoneNumber" = ${typeof phoneNumber !== 'undefined' && phoneNumber !== null ? `'${escapeSql(phoneNumber)}'` : (phoneNumber === null ? 'NULL' : '"phoneNumber"')},
@@ -838,6 +929,38 @@ async function updateCandidate(candidateId, data) {
 
   parseFormDataDiri(updated);
 
+  if (positionAppliedFor !== undefined || positionAppliedFptkIds !== undefined) {
+    await syncCandidateApplicationsFromPositions(candidateId, {
+      positionAppliedFor,
+      positionAppliedFptkIds,
+      actorUserId: actorUser?.id || null,
+      actorUser,
+    });
+    const refreshed = await prisma.candidate.findUnique({
+      where: { id: candidateId },
+      include: {
+        user: {
+          select: {
+            id: true,
+            email: true,
+            firstName: true,
+            lastName: true,
+            phoneNumber: true,
+            division: true,
+          },
+        },
+      },
+    });
+    if (refreshed) {
+      if (refreshed.nationalId) {
+        refreshed.nationalId = decrypt(refreshed.nationalId);
+      }
+      enrichCandidateFromLanguages(refreshed);
+      parseFormDataDiri(refreshed);
+      return refreshed;
+    }
+  }
+
   return updated;
 }
 
@@ -930,7 +1053,7 @@ async function searchCandidates(filters, pagination, user = null) {
       } else {
         where.id = '00000000-0000-0000-0000-000000000000';
       }
-    } else if (userRole === 'HRBP' || userRole === 'TA_SITE') {
+    } else if (userRole === 'HRBP') {
       const hrbpScope = buildHrbpApplicationFptkFilterFromUser(user);
       if (hrbpScope) {
         where.applications = {
@@ -940,7 +1063,8 @@ async function searchCandidates(filters, pagination, user = null) {
         where.id = '00000000-0000-0000-0000-000000000000';
       }
     }
-    // SUPER_ADMIN, TA_HO, and other roles see all candidates (no additional filtering)
+    // SUPER_ADMIN, TA_HO, TA_SITE, and other roles see all candidates (no additional filtering)
+    // TA_SITE: can list/view all candidates; create/update are denied in routes
   }
 
   const tokenizedSearch = buildTokenizedSearch(filters, (token) => ([

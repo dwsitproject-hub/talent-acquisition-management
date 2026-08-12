@@ -43,7 +43,8 @@ RUN npx prisma generate
 
 # Create necessary directories
 RUN mkdir -p logs uploads && \
-    chown -R nodejs:nodejs logs uploads
+    chown -R nodejs:nodejs logs uploads && \
+    chmod +x docker-entrypoint.sh
 
 # Switch to non-root user
 USER nodejs
@@ -58,6 +59,6 @@ ENTRYPOINT ["dumb-init", "--"]
 HEALTHCHECK --interval=30s --timeout=3s --start-period=40s \
   CMD node -e "require('http').get('http://localhost:4000/health', (r) => {process.exit(r.statusCode === 200 ? 0 : 1)})"
 
-# Start application
-CMD ["node", "src/server.js"]
+# Start application (optional migrate deploy when PRISMA_MIGRATE_ON_START=true)
+CMD ["sh", "docker-entrypoint.sh"]
 

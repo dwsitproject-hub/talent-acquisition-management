@@ -13,20 +13,24 @@ function createTransporter() {
   const port = process.env.SMTP_PORT ? parseInt(process.env.SMTP_PORT, 10) : 587;
   const secure = process.env.SMTP_SECURE === 'true' || port === 465;
   const user = process.env.SMTP_USER;
-  const pass = process.env.SMTP_PASS;
+  // Prefer SMTP_PASS; fall back to SMTP_PASSWORD used in some .env templates
+  const pass = process.env.SMTP_PASS || process.env.SMTP_PASSWORD;
+  const rejectUnauthorized = process.env.SMTP_REJECT_UNAUTHORIZED !== 'false';
 
   return nodemailer.createTransport({
     host,
     port,
     secure,
     auth: user ? { user, pass: pass || '' } : undefined,
+    tls: { rejectUnauthorized },
   });
 }
 
 /**
- * Send TA Team onboarding join reminder (14d / 7d before candidate join date).
+ * Send onboarding join reminder (14d / 7d before candidate join date).
+ * Recipients are resolved by position area: HO → TA_HO + HRBP; Site → TA_SITE + TA_HO + HRBP.
  * @param {Object} params
- * @param {string[]} params.recipients - TA user emails
+ * @param {string[]} params.recipients - role-based recipient emails
  * @param {string} params.candidateName
  * @param {string} params.joinDateFormatted - e.g. YYYY-MM-DD
  * @param {string} params.department - assigned department (FPTK)
@@ -56,7 +60,7 @@ async function sendOnboardingJoinReminderToTaTeam({
   const subject = `[Talent Acquisition] Join reminder: ${candidateName} — ${offsetDays} day(s) until join date`;
 
   const textLines = [
-    `This is an automated onboarding join-date reminder for the TA Team.`,
+    `This is an automated onboarding join-date reminder for TA / HRBP.`,
     ``,
     `Candidate: ${candidateName}`,
     `Join date: ${joinDateFormatted}`,
@@ -73,7 +77,7 @@ async function sendOnboardingJoinReminderToTaTeam({
 <head><meta charset="utf-8" /></head>
 <body style="font-family: system-ui, sans-serif; line-height: 1.5; color: #111827;">
   <h2 style="margin-bottom: 8px;">Onboarding join-date reminder</h2>
-  <p style="color: #6b7280; margin-top: 0;">Automated message for <strong>TA Team</strong> (${offsetDays} day(s) before join date).</p>
+  <p style="color: #6b7280; margin-top: 0;">Automated message for <strong>TA / HRBP</strong> (${offsetDays} day(s) before join date).</p>
   <table style="border-collapse: collapse; margin-top: 16px;">
     <tr><td style="padding: 6px 12px 6px 0; font-weight: 600;">Candidate</td><td>${escapeHtml(candidateName)}</td></tr>
     <tr><td style="padding: 6px 12px 6px 0; font-weight: 600;">Join date</td><td>${escapeHtml(joinDateFormatted)}</td></tr>
@@ -84,7 +88,7 @@ async function sendOnboardingJoinReminderToTaTeam({
 </html>`;
 
   try {
-    await transporter.sendMail({
+    const info = await transporter.sendMail({
       from,
       to: emails,
       subject,
@@ -92,9 +96,15 @@ async function sendOnboardingJoinReminderToTaTeam({
       html,
     });
     logger.info(
-      `[emailService] Onboarding reminder email sent for candidate="${candidateName}" offsetDays=${offsetDays} recipients=${emails.length}`
+      `[emailService] Onboarding reminder email sent for candidate="${candidateName}" offsetDays=${offsetDays} recipients=${emails.length}`,
+      {
+        messageId: info.messageId,
+        accepted: info.accepted,
+        rejected: info.rejected,
+        response: info.response,
+      }
     );
-    return { success: true };
+    return { success: true, messageId: info.messageId, response: info.response };
   } catch (err) {
     logger.error('[emailService] Failed to send onboarding reminder email', {
       message: err.message,

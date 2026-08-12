@@ -11,6 +11,8 @@ interface PositionEditOverlayProps {
   onSave: (updatedData: any) => void | Promise<void>
   headerBackLabel: string
   overlayZIndex?: number
+  candidateStatusOnly?: boolean
+  canManagePositionCandidates?: boolean
 }
 
 export default function PositionEditOverlay({
@@ -21,6 +23,8 @@ export default function PositionEditOverlay({
   onSave,
   headerBackLabel,
   overlayZIndex = 10050,
+  candidateStatusOnly = false,
+  canManagePositionCandidates = true,
 }: PositionEditOverlayProps) {
   return (
     <>
@@ -58,6 +62,8 @@ export default function PositionEditOverlay({
         onSave={onSave}
         overlayZIndex={overlayZIndex}
         headerBackLabel={headerBackLabel}
+        candidateStatusOnly={candidateStatusOnly}
+        canManagePositionCandidates={canManagePositionCandidates}
       />
     </>
   )

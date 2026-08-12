@@ -10,7 +10,12 @@ const { assertCandidateCanApplyToPosition } = require('../utils/candidateApplica
 const {
   PRISMA_APP_STATUS_STRINGS,
   mapUiStatusToApplicationStatus,
+  mapApplicationStatusToUi,
+  assertAllowedStatusTransition,
 } = require('../utils/applicationStatus');
+const { getPositionSlaBucket } = require('../utils/positionSla');
+const { runWithAuditSuppressed } = require('../utils/auditContext');
+const auditService = require('./auditService');
 
 const FPTK_RELATION_INCLUDE = {
   creator: {
@@ -596,6 +601,12 @@ async function syncFptkApplicationsTx(tx, fptkId, appliedCandidates, options = {
     const joinDateData = {};
     if (Object.prototype.hasOwnProperty.call(item, 'joinDate')) {
       joinDateData.joinDate = item.joinDate ? new Date(item.joinDate) : null;
+    }
+
+    if (existing && existing.status !== status) {
+      const hasInterviewResult = Array.isArray(item.interviews)
+        && item.interviews.some((iv) => iv && (iv.results || '').toString().trim().length > 0);
+      assertAllowedStatusTransition(existing.status, status, { hasInterviewResult });
     }
 
     if (existing) {
@@ -1202,6 +1213,9 @@ async function getFptkPositionOptions(filters, pagination, user = null) {
         position: true,
         department: true,
         division: true,
+        pt: true,
+        area: true,
+        areaDetail: true,
         currentStatus: true,
         status: true,
       },
@@ -1218,6 +1232,9 @@ async function getFptkPositionOptions(filters, pagination, user = null) {
     position: row.position,
     department: row.department || '',
     division: row.division || '',
+    pt: row.pt || '',
+    area: row.area || '',
+    areaDetail: row.areaDetail || '',
     currentStatus: row.currentStatus || row.status || '',
   }));
 
@@ -1250,6 +1267,7 @@ async function getSummaryByPosition(user = null) {
     location: true,
     area: true,
     areaDetail: true,
+    hiringManager: true,
     requestDate: true,
     fptkReceiveDate: true,
     closedAt: true,
@@ -1257,7 +1275,7 @@ async function getSummaryByPosition(user = null) {
     updatedAt: true,
   };
 
-  let fptks, grouped, totalGrouped, onboardingApps;
+  let fptks, applications, totalGrouped, onboardingApps;
 
   // Shared select for ONBOARDING candidates (name + join date)
   const onboardingSelect = {
@@ -1272,20 +1290,26 @@ async function getSummaryByPosition(user = null) {
     },
   };
 
+  // Minimal per-application select used to compute cumulative "ever reached
+  // this stage" counts (see status-history aggregation below).
+  const applicationSelect = { id: true, fptkId: true, status: true };
+
   const isScopedRole = Object.keys(fptkWhere).length > 0;
 
   if (!isScopedRole) {
     // Unrestricted roles (SUPER_ADMIN, TA_HO, etc.): all queries are
     // independent — run them in parallel to halve round-trip latency.
-    [fptks, grouped, totalGrouped, onboardingApps] = await Promise.all([
+    [fptks, applications, totalGrouped, onboardingApps] = await Promise.all([
       prisma.fPTK.findMany({
         where: {},
         select: fptkSelect,
         orderBy: { createdAt: 'desc' },
       }),
-      prisma.application.groupBy({
-        by: ['fptkId', 'status'],
-        _count: { _all: true },
+      // Per-application current status — combined with ApplicationStatusHistory
+      // below to compute cumulative stage counts (a candidate can count toward
+      // several stage columns at once, since each represents "ever reached").
+      prisma.application.findMany({
+        select: applicationSelect,
       }),
       // Total applicants per FPTK regardless of current status — used for the
       // cumulative "Applied" count so it never decreases as candidates advance.
@@ -1301,8 +1325,8 @@ async function getSummaryByPosition(user = null) {
     ]);
   } else {
     // Scoped roles (HIRING_MANAGER, Head of Division, HRBP, TA_SITE): fetch the
-    // allowed FPTK IDs first, then use fptkId IN (...) for the groupBy so
-    // the application query uses the composite index instead of a JOIN.
+    // allowed FPTK IDs first, then use fptkId IN (...) for the queries so
+    // the application queries use the composite index instead of a JOIN.
     fptks = await prisma.fPTK.findMany({
       where: fptkWhere,
       select: fptkSelect,
@@ -1310,12 +1334,11 @@ async function getSummaryByPosition(user = null) {
     });
 
     const fptkIds = fptks.map((f) => f.id);
-    [grouped, totalGrouped, onboardingApps] = fptkIds.length > 0
+    [applications, totalGrouped, onboardingApps] = fptkIds.length > 0
       ? await Promise.all([
-          prisma.application.groupBy({
-            by: ['fptkId', 'status'],
+          prisma.application.findMany({
             where: { fptkId: { in: fptkIds } },
-            _count: { _all: true },
+            select: applicationSelect,
           }),
           prisma.application.groupBy({
             by: ['fptkId'],
@@ -1351,31 +1374,75 @@ async function getSummaryByPosition(user = null) {
     });
   });
 
+  // Cumulative "ever reached this stage" counts — a candidate contributes to
+  // every UI stage their status history (plus current status) has touched,
+  // not just their current status. Dedup happens at the UI-status level
+  // (mapApplicationStatusToUi) since several raw enum statuses collapse into
+  // the same UI label (e.g. OFFER_SENT and MEDICAL_CHECKUP_SCHEDULED both map
+  // to "Under Review") — without that, a single candidate could be counted
+  // twice in one column.
+  const applicationIds = applications.map((a) => a.id);
+  const statusHistoryRows = applicationIds.length > 0
+    ? await prisma.applicationStatusHistory.findMany({
+        where: { applicationId: { in: applicationIds } },
+        select: { applicationId: true, toStatus: true },
+      })
+    : [];
+
+  const rawStatusesByApplicationId = new Map();
+  statusHistoryRows.forEach((h) => {
+    if (!rawStatusesByApplicationId.has(h.applicationId)) {
+      rawStatusesByApplicationId.set(h.applicationId, new Set());
+    }
+    rawStatusesByApplicationId.get(h.applicationId).add(h.toStatus);
+  });
+
   const countsByFptkId = {};
   const allStatuses = new Set();
-  grouped.forEach((g) => {
-    if (!g.fptkId) return;
-    const status = (g.status || '').toString();
-    allStatuses.add(status);
-    if (!countsByFptkId[g.fptkId]) countsByFptkId[g.fptkId] = {};
-    countsByFptkId[g.fptkId][status] = g._count?._all || 0;
+  applications.forEach((app) => {
+    if (!app.fptkId) return;
+
+    const rawStatusesReached = rawStatusesByApplicationId.get(app.id) || new Set();
+    rawStatusesReached.add(app.status);
+
+    const uiStatusesReached = new Set();
+    rawStatusesReached.forEach((raw) => {
+      uiStatusesReached.add(mapApplicationStatusToUi(raw));
+    });
+
+    if (!countsByFptkId[app.fptkId]) countsByFptkId[app.fptkId] = {};
+    uiStatusesReached.forEach((uiStatus) => {
+      allStatuses.add(uiStatus);
+      countsByFptkId[app.fptkId][uiStatus] = (countsByFptkId[app.fptkId][uiStatus] || 0) + 1;
+    });
   });
+
+  // Pre-compute SLA bucket server-side (uses memoised Indonesia holiday lookups).
+  // Returning it here means the browser never has to call getHolidays() at all.
+  const nowDate = new Date();
+  const fptksWithSla = fptks.map((f) => ({
+    ...f,
+    sla: getPositionSlaBucket(f, nowDate),
+  }));
 
   // Provide unique filter options quickly
   const priorities = new Set();
   const divisions = new Set();
   const locations = new Set();
-  fptks.forEach((f) => {
+  const hiringManagers = new Set();
+  fptksWithSla.forEach((f) => {
     const p = (f.priority || '').toString().trim();
     if (p) priorities.add(p);
     const d = (f.department || f.division || '').toString().trim();
     if (d) divisions.add(d);
     const l = (f.areaDetail || f.area || f.location || '').toString().trim();
     if (l) locations.add(l);
+    const hm = (f.hiringManager || '').toString().trim();
+    if (hm) hiringManagers.add(hm);
   });
 
   return {
-    fptks,
+    fptks: fptksWithSla,
     applicationCounts: countsByFptkId,
     totalApplicants: totalApplicantsByFptkId,
     onboardingCandidates: onboardingByFptkId,
@@ -1383,6 +1450,9 @@ async function getSummaryByPosition(user = null) {
     priorities: Array.from(priorities),
     divisions: Array.from(divisions),
     locations: Array.from(locations),
+    hiringManagers: Array.from(hiringManagers).sort((a, b) =>
+      a.localeCompare(b, undefined, { sensitivity: 'base' })
+    ),
   };
 }
 
@@ -1574,7 +1644,8 @@ async function updateFPTK(fptkId, data, updaterId) {
   if (data.responsibilities !== undefined) updateData.responsibilities = data.responsibilities;
   if (data.qualifications !== undefined) updateData.qualifications = data.qualifications;
 
-  const updatedFptk = await prisma.$transaction(async (tx) => {
+  const updatedFptk = await runWithAuditSuppressed(async () =>
+    prisma.$transaction(async (tx) => {
     // Get current FPTK to check for status change
     const currentFptk = await tx.fPTK.findUnique({
       where: { id: fptkId },
@@ -1623,12 +1694,78 @@ async function updateFPTK(fptkId, data, updaterId) {
     }
 
     return fptk;
-  });
+  }));
+
+  const changedFields = Object.keys(updateData);
+  const { oldSnapshot, newSnapshot } = auditService.buildChangedFieldSnapshot(
+    current,
+    { ...current, ...updateData },
+    changedFields
+  );
+
+  const positionLabel = current.position || current.positionTitle || fptkId;
+  let summary = `Update position: ${positionLabel}`;
+  const auditNewValues = { ...newSnapshot };
+
+  if (appliedCandidatesProvided) {
+    auditNewValues.candidateCount = normalizedAppliedCandidates.length;
+    if (changedFields.length === 0) {
+      summary = `Update position candidates: ${positionLabel}`;
+    }
+  }
+
+  if (changedFields.length > 0 || appliedCandidatesProvided) {
+    await auditService.writeAuditLog({
+      action: 'UPDATE',
+      entity: 'FPTK',
+      entityId: fptkId,
+      oldValues: changedFields.length > 0 ? oldSnapshot : null,
+      newValues: auditNewValues,
+      userId: updaterId,
+      summary,
+    });
+  }
 
   logger.info(`FPTK updated: ${fptkId}`);
 
   const enriched = await getFptkWithRelations(updatedFptk.id);
   return enriched || updatedFptk;
+}
+
+/**
+ * Sync applied candidates on a position without changing other FPTK fields.
+ * Used by TA_SITE and other scoped roles that may manage candidates but not edit the position.
+ */
+async function syncFptkAppliedCandidates(fptkId, appliedCandidates, userId) {
+  const current = await prisma.fPTK.findUnique({
+    where: { id: fptkId },
+    select: { id: true, position: true, positionTitle: true },
+  });
+
+  if (!current) {
+    throw new Error('FPTK not found');
+  }
+
+  const normalized = normalizeAppliedCandidates(appliedCandidates);
+
+  await prisma.$transaction(async (tx) => {
+    await syncFptkApplicationsTx(tx, fptkId, normalized, { userId });
+  });
+
+  const positionLabel = current.position || current.positionTitle || fptkId;
+  await auditService.writeAuditLog({
+    action: 'UPDATE',
+    entity: 'FPTK',
+    entityId: fptkId,
+    newValues: { candidateCount: normalized.length },
+    userId,
+    summary: `Update position candidates: ${positionLabel}`,
+  });
+
+  logger.info(`FPTK applied candidates synced: ${fptkId}`);
+
+  const enriched = await getFptkWithRelations(fptkId);
+  return enriched || current;
 }
 
 /**
@@ -1856,6 +1993,7 @@ module.exports = {
   getFptkCurrentStatusCounts,
   getSummaryByPosition,
   updateFPTK,
+  syncFptkAppliedCandidates,
   deleteFPTK,
   deleteFPTKsBulk,
   publishFPTK,

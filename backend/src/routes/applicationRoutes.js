@@ -152,6 +152,7 @@ router.put(
         user: req.user,
         blacklisted: blacklisted === true ? true : blacklisted === false ? false : undefined,
         blacklistReason,
+        enforceTransitionRules: true,
       }
     );
     
@@ -198,7 +199,12 @@ router.post(
   validate,
   asyncHandler(async (req, res) => {
     const { reason } = req.body;
-    const application = await applicationService.rejectApplication(req.params.id, req.user.id, reason);
+    const application = await applicationService.rejectApplication(
+      req.params.id,
+      req.user.id,
+      reason,
+      { user: req.user }
+    );
     
     res.json({
       success: true,

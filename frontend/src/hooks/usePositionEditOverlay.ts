@@ -1,14 +1,62 @@
-import { useCallback, useState } from 'react'
-import { FPTKAPI } from '@/lib/api'
+import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useAuth } from '@/contexts/AuthContext'
+import { FPTKAPI, MenuAccessAPI } from '@/lib/api'
 import { mapApiFptk } from '@/app/fptk/page'
-import { buildFptkUpdatePayload } from '@/utils/fptkUpdatePayload'
+import { buildFptkUpdatePayload, buildAppliedCandidatesOnlyPayload } from '@/utils/fptkUpdatePayload'
+import {
+  resolveFptkEditPermissions,
+  resolveRoleNameFromUser,
+} from '@/utils/fptkEditPermissions'
 import type { FPTK } from '@/types'
 
+function readMenuAccessFromStorage(): Record<string, unknown> {
+  if (typeof window === 'undefined') return {}
+  try {
+    return JSON.parse(localStorage.getItem('menuAccess') || 'null') || {}
+  } catch {
+    return {}
+  }
+}
+
 export function usePositionEditOverlay(onAfterSave?: () => void) {
+  const { user, isAuthenticated } = useAuth()
   const [isOpen, setIsOpen] = useState(false)
   const [jobPosting, setJobPosting] = useState<FPTK | null>(null)
   const [loading, setLoading] = useState(false)
   const [backLabel, setBackLabel] = useState('')
+  const [menuAccess, setMenuAccess] = useState<Record<string, unknown>>({})
+
+  useEffect(() => {
+    if (!isAuthenticated) {
+      setMenuAccess({})
+      return
+    }
+
+    setMenuAccess(readMenuAccessFromStorage())
+
+    let cancelled = false
+    MenuAccessAPI.get()
+      .then((access) => {
+        if (!cancelled) {
+          setMenuAccess(access || {})
+        }
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setMenuAccess(readMenuAccessFromStorage())
+        }
+      })
+
+    return () => {
+      cancelled = true
+    }
+  }, [isAuthenticated])
+
+  const roleName = resolveRoleNameFromUser(user)
+  const { candidateStatusOnly, canManagePositionCandidates, canOpenPositionEdit } = useMemo(
+    () => resolveFptkEditPermissions(roleName, menuAccess),
+    [roleName, menuAccess]
+  )
 
   const close = useCallback(() => {
     setIsOpen(false)
@@ -34,16 +82,23 @@ export function usePositionEditOverlay(onAfterSave?: () => void) {
     async (updatedData: any) => {
       if (!jobPosting) return
       try {
-        const payload = buildFptkUpdatePayload(jobPosting, updatedData)
-        await FPTKAPI.update(jobPosting.id, payload)
+        if (candidateStatusOnly && canManagePositionCandidates) {
+          const payload = buildAppliedCandidatesOnlyPayload(updatedData.appliedCandidates)
+          await FPTKAPI.updateAppliedCandidates(jobPosting.id, payload)
+        } else if (!candidateStatusOnly) {
+          const payload = buildFptkUpdatePayload(jobPosting, updatedData)
+          await FPTKAPI.update(jobPosting.id, payload)
+        } else {
+          return
+        }
         close()
         onAfterSave?.()
       } catch (error: any) {
         console.error('usePositionEditOverlay: save', error)
-        alert(error.response?.data?.message || 'Failed to update position. Please try again.')
+        throw error
       }
     },
-    [jobPosting, close, onAfterSave]
+    [jobPosting, close, onAfterSave, candidateStatusOnly, canManagePositionCandidates]
   )
 
   return {
@@ -51,6 +106,9 @@ export function usePositionEditOverlay(onAfterSave?: () => void) {
     jobPosting,
     loading,
     backLabel,
+    candidateStatusOnly,
+    canManagePositionCandidates,
+    canOpenPositionEdit,
     open,
     close,
     handleSave,

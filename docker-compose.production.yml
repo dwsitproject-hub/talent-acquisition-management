@@ -26,6 +26,8 @@ services:
       # Database - set DATABASE_URL in .env.production (never commit real values)
       # Format: postgresql://<DB_USER>:<DB_PASSWORD>@<DB_HOST>:5432/tas_db?schema=public&pool_timeout=0&connection_limit=20
       DATABASE_URL: ${DATABASE_URL}
+      # Set true on SIT/staging so audit_logs and other migrations apply on container start
+      PRISMA_MIGRATE_ON_START: ${PRISMA_MIGRATE_ON_START:-false}
 
       # Redis
       REDIS_URL: redis://:${REDIS_PASSWORD}@redis:6379

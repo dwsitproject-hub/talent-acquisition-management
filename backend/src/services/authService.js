@@ -9,6 +9,7 @@ const {
   revokeAllUserTokens,
 } = require('../utils/token');
 const logger = require('../utils/logger');
+const auditService = require('./auditService');
 
 /**
  * Register a new candidate user
@@ -141,6 +142,8 @@ async function login(email, password, metadata = {}) {
 
   logger.info(`User logged in: ${email}`);
 
+  await auditService.recordAuthEvent('LOGIN', user.id, metadata);
+
   // Map backend enum to frontend role name
   const mapEnumToRole = (role) => {
     const roleMap = {
@@ -238,9 +241,19 @@ async function refreshAccessToken(refreshToken) {
 /**
  * Logout user
  */
-async function logout(refreshToken) {
+async function logout(refreshToken, metadata = {}) {
   if (refreshToken) {
+    const tokenRecord = await prisma.refreshToken.findUnique({
+      where: { token: refreshToken },
+      select: { userId: true },
+    });
+
     await revokeRefreshToken(refreshToken);
+
+    if (tokenRecord?.userId) {
+      await auditService.recordAuthEvent('LOGOUT', tokenRecord.userId, metadata);
+    }
+
     logger.info('User logged out');
   }
 }

@@ -1,43 +1,22 @@
-const { PrismaClient } = require('@prisma/client');
+const prismaBase = require('./prismaBase');
 const logger = require('../utils/logger');
+const { createAuditExtension } = require('../utils/prismaAuditExtension');
 
-const prisma = new PrismaClient({
-  log: [
-    {
-      emit: 'event',
-      level: 'query',
-    },
-    {
-      emit: 'event',
-      level: 'error',
-    },
-    {
-      emit: 'event',
-      level: 'warn',
-    },
-  ],
-});
-
-// Log queries in development
 if (process.env.NODE_ENV === 'development') {
-  prisma.$on('query', (e) => {
+  prismaBase.$on('query', (e) => {
     logger.debug('Query: ' + e.query);
     logger.debug('Duration: ' + e.duration + 'ms');
   });
 }
 
-// Log errors
-prisma.$on('error', (e) => {
+prismaBase.$on('error', (e) => {
   logger.error('Prisma Error:', e);
 });
 
-// Log warnings
-prisma.$on('warn', (e) => {
+prismaBase.$on('warn', (e) => {
   logger.warn('Prisma Warning:', e);
 });
 
-// Note: Graceful shutdown is handled in server.js
-// We don't disconnect here to avoid conflicts with test scripts and multiple instances
+const prisma = prismaBase.$extends(createAuditExtension());
 
 module.exports = prisma;
-

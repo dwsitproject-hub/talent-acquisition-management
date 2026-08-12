@@ -19,6 +19,7 @@ import {
   UserGroupIcon,
   BuildingOfficeIcon,
   MapPinIcon,
+  ShieldCheckIcon,
 } from '@heroicons/react/24/outline'
 
 type NavChild = { name: string; href: string; icon: typeof UsersIcon }
@@ -51,6 +52,10 @@ const settingsNavigation = [
   { name: 'Settings', href: '/settings', icon: CogIcon },
 ]
 
+const adminNavigation = [
+  { name: 'Audit Trail', href: '/audit-trail', icon: ShieldCheckIcon },
+]
+
 interface SidebarProps {
   sidebarOpen: boolean
   setSidebarOpen: (open: boolean) => void
@@ -61,6 +66,7 @@ interface SidebarProps {
 function getDefaultNavRoles(href: string): string[] {
   const d: Record<string, string[]> = {
     '/team': ['SUPER_ADMIN', 'TA_HO'],
+    '/audit-trail': ['SUPER_ADMIN'],
     '/candidates': [
       'SUPER_ADMIN', 'Management', 'Head of Division', 'HRBP', 'TA_HO', 'TA_SITE',
       'HIRING_MANAGER', 'INTERVIEWER',
@@ -290,6 +296,10 @@ export default function Sidebar({
     return isVisible(item.href, defaultRoles)
   })
 
+  const filteredAdminNavigation = adminNavigation.filter((item) =>
+    isVisible(item.href, getDefaultNavRoles(item.href))
+  )
+
   const navPx = sidebarCollapsed ? 'px-2' : 'px-6'
   const listMx = sidebarCollapsed ? '' : '-mx-2'
 
@@ -371,6 +381,37 @@ export default function Sidebar({
                           </div>
                           <ul role="list" className="-mx-2 mt-2 space-y-1">
                             {filteredMasterNavigation.map((item) => (
+                              <li key={item.name}>
+                                <Link
+                                  href={item.href}
+                                  className={cn(
+                                    pathname === item.href
+                                      ? 'bg-gray-50 text-indigo-600'
+                                      : 'text-gray-700 hover:text-indigo-600 hover:bg-gray-50',
+                                    'group flex gap-x-3 rounded-md p-2 text-sm leading-6 font-semibold'
+                                  )}
+                                >
+                                  <item.icon
+                                    className={cn(
+                                      pathname === item.href ? 'text-indigo-600' : 'text-gray-400 group-hover:text-indigo-600',
+                                      'h-6 w-6 shrink-0'
+                                    )}
+                                    aria-hidden="true"
+                                  />
+                                  {item.name}
+                                </Link>
+                              </li>
+                            ))}
+                          </ul>
+                        </li>
+                      )}
+                      {!loading && filteredAdminNavigation.length > 0 && (
+                        <li>
+                          <div className="text-xs font-semibold leading-6 text-gray-400 uppercase tracking-wider">
+                            Administration
+                          </div>
+                          <ul role="list" className="-mx-2 mt-2 space-y-1">
+                            {filteredAdminNavigation.map((item) => (
                               <li key={item.name}>
                                 <Link
                                   href={item.href}
@@ -484,6 +525,44 @@ export default function Sidebar({
                   )}
                   <ul role="list" className={cn('mt-2 space-y-1', listMx)}>
                     {filteredMasterNavigation.map((item) => (
+                      <li key={item.name}>
+                        <Link
+                          href={item.href}
+                          title={sidebarCollapsed ? item.name : undefined}
+                          className={cn(
+                            pathname === item.href
+                              ? 'bg-gray-50 text-indigo-600'
+                              : 'text-gray-700 hover:text-indigo-600 hover:bg-gray-50',
+                            sidebarCollapsed
+                              ? 'flex justify-center rounded-md p-2'
+                              : 'group flex gap-x-3 rounded-md p-2 text-sm leading-6 font-semibold'
+                          )}
+                        >
+                          <item.icon
+                            className={cn(
+                              pathname === item.href ? 'text-indigo-600' : 'text-gray-400 group-hover:text-indigo-600',
+                              'h-6 w-6 shrink-0'
+                            )}
+                            aria-hidden="true"
+                          />
+                          {!sidebarCollapsed && item.name}
+                          {sidebarCollapsed && <span className="sr-only">{item.name}</span>}
+                        </Link>
+                      </li>
+                    ))}
+                  </ul>
+                </li>
+              )}
+
+              {!loading && filteredAdminNavigation.length > 0 && (
+                <li>
+                  {!sidebarCollapsed && (
+                    <div className="text-xs font-semibold leading-6 text-gray-400 uppercase tracking-wider">
+                      Administration
+                    </div>
+                  )}
+                  <ul role="list" className={cn('mt-2 space-y-1', listMx)}>
+                    {filteredAdminNavigation.map((item) => (
                       <li key={item.name}>
                         <Link
                           href={item.href}

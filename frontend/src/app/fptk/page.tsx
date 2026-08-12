@@ -28,24 +28,9 @@ import {
 import { FPTKAPI, MasterOfficeLocationAPI, MenuAccessAPI } from '@/lib/api'
 import MultiSelectDropdown from '@/components/MultiSelectDropdown'
 import { mapUiStatusToApplicationStatus } from '@/utils/applicationStatusUi'
+import { resolveFptkEditPermissions, resolveRoleNameFromUser } from '@/utils/fptkEditPermissions'
 
 const DEFAULT_CURRENT_STATUS = 'Pending FKTK'
-
-const mapEnumToRole = (role: string): string => {
-  if (!role) return role
-  const roleMap: Record<string, string> = {
-    SUPER_ADMIN: 'SUPER_ADMIN',
-    CHRO: 'Management',
-    DEPARTMENT_HEAD: 'Head of Division',
-    HRBP: 'HRBP',
-    TA_SITE: 'TA_SITE',
-    TA_HO: 'TA_HO',
-    HIRING_MANAGER: 'HIRING_MANAGER',
-    INTERVIEWER: 'INTERVIEWER',
-    CANDIDATE: 'CANDIDATE',
-  }
-  return roleMap[role] || role
-}
 
 const CURRENT_STATUS_OPTIONS = [
   'Open',
@@ -378,7 +363,7 @@ function FPTKPageContent() {
   const searchParams = useSearchParams()
   const editIdFromUrl = searchParams.get('edit')?.trim() || null
   const backendRole = (user as any)?.role?.name || (user as any)?.role || 'TA_HO'
-  const roleName = mapEnumToRole(backendRole)
+  const roleName = resolveRoleNameFromUser(user)
   const [fptks, setFptks] = useState<FPTK[]>([])
   const [loading, setLoading] = useState(true)
   const [searchTerm, setSearchTerm] = useState('')
@@ -799,6 +784,20 @@ function FPTKPageContent() {
     if (!selectedJobPosting) return
 
     try {
+      if (roleName === 'TA_SITE') {
+        const payload = {
+          appliedCandidates: mapAppliedCandidatesForPayload(updatedData.appliedCandidates),
+        }
+        const updated = await FPTKAPI.updateAppliedCandidates(selectedJobPosting.id, payload)
+        const mapped = mapApiFptk(updated)
+        applyFptkListUpdate(mapped)
+        void refreshStatusCounts()
+        void loadFPTKs({ silent: true })
+        setIsEditModalOpen(false)
+        setSelectedJobPosting(null)
+        return
+      }
+
       const current: any = selectedJobPosting
       const currentStatus = updatedData.status || current.currentStatus || DEFAULT_CURRENT_STATUS
       const statusEnum = mapUiStatusToDbStatus(updatedData.status, current.statusEnum || 'DRAFT')
@@ -861,7 +860,7 @@ function FPTKPageContent() {
       setSelectedJobPosting(null)
     } catch (error: any) {
       console.error('Error updating FPTK:', error)
-      alert(error.response?.data?.message || 'Failed to update position. Please try again.')
+      throw error
     }
   }
 
@@ -1126,10 +1125,9 @@ function FPTKPageContent() {
     return null
   }
   const perms = cfg.permissions || { view: visibleRoles, create: ['SUPER_ADMIN','TA_HO','HIRING_MANAGER'], edit: ['SUPER_ADMIN','TA_HO','HIRING_MANAGER'] }
+  const { canEdit, candidateStatusOnly: canEditCandidateStatusOnly, canManagePositionCandidates, canOpenPositionEdit } =
+    resolveFptkEditPermissions(roleName, menuAccess)
   const canCreate = (perms.create || []).includes(roleName) || (perms.create || []).includes('*')
-  const canEdit = (perms.edit || []).includes(roleName) || (perms.edit || []).includes('*')
-  const canEditCandidateStatusOnly = roleName === 'TA_SITE' && !canEdit
-  const canOpenPositionEdit = canEdit || canEditCandidateStatusOnly
   const canDelete = backendRole === 'SUPER_ADMIN'
 
   const filteredFptks = fptks
@@ -1509,7 +1507,7 @@ function FPTKPageContent() {
                         className={`text-sm font-medium flex items-center ${canOpenPositionEdit ? 'text-gray-400 hover:text-gray-600' : 'text-gray-300 cursor-not-allowed'}`}
                       >
                         <PencilIcon className="h-4 w-4 mr-1" />
-                        {canEditCandidateStatusOnly ? 'Update Status' : 'Edit'}
+                        {canEditCandidateStatusOnly ? 'Update Candidate' : 'Edit'}
                       </button>
                       <button 
                         onClick={() => handleCopyJobPosting(fptk)}
@@ -1600,6 +1598,7 @@ function FPTKPageContent() {
           onSave={handleUpdateJobPosting}
           onCandidateStatusUpdate={handleCandidateStatusUpdate}
           candidateStatusOnly={canEditCandidateStatusOnly}
+          canManagePositionCandidates={canManagePositionCandidates}
         />
 
         {/* Upload Results Modal */}

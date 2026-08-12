@@ -1,7 +1,7 @@
 const bcrypt = require('bcryptjs');
 const prisma = require('../config/database');
 const logger = require('../utils/logger');
-const { serializeHrbpFields } = require('../utils/hrbpScope');
+const { serializeHrbpFields, validateUserPtAreaAssignment } = require('../utils/hrbpScope');
 const { serializeHodFields } = require('../utils/hodScope');
 
 // Map frontend role names to backend enum values
@@ -101,7 +101,22 @@ function buildUserAreaFilterCondition(areaFilter) {
   return null;
 }
 
-async function listUsers(search, role, area) {
+/** Division filter for user list, including multi-value (||) division fields. */
+function buildUserDivisionFilterCondition(divisionFilter) {
+  const target = (divisionFilter || '').trim();
+  if (!target) return null;
+
+  return {
+    OR: [
+      { division: { equals: target, mode: 'insensitive' } },
+      { division: { startsWith: `${target}||`, mode: 'insensitive' } },
+      { division: { endsWith: `||${target}`, mode: 'insensitive' } },
+      { division: { contains: `||${target}||`, mode: 'insensitive' } },
+    ],
+  };
+}
+
+async function listUsers(search, role, area, division) {
   const where = {};
   
   if (search) {
@@ -122,15 +137,23 @@ async function listUsers(search, role, area) {
   if (areaFilterCondition) {
     addConditionToWhere(where, areaFilterCondition);
   }
+
+  const divisionFilterCondition = buildUserDivisionFilterCondition(division);
+  if (divisionFilterCondition) {
+    addConditionToWhere(where, divisionFilterCondition);
+  }
   
   const users = await prisma.user.findMany({
     where,
-    orderBy: { createdAt: 'desc' },
+    // Alphabetical when filtering by division (e.g. HM dropdown); otherwise newest first
+    orderBy: division
+      ? [{ firstName: 'asc' }, { lastName: 'asc' }]
+      : { createdAt: 'desc' },
   });
   return users.map(mapUser);
 }
 
-async function createUser(data) {
+async function createUser(data, requester = null) {
   const {
     email,
     password,
@@ -153,6 +176,14 @@ async function createUser(data) {
   // Map role to enum value
   const mappedRole = mapRoleToEnum(role);
   logger.info(`Creating user with role: "${role}" -> mapped to: "${mappedRole}"`);
+
+  validateUserPtAreaAssignment({
+    pt,
+    area,
+    areaDetail,
+    role: mappedRole,
+    requesterRole: requester?.role || null,
+  });
 
   const hodFields = serializeHodFields({ division, sectionName });
   const hrbpFields = serializeHrbpFields({ pt, area, areaDetail, role: mappedRole });
@@ -181,7 +212,7 @@ async function createUser(data) {
   return mapUser(user);
 }
 
-async function updateUser(id, data) {
+async function updateUser(id, data, requester = null) {
   // Map role to enum value
   const mappedRole = mapRoleToEnum(data.role);
   
@@ -192,6 +223,14 @@ async function updateUser(id, data) {
     }
     return String(value).trim() || null;
   };
+
+  validateUserPtAreaAssignment({
+    pt: data.pt,
+    area: data.area,
+    areaDetail: data.areaDetail,
+    role: mappedRole,
+    requesterRole: requester?.role || null,
+  });
   
   const hodFields = serializeHodFields({ division: data.division, sectionName: data.sectionName });
   const hrbpFields = serializeHrbpFields({

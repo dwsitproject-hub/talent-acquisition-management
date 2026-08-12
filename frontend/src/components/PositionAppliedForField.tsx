@@ -19,6 +19,10 @@ interface PositionAppliedForFieldProps {
   disabled?: boolean
   /** When false, picker prompts user to select a division first. */
   divisionSelected?: boolean
+  /** Override copy when picker is not ready (e.g. TA_SITE missing PT scope). */
+  pickerNotReadyMessage?: string
+  /** Override copy when ready but no options match. */
+  noOptionsMessage?: string
 }
 
 function matchesQuery(option: PositionOption, query: string): boolean {
@@ -45,6 +49,8 @@ export default function PositionAppliedForField({
   onChange,
   disabled = false,
   divisionSelected = true,
+  pickerNotReadyMessage,
+  noOptionsMessage,
 }: PositionAppliedForFieldProps) {
   const [query, setQuery] = useState('')
 
@@ -68,8 +74,12 @@ export default function PositionAppliedForField({
 
   const helperText = (() => {
     if (loading) return 'Loading positions…'
-    if (!divisionSelected) return 'Select a division first to see open positions'
-    if (options.length === 0) return 'No open positions for selected division(s)'
+    if (!divisionSelected) {
+      return pickerNotReadyMessage || 'Select a division first to see open positions'
+    }
+    if (options.length === 0) {
+      return noOptionsMessage || 'No open positions for selected division(s)'
+    }
     if (meta) {
       const parts = [`${meta.selectableCount} position${meta.selectableCount === 1 ? '' : 's'} available`]
       if (meta.excludedByStatusCount > 0) {
@@ -82,14 +92,14 @@ export default function PositionAppliedForField({
 
   const emptyOptionsMessage = (() => {
     if (loading) return 'Loading…'
-    if (!divisionSelected) return 'Select a division first'
+    if (!divisionSelected) return pickerNotReadyMessage || 'Select a division first'
     if (query.trim()) return 'No matching positions'
-    return 'No open positions for selected division(s)'
+    return noOptionsMessage || 'No open positions for selected division(s)'
   })()
 
   const inputPlaceholder = (() => {
     if (loading) return 'Loading positions…'
-    if (!divisionSelected) return 'Select a division first'
+    if (!divisionSelected) return pickerNotReadyMessage || 'Select a division first'
     return 'Search position to add…'
   })()
 

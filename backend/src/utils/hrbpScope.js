@@ -68,6 +68,46 @@ function serializeHrbpFields({ pt, area, areaDetail, role }) {
   };
 }
 
+/** Roles that may only store a single PT / Area / Area Detail value. */
+const SINGLE_PT_AREA_DETAIL_ROLES = new Set(['CHRO', 'TA_HO']);
+
+function roleAllowsMultiPtAreaDetail(mappedRole) {
+  if (!mappedRole) return false;
+  return !SINGLE_PT_AREA_DETAIL_ROLES.has(mappedRole);
+}
+
+/**
+ * Enforce PT/Area scope rules on user create/update.
+ * - Management (CHRO) and TA_HO: single values only.
+ * - All other scoped roles: multiple values allowed, but only SUPER_ADMIN may assign them.
+ */
+function validateUserPtAreaAssignment({ pt, area, areaDetail, role, requesterRole }) {
+  const mappedRole = role;
+  const pts = parseMulti(pt);
+  const areas = parseMulti(area);
+  const details = parseMulti(areaDetail);
+
+  if (SINGLE_PT_AREA_DETAIL_ROLES.has(mappedRole)) {
+    if (pts.length > 1 || areas.length > 1 || details.length > 1) {
+      const err = new Error('Management and TA HO users can only have one PT, Area, and Area Detail');
+      err.statusCode = 400;
+      throw err;
+    }
+    return;
+  }
+
+  if (!roleAllowsMultiPtAreaDetail(mappedRole)) {
+    return;
+  }
+
+  const hasMultiple = pts.length > 1 || areas.length > 1 || details.length > 1;
+  if (hasMultiple && requesterRole !== 'SUPER_ADMIN') {
+    const err = new Error('Only SUPER_ADMIN can assign multiple PT and Area Detail values');
+    err.statusCode = 403;
+    throw err;
+  }
+}
+
 function inFilter(values) {
   if (!values || values.length === 0) return undefined;
   return values.length === 1 ? values[0] : { in: values };
@@ -86,10 +126,13 @@ function buildHrbpApplicationFptkFilterFromUser(user) {
 module.exports = {
   SEP,
   TA_SITE_FIXED_AREA,
+  SINGLE_PT_AREA_DETAIL_ROLES,
   isTaSiteRole,
   parseMulti,
   inFilter,
   packField,
+  roleAllowsMultiPtAreaDetail,
+  validateUserPtAreaAssignment,
   buildHrbpFptkFilterFromUser,
   buildHrbpApplicationFptkFilterFromUser,
   serializeHrbpFields,

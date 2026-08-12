@@ -1,6 +1,7 @@
 const { verifyAccessToken } = require('../utils/token');
 const prisma = require('../config/database');
 const logger = require('../utils/logger');
+const { setAuditUserId } = require('../utils/auditContext');
 
 /**
  * Authentication middleware - verifies JWT token
@@ -57,6 +58,7 @@ async function authenticate(req, res, next) {
 
     // Attach user to request
     req.user = user;
+    setAuditUserId(user.id);
     next();
   } catch (error) {
     logger.error('Authentication error:', error);
@@ -203,12 +205,18 @@ async function optionalAuth(req, res, next) {
         firstName: true,
         lastName: true,
         role: true,
+        department: true,
+        division: true,
+        pt: true,
+        area: true,
+        areaDetail: true,
         isActive: true,
       },
     });
 
     if (user && user.isActive) {
       req.user = user;
+      setAuditUserId(user.id);
     }
 
     next();
