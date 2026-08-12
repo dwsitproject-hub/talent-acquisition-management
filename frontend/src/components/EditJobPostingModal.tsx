@@ -24,7 +24,13 @@ import {
   getCandidateSaveErrorMessage,
   isCandidateLockSaveError,
 } from '@/utils/candidateSaveErrors'
-import { mapApplicationStatusToUi, mapUiStatusToApplicationStatus } from '@/utils/applicationStatusUi'
+import {
+  mapApplicationStatusToUi,
+  mapUiStatusToApplicationStatus,
+  getAllowedNextStatuses,
+  isInterviewResultRequired,
+  ALL_APPLICATION_UI_STATUSES,
+} from '@/utils/applicationStatusUi'
 
 interface EditJobPostingModalProps {
   isOpen: boolean
@@ -885,6 +891,16 @@ export default function EditJobPostingModal({
       c => c.id === candidateId || c.candidateId === candidateId
     )
     const oldStatus = target ? target.status : undefined
+
+    if (isInterviewResultRequired(oldStatus, newStatus)) {
+      const hasInterviewResult = (target?.interviews || []).some(
+        (iv: any) => (iv?.results || '').toString().trim().length > 0
+      )
+      if (!hasInterviewResult) {
+        alert(`Interview Result is required before moving this candidate from "${oldStatus}" to "${newStatus}". Please fill in the Interview Results field first.`)
+        return
+      }
+    }
 
     if (candidateStatusOnly) {
       const applicationId = target?.applicationId
@@ -2281,21 +2297,9 @@ export default function EditJobPostingModal({
                               backgroundColor: 'white'
                             }}
                           >
-                            <option value="Applied">Applied</option>
-                            <option value="Under Review">Under Review</option>
-                            <option value="Shortlisted">Shortlisted</option>
-                            <option value="Interview Scheduled">Interview Scheduled</option>
-                            <option value="Interviewed">Interviewed</option>
-                            <option value="Assessment">Assessment</option>
-                            <option value="Offering Creation">Offering Creation</option>
-                            <option value="Pending Feedback">Pending Feedback</option>
-                            <option value="Offer Accepted">Offer Accepted</option>
-                            <option value="MCU">MCU</option>
-                            <option value="On Boarding">On Boarding</option>
-                            <option value="Offer Rejected">Offer Rejected</option>
-                            <option value="Rejected (Failed Interview / Assessment)">Rejected (Failed Interview / Assessment)</option>
-                            <option value="Withdrawn">Withdrawn</option>
-                            <option value="Keep In View">Keep In View</option>
+                            {(getAllowedNextStatuses(candidate.status) || ALL_APPLICATION_UI_STATUSES).map((statusOption) => (
+                              <option key={statusOption} value={statusOption}>{statusOption}</option>
+                            ))}
                           </select>
                           {candidate.applicationId && (
                             <button

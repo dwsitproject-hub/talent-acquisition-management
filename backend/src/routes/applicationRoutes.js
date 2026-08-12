@@ -152,6 +152,7 @@ router.put(
         user: req.user,
         blacklisted: blacklisted === true ? true : blacklisted === false ? false : undefined,
         blacklistReason,
+        enforceTransitionRules: true,
       }
     );
     
