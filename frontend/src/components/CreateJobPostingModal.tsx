@@ -108,24 +108,49 @@ export default function CreateJobPostingModal({ isOpen, onClose, onSave, editing
       }
     }
 
-    const loadHiringManagers = async () => {
-      try {
-        const users = await AdminUsersAPI.list('', 'HIRING_MANAGER')
-        if (isMounted) {
-          setHiringManagerOptions(users.map((u: any) => ({ firstName: u.firstName, lastName: u.lastName })))
-        }
-      } catch (error) {
-        console.error('Error loading hiring managers:', error)
-      }
-    }
-
     loadDivisions()
-    loadHiringManagers()
 
     return () => {
       isMounted = false
     }
   }, [])
+
+  // Load hiring managers filtered by selected position division (A–Z)
+  useEffect(() => {
+    let isMounted = true
+    const division = (formData.division || '').trim()
+
+    if (!division) {
+      setHiringManagerOptions([])
+      return () => {
+        isMounted = false
+      }
+    }
+
+    const loadHiringManagers = async () => {
+      try {
+        const users = await AdminUsersAPI.list('', 'HIRING_MANAGER', undefined, division)
+        if (!isMounted) return
+        const options = (users || [])
+          .map((u: any) => ({ firstName: u.firstName || '', lastName: u.lastName || '' }))
+          .sort((a: { firstName: string; lastName: string }, b: { firstName: string; lastName: string }) => {
+            const nameA = `${a.firstName} ${a.lastName}`.trim().toLowerCase()
+            const nameB = `${b.firstName} ${b.lastName}`.trim().toLowerCase()
+            return nameA.localeCompare(nameB)
+          })
+        setHiringManagerOptions(options)
+      } catch (error) {
+        console.error('Error loading hiring managers:', error)
+        if (isMounted) setHiringManagerOptions([])
+      }
+    }
+
+    loadHiringManagers()
+
+    return () => {
+      isMounted = false
+    }
+  }, [formData.division])
 
   // Load office locations from Master Office Location
   useEffect(() => {
@@ -391,7 +416,7 @@ export default function CreateJobPostingModal({ isOpen, onClose, onSave, editing
         pt: editingJobPosting.pt || '',
         noFktk: editingJobPosting.noFktk || '',
         statusFktk: editingJobPosting.statusFktk || '',
-        division: editingJobPosting.department || '',
+        division: editingJobPosting.division || editingJobPosting.department || '',
         section: editingJobPosting.section || '',
         hiringManager: editingJobPosting.hiringManager || '',
         position: editingJobPosting.title || '',
@@ -569,7 +594,8 @@ export default function CreateJobPostingModal({ isOpen, onClose, onSave, editing
       setFormData(prev => ({
         ...prev,
         division: value,
-        section: '' // Reset section when division changes
+        section: '', // Reset section when division changes
+        hiringManager: '', // HM options are scoped to division
       }))
       return
     }
@@ -960,6 +986,7 @@ export default function CreateJobPostingModal({ isOpen, onClose, onSave, editing
                 value={formData.hiringManager}
                 onChange={handleInputChange}
                 required
+                disabled={!formData.division}
                 aria-invalid={fInv('hiringManager')}
                 style={{
                   width: '100%',
@@ -967,10 +994,13 @@ export default function CreateJobPostingModal({ isOpen, onClose, onSave, editing
                   border: '1px solid #d1d5db',
                   borderRadius: '6px',
                   fontSize: '14px',
+                  backgroundColor: formData.division ? 'white' : '#f9fafb',
                   ...fptkRequiredFieldHighlightStyle(fInv('hiringManager'))
                 }}
               >
-                <option value="">Select Hiring Manager</option>
+                <option value="">
+                  {formData.division ? 'Select Hiring Manager' : 'Select Division first'}
+                </option>
                 {hiringManagerOptions.map((user, index) => {
                   const fullName = `${user.firstName} ${user.lastName}`.trim()
                   return (
@@ -979,6 +1009,12 @@ export default function CreateJobPostingModal({ isOpen, onClose, onSave, editing
                     </option>
                   )
                 })}
+                {formData.hiringManager &&
+                  !hiringManagerOptions.some(
+                    (u) => `${u.firstName} ${u.lastName}`.trim() === formData.hiringManager
+                  ) && (
+                    <option value={formData.hiringManager}>{formData.hiringManager}</option>
+                  )}
               </select>
             </div>
 

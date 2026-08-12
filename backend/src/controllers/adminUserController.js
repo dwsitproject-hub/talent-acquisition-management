@@ -7,7 +7,8 @@ exports.listUsers = asyncHandler(async (req, res) => {
   const search = (req.query.search || '').toString();
   const role = req.query.role || null;
   const area = req.query.area || null;
-  const users = await adminUserService.listUsers(search, role, area);
+  const division = req.query.division || null;
+  const users = await adminUserService.listUsers(search, role, area, division);
   res.json({ success: true, data: users });
 });
 

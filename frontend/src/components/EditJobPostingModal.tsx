@@ -24,7 +24,13 @@ import {
   getCandidateSaveErrorMessage,
   isCandidateLockSaveError,
 } from '@/utils/candidateSaveErrors'
-import { mapApplicationStatusToUi, mapUiStatusToApplicationStatus } from '@/utils/applicationStatusUi'
+import {
+  mapApplicationStatusToUi,
+  mapUiStatusToApplicationStatus,
+  getAllowedNextStatuses,
+  isInterviewResultRequired,
+  ALL_APPLICATION_UI_STATUSES,
+} from '@/utils/applicationStatusUi'
 
 interface EditJobPostingModalProps {
   isOpen: boolean
@@ -254,17 +260,6 @@ export default function EditJobPostingModal({
       }
     }
 
-    const loadHiringManagers = async () => {
-      try {
-        const users = await AdminUsersAPI.list('', 'HIRING_MANAGER')
-        if (isMounted) {
-          setHiringManagerOptions(users.map((u: any) => ({ firstName: u.firstName, lastName: u.lastName })))
-        }
-      } catch (error) {
-        console.error('Error loading hiring managers:', error)
-      }
-    }
-
     const loadTeamMembers = async () => {
       try {
         const users = await AdminUsersAPI.list('', '') // Load all users
@@ -283,13 +278,49 @@ export default function EditJobPostingModal({
     }
 
     loadDivisions()
-    loadHiringManagers()
     loadTeamMembers()
 
     return () => {
       isMounted = false
     }
   }, [])
+
+  // Load hiring managers filtered by selected position division (A–Z)
+  useEffect(() => {
+    let isMounted = true
+    const division = (formData.division || '').trim()
+
+    if (!division) {
+      setHiringManagerOptions([])
+      return () => {
+        isMounted = false
+      }
+    }
+
+    const loadHiringManagers = async () => {
+      try {
+        const users = await AdminUsersAPI.list('', 'HIRING_MANAGER', undefined, division)
+        if (!isMounted) return
+        const options = (users || [])
+          .map((u: any) => ({ firstName: u.firstName || '', lastName: u.lastName || '' }))
+          .sort((a: { firstName: string; lastName: string }, b: { firstName: string; lastName: string }) => {
+            const nameA = `${a.firstName} ${a.lastName}`.trim().toLowerCase()
+            const nameB = `${b.firstName} ${b.lastName}`.trim().toLowerCase()
+            return nameA.localeCompare(nameB)
+          })
+        setHiringManagerOptions(options)
+      } catch (error) {
+        console.error('Error loading hiring managers:', error)
+        if (isMounted) setHiringManagerOptions([])
+      }
+    }
+
+    loadHiringManagers()
+
+    return () => {
+      isMounted = false
+    }
+  }, [formData.division])
 
   const ptOptions = useMemo(() => {
     const set = new Set<string>()
@@ -387,7 +418,7 @@ export default function EditJobPostingModal({
         pt: (jobPosting as any).pt || '',
         noFktk: (jobPosting as any).noFktk || '',
         statusFktk: (jobPosting as any).statusFktk || '',
-        division: jobPosting.department || '',
+        division: (jobPosting as any).division || jobPosting.department || '',
         section: (jobPosting as any).section || '',
         hiringManager: jobPosting.hiringManager || '',
         position: jobPosting.title || '',
@@ -438,7 +469,7 @@ export default function EditJobPostingModal({
         pt: (jobPosting as any).pt || '',
         noFktk: (jobPosting as any).noFktk || '',
         statusFktk: (jobPosting as any).statusFktk || '',
-        division: jobPosting.department || '',
+        division: (jobPosting as any).division || jobPosting.department || '',
         section: (jobPosting as any).section || '',
         hiringManager: jobPosting.hiringManager || '',
         position: jobPosting.title || '',
@@ -861,6 +892,16 @@ export default function EditJobPostingModal({
     )
     const oldStatus = target ? target.status : undefined
 
+    if (isInterviewResultRequired(oldStatus, newStatus)) {
+      const hasInterviewResult = (target?.interviews || []).some(
+        (iv: any) => (iv?.results || '').toString().trim().length > 0
+      )
+      if (!hasInterviewResult) {
+        alert(`Interview Result is required before moving this candidate from "${oldStatus}" to "${newStatus}". Please fill in the Interview Results field first.`)
+        return
+      }
+    }
+
     if (candidateStatusOnly) {
       const applicationId = target?.applicationId
       if (!applicationId) {
@@ -1142,7 +1183,8 @@ export default function EditJobPostingModal({
       setFormData(prev => ({
         ...prev,
         division: value,
-        section: '' // Reset section when division changes
+        section: '', // Reset section when division changes
+        hiringManager: '', // HM options are scoped to division
       }))
       return
     }
@@ -1518,6 +1560,7 @@ export default function EditJobPostingModal({
                     name="hiringManager"
                     value={formData.hiringManager}
                     onChange={handleInputChange}
+                    disabled={!formData.division}
                     aria-invalid={fInv('hiringManager')}
                     style={{
                       width: '100%',
@@ -1525,10 +1568,13 @@ export default function EditJobPostingModal({
                       border: '1px solid #d1d5db',
                       borderRadius: '6px',
                       fontSize: '14px',
+                      backgroundColor: formData.division ? 'white' : '#f9fafb',
                       ...fptkRequiredFieldHighlightStyle(fInv('hiringManager'))
                     }}
                   >
-                    <option value="">Select Hiring Manager</option>
+                    <option value="">
+                      {formData.division ? 'Select Hiring Manager' : 'Select Division first'}
+                    </option>
                     {hiringManagerOptions.map((user, index) => {
                       const fullName = `${user.firstName} ${user.lastName}`.trim()
                       return (
@@ -1537,6 +1583,12 @@ export default function EditJobPostingModal({
                         </option>
                       )
                     })}
+                    {formData.hiringManager &&
+                      !hiringManagerOptions.some(
+                        (u) => `${u.firstName} ${u.lastName}`.trim() === formData.hiringManager
+                      ) && (
+                        <option value={formData.hiringManager}>{formData.hiringManager}</option>
+                      )}
                   </select>
                 </div>
 
@@ -2245,21 +2297,9 @@ export default function EditJobPostingModal({
                               backgroundColor: 'white'
                             }}
                           >
-                            <option value="Applied">Applied</option>
-                            <option value="Under Review">Under Review</option>
-                            <option value="Shortlisted">Shortlisted</option>
-                            <option value="Interview Scheduled">Interview Scheduled</option>
-                            <option value="Interviewed">Interviewed</option>
-                            <option value="Assessment">Assessment</option>
-                            <option value="Offering Creation">Offering Creation</option>
-                            <option value="Pending Feedback">Pending Feedback</option>
-                            <option value="Offer Accepted">Offer Accepted</option>
-                            <option value="MCU">MCU</option>
-                            <option value="On Boarding">On Boarding</option>
-                            <option value="Offer Rejected">Offer Rejected</option>
-                            <option value="Rejected (Failed Interview / Assessment)">Rejected (Failed Interview / Assessment)</option>
-                            <option value="Withdrawn">Withdrawn</option>
-                            <option value="Keep In View">Keep In View</option>
+                            {(getAllowedNextStatuses(candidate.status) || ALL_APPLICATION_UI_STATUSES).map((statusOption) => (
+                              <option key={statusOption} value={statusOption}>{statusOption}</option>
+                            ))}
                           </select>
                           {candidate.applicationId && (
                             <button

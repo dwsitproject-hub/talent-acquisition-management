@@ -40,6 +40,7 @@ const UI_STATUS_TO_APPLICATION_STATUS: Record<string, string> = {
   'interview completed': 'INTERVIEW_COMPLETED',
   assessment: 'TECHNICAL_TEST',
   'offering creation': 'OFFER_PROPOSED',
+  'offer creation': 'OFFER_PROPOSED',
   'pending feedback': 'OFFER_APPROVED',
   'document verification': 'DOCUMENT_VERIFICATION',
   'offer proposed': 'OFFER_PROPOSED',
@@ -129,8 +130,8 @@ export function getApplicationStatusPillClass(uiStatus: string): { backgroundCol
   if (
     uiStatus === 'Offer Accepted' ||
     uiStatus === 'Offering Creation' ||
-    uiStatus === 'Pending Feedback' ||
     uiStatus === 'Offer Sent' ||
+    uiStatus === 'Pending Feedback' ||
     uiStatus === 'Hired' ||
     uiStatus === 'Contract Sent' ||
     uiStatus === 'Contract Signed' ||
@@ -146,4 +147,78 @@ export function getApplicationStatusPillClass(uiStatus: string): { backgroundCol
     return { backgroundColor: '#fee2e2', color: '#991b1b' }
   }
   return { backgroundColor: '#f3f4f6', color: '#374151' }
+}
+
+/** Shorthand used for the generic "Reject" action available on the candidate status dropdown. */
+export const REJECTED_UI_STATUS = 'Rejected (Failed Interview / Assessment)'
+
+/**
+ * Candidate pipeline status workflow: maps each status to the list of statuses a user is
+ * allowed to move a candidate into next. Statuses not present here are considered outside
+ * the managed workflow (legacy / unrecognized values) and are unrestricted - see
+ * `getAllowedNextStatuses`.
+ */
+export const STATUS_TRANSITIONS: Record<string, string[]> = {
+  Applied: ['Under Review', REJECTED_UI_STATUS, 'Withdrawn'],
+  'Under Review': ['Shortlisted', REJECTED_UI_STATUS, 'Withdrawn'],
+  Shortlisted: ['Interview Scheduled', REJECTED_UI_STATUS, 'Withdrawn'],
+  'Interview Scheduled': ['Interviewed', REJECTED_UI_STATUS, 'Withdrawn', 'Keep In View'],
+  Interviewed: ['Assessment', 'Document Verification', REJECTED_UI_STATUS, 'Keep In View', 'Withdrawn'],
+  Assessment: ['Document Verification', REJECTED_UI_STATUS, 'Keep In View', 'Withdrawn'],
+  'Document Verification': ['Offering Creation', 'Withdrawn'],
+  'Offering Creation': ['Offer Sent'],
+  'Offer Sent': ['Pending Feedback', 'Offer Accepted', 'Withdrawn'],
+  'Pending Feedback': ['Offer Accepted', 'Withdrawn'],
+  'Offer Accepted': ['MCU', 'Withdrawn'],
+  MCU: ['On Boarding', 'Withdrawn', REJECTED_UI_STATUS],
+  'Keep In View': ['Offering Creation'],
+  'On Boarding': [],
+  [REJECTED_UI_STATUS]: [],
+  Withdrawn: [],
+}
+
+/** Full, unrestricted list of statuses - used as a fallback for legacy/unmanaged statuses. */
+export const ALL_APPLICATION_UI_STATUSES: string[] = [
+  'Applied',
+  'Under Review',
+  'Shortlisted',
+  'Interview Scheduled',
+  'Interviewed',
+  'Assessment',
+  'Document Verification',
+  'Offering Creation',
+  'Offer Sent',
+  'Pending Feedback',
+  'Offer Accepted',
+  'MCU',
+  'On Boarding',
+  'Offer Rejected',
+  REJECTED_UI_STATUS,
+  'Withdrawn',
+  'Keep In View',
+]
+
+/**
+ * Returns the statuses selectable from `currentUiStatus` (always includes the current
+ * status itself so a <select> never renders with an out-of-list value). Returns `null` when
+ * the current status isn't part of the managed workflow, signaling callers to fall back to
+ * an unrestricted list (keeps legacy data usable).
+ */
+export function getAllowedNextStatuses(currentUiStatus?: string | null): string[] | null {
+  const current = (currentUiStatus || 'Applied').toString().trim()
+  const next = STATUS_TRANSITIONS[current]
+  if (!next) return null
+  return Array.from(new Set([current, ...next]))
+}
+
+/** Transitions where the Interview Result must be filled in before the change is allowed. */
+const INTERVIEW_RESULT_REQUIRED_TRANSITIONS: Array<{ from: string; to: string }> = [
+  { from: 'Interviewed', to: 'Document Verification' },
+  { from: 'Interviewed', to: 'Assessment' },
+]
+
+export function isInterviewResultRequired(fromUiStatus?: string | null, toUiStatus?: string | null): boolean {
+  return INTERVIEW_RESULT_REQUIRED_TRANSITIONS.some(
+    (t) => t.from === fromUiStatus && t.to === toUiStatus
+  )
 }

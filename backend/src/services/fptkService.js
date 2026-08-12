@@ -11,6 +11,7 @@ const {
   PRISMA_APP_STATUS_STRINGS,
   mapUiStatusToApplicationStatus,
   mapApplicationStatusToUi,
+  assertAllowedStatusTransition,
 } = require('../utils/applicationStatus');
 const { getPositionSlaBucket } = require('../utils/positionSla');
 const { runWithAuditSuppressed } = require('../utils/auditContext');
@@ -600,6 +601,12 @@ async function syncFptkApplicationsTx(tx, fptkId, appliedCandidates, options = {
     const joinDateData = {};
     if (Object.prototype.hasOwnProperty.call(item, 'joinDate')) {
       joinDateData.joinDate = item.joinDate ? new Date(item.joinDate) : null;
+    }
+
+    if (existing && existing.status !== status) {
+      const hasInterviewResult = Array.isArray(item.interviews)
+        && item.interviews.some((iv) => iv && (iv.results || '').toString().trim().length > 0);
+      assertAllowedStatusTransition(existing.status, status, { hasInterviewResult });
     }
 
     if (existing) {

@@ -101,7 +101,22 @@ function buildUserAreaFilterCondition(areaFilter) {
   return null;
 }
 
-async function listUsers(search, role, area) {
+/** Division filter for user list, including multi-value (||) division fields. */
+function buildUserDivisionFilterCondition(divisionFilter) {
+  const target = (divisionFilter || '').trim();
+  if (!target) return null;
+
+  return {
+    OR: [
+      { division: { equals: target, mode: 'insensitive' } },
+      { division: { startsWith: `${target}||`, mode: 'insensitive' } },
+      { division: { endsWith: `||${target}`, mode: 'insensitive' } },
+      { division: { contains: `||${target}||`, mode: 'insensitive' } },
+    ],
+  };
+}
+
+async function listUsers(search, role, area, division) {
   const where = {};
   
   if (search) {
@@ -122,10 +137,18 @@ async function listUsers(search, role, area) {
   if (areaFilterCondition) {
     addConditionToWhere(where, areaFilterCondition);
   }
+
+  const divisionFilterCondition = buildUserDivisionFilterCondition(division);
+  if (divisionFilterCondition) {
+    addConditionToWhere(where, divisionFilterCondition);
+  }
   
   const users = await prisma.user.findMany({
     where,
-    orderBy: { createdAt: 'desc' },
+    // Alphabetical when filtering by division (e.g. HM dropdown); otherwise newest first
+    orderBy: division
+      ? [{ firstName: 'asc' }, { lastName: 'asc' }]
+      : { createdAt: 'desc' },
   });
   return users.map(mapUser);
 }
