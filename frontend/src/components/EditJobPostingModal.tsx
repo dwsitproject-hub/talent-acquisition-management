@@ -5,6 +5,7 @@ import { useModalEscape } from '@/hooks/useModalEscape'
 import { XMarkIcon } from '@heroicons/react/24/outline'
 import { FPTK } from '@/types'
 import { MasterOfficeLocationAPI, MasterDivisionAPI, CandidatesAPI, AdminUsersAPI, ApplicationsAPI } from '@/lib/api'
+import { loadHiringManagerOptions } from '@/lib/hiringManagerOptions'
 import ApplicationHistoryModal from './ApplicationHistoryModal'
 import { fetchApplicationsForFptk } from '@/utils/mapFptkApplication'
 import { useAuth } from '@/contexts/AuthContext'
@@ -299,15 +300,8 @@ export default function EditJobPostingModal({
 
     const loadHiringManagers = async () => {
       try {
-        const users = await AdminUsersAPI.list('', 'HIRING_MANAGER', undefined, division)
+        const options = await loadHiringManagerOptions(division)
         if (!isMounted) return
-        const options = (users || [])
-          .map((u: any) => ({ firstName: u.firstName || '', lastName: u.lastName || '' }))
-          .sort((a: { firstName: string; lastName: string }, b: { firstName: string; lastName: string }) => {
-            const nameA = `${a.firstName} ${a.lastName}`.trim().toLowerCase()
-            const nameB = `${b.firstName} ${b.lastName}`.trim().toLowerCase()
-            return nameA.localeCompare(nameB)
-          })
         setHiringManagerOptions(options)
       } catch (error) {
         console.error('Error loading hiring managers:', error)

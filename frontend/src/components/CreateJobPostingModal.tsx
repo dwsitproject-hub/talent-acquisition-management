@@ -3,7 +3,8 @@
 import { useState, useEffect, useMemo, useRef } from 'react'
 import { useModalEscape } from '@/hooks/useModalEscape'
 import { XMarkIcon } from '@heroicons/react/24/outline'
-import { MasterOfficeLocationAPI, MasterDivisionAPI, CandidatesAPI, AdminUsersAPI } from '@/lib/api'
+import { MasterOfficeLocationAPI, MasterDivisionAPI, CandidatesAPI } from '@/lib/api'
+import { loadHiringManagerOptions } from '@/lib/hiringManagerOptions'
 import { compressFile, formatFileSize } from '@/utils/fileCompression'
 import {
   fptkRequiredFieldHighlightStyle,
@@ -129,15 +130,8 @@ export default function CreateJobPostingModal({ isOpen, onClose, onSave, editing
 
     const loadHiringManagers = async () => {
       try {
-        const users = await AdminUsersAPI.list('', 'HIRING_MANAGER', undefined, division)
+        const options = await loadHiringManagerOptions(division)
         if (!isMounted) return
-        const options = (users || [])
-          .map((u: any) => ({ firstName: u.firstName || '', lastName: u.lastName || '' }))
-          .sort((a: { firstName: string; lastName: string }, b: { firstName: string; lastName: string }) => {
-            const nameA = `${a.firstName} ${a.lastName}`.trim().toLowerCase()
-            const nameB = `${b.firstName} ${b.lastName}`.trim().toLowerCase()
-            return nameA.localeCompare(nameB)
-          })
         setHiringManagerOptions(options)
       } catch (error) {
         console.error('Error loading hiring managers:', error)
