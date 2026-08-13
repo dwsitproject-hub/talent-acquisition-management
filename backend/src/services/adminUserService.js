@@ -128,9 +128,19 @@ async function listUsers(search, role, area, division) {
   }
   
   if (role) {
-    // Map frontend role name to backend enum
-    const mappedRole = mapRoleToEnum(role);
-    where.role = mappedRole;
+    const roleValues = Array.isArray(role)
+      ? role
+      : String(role).split(',');
+    const mappedRoles = [...new Set(
+      roleValues
+        .map((value) => mapRoleToEnum(String(value || '').trim()))
+        .filter(Boolean)
+    )];
+    if (mappedRoles.length === 1) {
+      where.role = mappedRoles[0];
+    } else if (mappedRoles.length > 1) {
+      where.role = { in: mappedRoles };
+    }
   }
 
   const areaFilterCondition = buildUserAreaFilterCondition(area);
