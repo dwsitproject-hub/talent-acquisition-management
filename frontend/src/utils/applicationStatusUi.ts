@@ -31,7 +31,8 @@ export const PRISMA_APPLICATION_STATUSES = new Set([
 const UI_STATUS_TO_APPLICATION_STATUS: Record<string, string> = {
   applied: 'SUBMITTED',
   submitted: 'SUBMITTED',
-  'under review': 'SCREENING',
+  // Keep in sync with mapApplicationStatusToUi (PSYCHOMETRIC_TEST = Under Review).
+  'under review': 'PSYCHOMETRIC_TEST',
   screening: 'SCREENING',
   shortlisted: 'SCREENING',
   'cv screening': 'SCREENING',
