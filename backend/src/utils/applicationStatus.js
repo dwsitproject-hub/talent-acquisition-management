@@ -5,7 +5,8 @@ const PRISMA_APP_STATUS_STRINGS = new Set(Object.values($Enums.ApplicationStatus
 const UI_STATUS_TO_APP_STATUS_MAP = {
   applied: 'SUBMITTED',
   submitted: 'SUBMITTED',
-  'under review': 'SCREENING',
+  // Keep in sync with PIPELINE_STATUS_UI_LABELS (PSYCHOMETRIC_TEST = Under Review).
+  'under review': 'PSYCHOMETRIC_TEST',
   screening: 'SCREENING',
   shortlisted: 'SCREENING',
   'cv screening': 'SCREENING',
