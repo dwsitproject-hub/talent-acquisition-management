@@ -566,6 +566,7 @@ export default function CandidatesPage() {
     visibleRoles,
     canCreate,
     canEdit,
+    canDelete,
     canViewDetails,
     canGenerateLink,
   } = resolveCandidatePermissions(roleName, menuAccess)
@@ -1356,9 +1357,9 @@ export default function CandidatesPage() {
                               Edit
                             </button>
                             <button 
-                              disabled={!canEdit || deletingCandidateId === candidate.id}
-                              onClick={() => canEdit && handleDeleteCandidate(candidate.id)}
-                              className={`${canEdit && deletingCandidateId !== candidate.id ? 'text-red-600 hover:text-red-900' : 'text-gray-300 cursor-not-allowed'}`}
+                              disabled={!canDelete || deletingCandidateId === candidate.id}
+                              onClick={() => canDelete && handleDeleteCandidate(candidate.id)}
+                              className={`${canDelete && deletingCandidateId !== candidate.id ? 'text-red-600 hover:text-red-900' : 'text-gray-300 cursor-not-allowed'}`}
                             >
                               {deletingCandidateId === candidate.id ? 'Deleting…' : 'Delete'}
                             </button>

@@ -14,6 +14,7 @@ import {
   isTaSiteAuthUser,
   prunePositionAppliedFor,
   resolvePositionAppliedFptkIds,
+  outOfScopePositionTitles,
   type PositionOption,
 } from '@/lib/fptkPositionOptions'
 import PositionAppliedForField, { type PositionPickerMeta } from '@/components/PositionAppliedForField'
@@ -126,6 +127,11 @@ export default function EditCandidateModal({ isOpen, onClose, onSave, candidate 
   const taSitePickerNotReadyMessage =
     'Your account has no PT or Area Detail assigned. Contact an administrator.'
   const taSiteNoOptionsMessage = 'No open positions for your PT / Area Detail scope'
+
+  const lockedPositionTitles = useMemo(() => {
+    if (!isTaSiteUser || loadingPositions) return []
+    return outOfScopePositionTitles(formData.positionAppliedFor, positionOptionsForPicker)
+  }, [isTaSiteUser, loadingPositions, formData.positionAppliedFor, positionOptionsForPicker])
 
   const cvInputRef = useRef<HTMLInputElement>(null)
   const formInputRef = useRef<HTMLInputElement>(null)
@@ -350,11 +356,13 @@ export default function EditCandidateModal({ isOpen, onClose, onSave, candidate 
       return {
         ...prev,
         division: nextDivision,
-        positionAppliedFor: prunePositionAppliedFor(
-          prev.positionAppliedFor,
-          activeJobPostings,
-          nextDivision
-        ),
+        positionAppliedFor: isTaSiteUser
+          ? prev.positionAppliedFor
+          : prunePositionAppliedFor(
+              prev.positionAppliedFor,
+              activeJobPostings,
+              nextDivision
+            ),
       }
     })
   }
@@ -479,7 +487,7 @@ export default function EditCandidateModal({ isOpen, onClose, onSave, candidate 
             ...formData,
             positionAppliedFptkIds: resolvePositionAppliedFptkIds(
               formData.positionAppliedFor,
-              activeJobPostings
+              isTaSiteUser ? positionOptionsForPicker : activeJobPostings
             ),
           },
           {
@@ -703,14 +711,25 @@ export default function EditCandidateModal({ isOpen, onClose, onSave, candidate 
                       disabled={!divisionSelected}
                       pickerNotReadyMessage={isTaSiteUser ? taSitePickerNotReadyMessage : undefined}
                       noOptionsMessage={isTaSiteUser ? taSiteNoOptionsMessage : undefined}
+                      lockedTitles={lockedPositionTitles}
+                      lockNote={
+                        isTaSiteUser
+                          ? 'HO and other-site positions stay attached. You can only add or remove open positions in your PT / Site / Area Detail.'
+                          : undefined
+                      }
                       onChange={(positionAppliedFor) =>
                         setFormData((prev) => {
                           const next: typeof prev = { ...prev, positionAppliedFor }
                           if (isTaSiteUser) {
-                            const divisionsFromPositions = positionAppliedFor
+                            const inScopeTitles = new Set(positionOptionsForPicker.map((opt) => opt.title))
+                            const scopedDivisions = positionAppliedFor
+                              .filter((title) => inScopeTitles.has(title))
                               .map((title) => activeJobPostings.find((opt) => opt.title === title)?.division?.trim())
                               .filter((div): div is string => !!div)
-                            next.division = [...new Set(divisionsFromPositions)]
+                            const hasLocked = positionAppliedFor.some((title) => !inScopeTitles.has(title))
+                            next.division = hasLocked
+                              ? [...new Set([...scopedDivisions, ...prev.division])]
+                              : [...new Set(scopedDivisions)]
                           }
                           return next
                         })

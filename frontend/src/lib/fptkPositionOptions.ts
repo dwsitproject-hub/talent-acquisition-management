@@ -40,6 +40,15 @@ export function isTaSiteAuthUser(user: { role?: unknown } | null | undefined): b
   return resolveAuthUserRoleName(user) === 'TA_SITE'
 }
 
+/** Titles already on the candidate that are not in the TA_SITE picker options (HO / other sites). */
+export function outOfScopePositionTitles(
+  selected: string[],
+  inScopeOptions: PositionOption[]
+): string[] {
+  const allowed = new Set(inScopeOptions.map((opt) => opt.title).filter(Boolean))
+  return selected.filter((title) => Boolean(title) && !allowed.has(title))
+}
+
 /** Open positions matching TA_SITE user's PT list and Area Detail (area fixed to Site). */
 export function filterPositionOptionsByTaSiteScope(
   options: PositionOption[],

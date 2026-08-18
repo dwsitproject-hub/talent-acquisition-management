@@ -223,11 +223,13 @@ export default function EnhancedAddCandidateModal({ isOpen, onClose, onSave }: E
       return {
         ...prev,
         division: nextDivision,
-        positionAppliedFor: prunePositionAppliedFor(
-          prev.positionAppliedFor,
-          activeJobPostings,
-          nextDivision
-        ),
+        positionAppliedFor: isTaSiteUser
+          ? prev.positionAppliedFor
+          : prunePositionAppliedFor(
+              prev.positionAppliedFor,
+              activeJobPostings,
+              nextDivision
+            ),
       }
     })
   }
@@ -327,7 +329,7 @@ export default function EnhancedAddCandidateModal({ isOpen, onClose, onSave }: E
           ...formData,
           positionAppliedFptkIds: resolvePositionAppliedFptkIds(
             formData.positionAppliedFor,
-            activeJobPostings
+            isTaSiteUser ? positionOptionsForPicker : activeJobPostings
           ),
         },
         {
@@ -534,16 +536,17 @@ export default function EnhancedAddCandidateModal({ isOpen, onClose, onSave }: E
                       </select>
                     </div>
                   </div>
-                  <PositionAppliedForField
-                    selected={formData.positionAppliedFor}
-                    options={positionOptionsForPicker}
-                    loading={loadingPositions}
-                    meta={filteredPickerMeta}
-                    divisionSelected={divisionSelected}
-                    disabled={!divisionSelected}
-                    pickerNotReadyMessage={isTaSiteUser ? taSitePickerNotReadyMessage : undefined}
-                    noOptionsMessage={isTaSiteUser ? taSiteNoOptionsMessage : undefined}
-                    onChange={(positionAppliedFor) =>
+                    <PositionAppliedForField
+                      selected={formData.positionAppliedFor}
+                      options={positionOptionsForPicker}
+                      loading={loadingPositions}
+                      meta={filteredPickerMeta}
+                      divisionSelected={divisionSelected}
+                      disabled={!divisionSelected}
+                      pickerNotReadyMessage={isTaSiteUser ? taSitePickerNotReadyMessage : undefined}
+                      noOptionsMessage={isTaSiteUser ? taSiteNoOptionsMessage : undefined}
+                      lockNote={isTaSiteUser ? 'You can only attach open Site positions in your assigned PT / Area Detail. HO and other-site positions are not available.' : undefined}
+                      onChange={(positionAppliedFor) =>
                       setFormData((prev) => {
                         const next: typeof prev = { ...prev, positionAppliedFor }
                         if (isTaSiteUser) {

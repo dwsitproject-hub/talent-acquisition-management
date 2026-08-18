@@ -1064,7 +1064,7 @@ async function searchCandidates(filters, pagination, user = null) {
       }
     }
     // SUPER_ADMIN, TA_HO, TA_SITE, and other roles see all candidates (no additional filtering)
-    // TA_SITE: can list/view all candidates; create/update are denied in routes
+    // TA_SITE: can list/view/create/update; position attachment is scoped; delete is denied in routes
   }
 
   const tokenizedSearch = buildTokenizedSearch(filters, (token) => ([
