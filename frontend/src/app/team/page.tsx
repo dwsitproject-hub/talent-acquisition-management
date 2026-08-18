@@ -169,9 +169,9 @@ const routes: Array<{
         'INTERVIEWER',
       ],
       permissions: {
-        // TA_SITE: view allowed; create/edit hard-denied in candidatePermissions + API
-        create: ['SUPER_ADMIN', 'HRBP', 'TA_HO'],
-        edit: ['SUPER_ADMIN', 'HRBP', 'TA_HO'],
+        // TA_SITE: view/create/edit master data; position picker scoped to Site PT/Area Detail
+        create: ['SUPER_ADMIN', 'HRBP', 'TA_HO', 'TA_SITE'],
+        edit: ['SUPER_ADMIN', 'HRBP', 'TA_HO', 'TA_SITE'],
       },
     },
   },

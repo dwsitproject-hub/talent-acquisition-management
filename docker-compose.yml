@@ -64,6 +64,8 @@ services:
       CANDIDATE_PORTAL_URL: http://localhost:4002
       CORS_ORIGIN: http://localhost:4001,http://localhost:4002,http://172.30.63.129:4001,http://172.30.63.129:4002,http://your-db-host.internal:4001,http://your-db-host.internal:4002
       CORS_CREDENTIALS: true
+      # Run pending Prisma migrations automatically on every container start
+      PRISMA_MIGRATE_ON_START: "true"
       # Local dev convenience: avoid hitting in-memory rate limits (all requests appear from the Docker gateway IP)
       RATE_LIMIT_WINDOW_MS: 900000
       RATE_LIMIT_MAX_REQUESTS: 5000

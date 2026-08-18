@@ -21,8 +21,8 @@ const DEFAULT_CANDIDATE_VISIBLE_ROLES = [
   'INTERVIEWER',
 ]
 
-const DEFAULT_CANDIDATE_CREATE_ROLES = ['SUPER_ADMIN', 'HRBP', 'TA_HO']
-const DEFAULT_CANDIDATE_EDIT_ROLES = ['SUPER_ADMIN', 'HRBP', 'TA_HO']
+const DEFAULT_CANDIDATE_CREATE_ROLES = ['SUPER_ADMIN', 'HRBP', 'TA_HO', 'TA_SITE']
+const DEFAULT_CANDIDATE_EDIT_ROLES = ['SUPER_ADMIN', 'HRBP', 'TA_HO', 'TA_SITE']
 
 export function mapBackendRoleToDisplayName(role: string): string {
   if (!role) return role
@@ -40,8 +40,8 @@ export function resolveRoleNameFromUser(user: unknown): string {
 
 /**
  * Candidate page permissions.
- * TA_SITE: can list + view all candidates, but never create/edit
- * — enforced even if menuAccess is misconfigured.
+ * TA_SITE: list, view, create, and update master data. Position picker stays scoped
+ * to their PT / Site / Area Detail. Delete remains blocked.
  */
 export function resolveCandidatePermissions(
   roleName: string,
@@ -63,22 +63,22 @@ export function resolveCandidatePermissions(
     edit: DEFAULT_CANDIDATE_EDIT_ROLES,
   }
 
-  const canCreate = isTaSite
-    ? false
-    : (perms.create || []).includes(roleName) || (perms.create || []).includes('*')
-  const canEdit = isTaSite
-    ? false
-    : (perms.edit || []).includes(roleName) || (perms.edit || []).includes('*')
+  const canCreate =
+    (perms.create || []).includes(roleName) || (perms.create || []).includes('*')
+  const canEditFromMenu =
+    (perms.edit || []).includes(roleName) || (perms.edit || []).includes('*')
+  const canEdit = isTaSite || canEditFromMenu
+  const canDelete = !isTaSite && canEditFromMenu
   const canViewDetails = true
-  const canGenerateLink =
-    !isTaSite && ['SUPER_ADMIN', 'TA_HO', 'HRBP'].includes(roleName)
+  const canGenerateLink = ['SUPER_ADMIN', 'TA_HO', 'HRBP', 'TA_SITE'].includes(roleName)
 
   return {
     visibleRoles,
     canCreate,
     canEdit,
+    canDelete,
     canViewDetails,
     canGenerateLink,
-    isTaSiteListOnly: isTaSite,
+    isTaSiteListOnly: false,
   }
 }

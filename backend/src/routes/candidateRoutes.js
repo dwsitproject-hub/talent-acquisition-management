@@ -14,19 +14,30 @@ const { buildHrbpApplicationFptkFilterFromUser } = require('../utils/hrbpScope')
 const { isDepartmentHeadRole, buildHodCandidateScopeFromUser } = require('../utils/hodScope');
 const { assertUserCanAccessCandidate } = require('../utils/candidateAccess');
 
-const CANDIDATE_CREATE_FALLBACK = ['TA_HO', 'HRBP', 'SUPER_ADMIN', 'CHRO'];
-const CANDIDATE_EDIT_FALLBACK = ['TA_HO', 'HRBP', 'SUPER_ADMIN', 'CHRO'];
+const CANDIDATE_CREATE_FALLBACK = ['TA_HO', 'HRBP', 'SUPER_ADMIN', 'CHRO', 'TA_SITE'];
+const CANDIDATE_EDIT_FALLBACK = ['TA_HO', 'HRBP', 'SUPER_ADMIN', 'CHRO', 'TA_SITE'];
 
-/** TA_SITE: can list/view candidates, but hard deny create/update regardless of menuAccess. */
-function denyTaSiteCandidateWrite(req, res, next) {
+/**
+ * TA_SITE may create and update candidate master data. Position attachment stays
+ * scoped to their PT / Site / Area Detail (enforced in candidatePositionSync).
+ * Delete remains blocked.
+ */
+function denyTaSiteCandidateDelete(req, res, next) {
   if (req.user?.role === 'TA_SITE') {
     return res.status(403).json({
       success: false,
-      message:
-        'TA_SITE users can view candidates but cannot create or update candidate records',
+      message: 'TA_SITE users can update candidates but cannot delete candidate records',
     });
   }
   return next();
+}
+
+/** TA_SITE update is always allowed; other roles follow menu access / fallback. */
+function requireCandidateUpdateAccess(req, res, next) {
+  if (req.user?.role === 'TA_SITE') {
+    return next();
+  }
+  return requireMenuEdit('/candidates', CANDIDATE_EDIT_FALLBACK)(req, res, next);
 }
 
 /**
@@ -169,13 +180,12 @@ router.post('/me/reference', authenticate, authorize('CANDIDATE'), asyncHandler(
 
 /**
  * @route   POST /api/candidates
- * @desc    Create new candidate (for TA/HR)
- * @access  Private (TA, HRBP, Admin)
+ * @desc    Create new candidate (for TA/HR, including TA_SITE scoped to their area)
+ * @access  Private (TA_HO, TA_SITE, HRBP, CHRO, Admin)
  */
 router.post(
   '/',
   authenticate,
-  denyTaSiteCandidateWrite,
   requireMenuCreate('/candidates', CANDIDATE_CREATE_FALLBACK),
   asyncHandler(async (req, res) => {
     console.log('CREATE CANDIDATE - Received data:', JSON.stringify(req.body, null, 2));
@@ -212,8 +222,7 @@ router.post(
 router.get(
   '/bulk-template',
   authenticate,
-  denyTaSiteCandidateWrite,
-  authorize('TA_HO', 'HRBP', 'SUPER_ADMIN', 'CHRO'),
+  authorize('TA_HO', 'HRBP', 'SUPER_ADMIN', 'CHRO', 'TA_SITE'),
   asyncHandler(async (req, res) => {
     const format = (req.query.format || 'csv').toString();
     return sendTemplate(res, {
@@ -232,7 +241,6 @@ router.get(
 router.post(
   '/bulk-upload',
   authenticate,
-  denyTaSiteCandidateWrite,
   requireMenuCreate('/candidates', CANDIDATE_CREATE_FALLBACK),
   uploadLimiter,
   asyncHandler(async (req, res) => {
@@ -297,8 +305,7 @@ router.get(
 router.put(
   '/:id',
   authenticate,
-  denyTaSiteCandidateWrite,
-  requireMenuEdit('/candidates', CANDIDATE_EDIT_FALLBACK),
+  requireCandidateUpdateAccess,
   validationRules.uuidParam('id'),
   validate,
   asyncHandler(async (req, res) => {
@@ -324,7 +331,7 @@ router.put(
 router.delete(
   '/:id',
   authenticate,
-  denyTaSiteCandidateWrite,
+  denyTaSiteCandidateDelete,
   requireMenuEdit('/candidates', CANDIDATE_EDIT_FALLBACK),
   validationRules.uuidParam('id'),
   validate,
@@ -347,8 +354,7 @@ router.delete(
 router.post(
   '/:id/documents',
   authenticate,
-  denyTaSiteCandidateWrite,
-  requireMenuEdit('/candidates', CANDIDATE_EDIT_FALLBACK),
+  requireMenuCreate('/candidates', CANDIDATE_CREATE_FALLBACK),
   uploadLimiter,
   validationRules.uuidParam('id'),
   validate,
@@ -388,8 +394,7 @@ router.post(
 router.post(
   '/:id/form-link',
   authenticate,
-  denyTaSiteCandidateWrite,
-  requireMenuEdit('/candidates', CANDIDATE_EDIT_FALLBACK),
+  requireMenuCreate('/candidates', CANDIDATE_CREATE_FALLBACK),
   validationRules.uuidParam('id'),
   validate,
   asyncHandler(async (req, res) => {

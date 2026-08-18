@@ -2,7 +2,7 @@ import axios from 'axios'
 
 // Dynamically determine API URL based on current hostname
 // This allows the app to work with both localhost and public IP addresses
-function getApiBaseUrl(): string {
+export function getApiBaseUrl(): string {
   // If NEXT_PUBLIC_API_URL is explicitly set, use it
   if (typeof process !== 'undefined' && process.env?.NEXT_PUBLIC_API_URL) {
     return process.env.NEXT_PUBLIC_API_URL
@@ -18,6 +18,13 @@ function getApiBaseUrl(): string {
   
   // Fallback for server-side rendering
   return 'http://localhost:4000/api'
+}
+
+/** Full browser URL for starting DWS Hub OIDC login (not under axios base path quirks). */
+export function getOidcLoginUrl(): string {
+  const base = getApiBaseUrl().replace(/\/+$/, '')
+  // base is typically http://host:4000/api
+  return `${base}/auth/oidc/login`
 }
 
 // Create axios instance with dynamic baseURL

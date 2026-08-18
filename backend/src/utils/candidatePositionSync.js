@@ -13,12 +13,48 @@ function normalizeFptkIdList(value) {
   return [...new Set(raw.map((v) => String(v || '').trim()).filter(Boolean))];
 }
 
+function isScopedPositionRole(user) {
+  return user?.role === 'HRBP' || user?.role === 'TA_SITE';
+}
+
 function buildScopeFilterForUser(user) {
   if (!user) return null;
-  if (user.role === 'HRBP' || user.role === 'TA_SITE') {
+  if (isScopedPositionRole(user)) {
     return buildHrbpFptkFilterFromUser(user);
   }
   return null;
+}
+
+function outOfScopeAttachmentError(message) {
+  const err = new Error(
+    message ||
+      'You can only attach candidates to positions in your assigned PT, Site area, and Area Detail'
+  );
+  err.statusCode = 403;
+  return err;
+}
+
+/** Throws 403 if any requested FPTK id is outside the in-scope id list. */
+function assertRequestedFptkIdsAreInScope(requestedIds, inScopeIds) {
+  const requested = normalizeFptkIdList(requestedIds);
+  const allowed = new Set(normalizeFptkIdList(inScopeIds));
+  const blocked = requested.filter((id) => !allowed.has(id));
+  if (blocked.length > 0) {
+    throw outOfScopeAttachmentError();
+  }
+}
+
+async function assertExplicitFptkIdsInScopeTx(tx, ids, scopeFilter) {
+  const requested = normalizeFptkIdList(ids);
+  if (requested.length === 0) return;
+  const rows = await tx.fPTK.findMany({
+    where: { id: { in: requested }, ...scopeFilter },
+    select: { id: true },
+  });
+  assertRequestedFptkIdsAreInScope(
+    requested,
+    rows.map((row) => row.id)
+  );
 }
 
 async function findFptksForTitleTx(tx, title, scopeFilter = null) {
@@ -48,11 +84,24 @@ async function findFptksForTitleTx(tx, title, scopeFilter = null) {
 }
 
 async function resolveFptkIdsFromPositionsTx(tx, { positionAppliedFor, positionAppliedFptkIds, actorUser }) {
-  const ids = new Set(normalizeFptkIdList(positionAppliedFptkIds));
+  const explicitIds = normalizeFptkIdList(positionAppliedFptkIds);
   const scopeFilter = buildScopeFilterForUser(actorUser);
   const titles = Array.isArray(positionAppliedFor)
     ? positionAppliedFor.map(normalizeTitle).filter(Boolean)
     : [];
+
+  if (isScopedPositionRole(actorUser) && !scopeFilter) {
+    if (explicitIds.length > 0) {
+      throw outOfScopeAttachmentError('Missing PT/Area scope for this user');
+    }
+    return [];
+  }
+
+  if (scopeFilter) {
+    await assertExplicitFptkIdsInScopeTx(tx, explicitIds, scopeFilter);
+  }
+
+  const ids = new Set(explicitIds);
 
   for (const title of titles) {
     const matches = await findFptksForTitleTx(tx, title, scopeFilter);
@@ -201,4 +250,5 @@ async function syncCandidateApplicationsFromPositions(
 
 module.exports = {
   syncCandidateApplicationsFromPositions,
+  assertRequestedFptkIdsAreInScope,
 };

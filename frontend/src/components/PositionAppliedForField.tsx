@@ -23,6 +23,10 @@ interface PositionAppliedForFieldProps {
   pickerNotReadyMessage?: string
   /** Override copy when ready but no options match. */
   noOptionsMessage?: string
+  /** Selected titles that cannot be removed (e.g. HO / out-of-scope positions for TA_SITE). */
+  lockedTitles?: string[]
+  /** Extra helper under the picker when locked titles are present. */
+  lockNote?: string
 }
 
 function matchesQuery(option: PositionOption, query: string): boolean {
@@ -51,6 +55,8 @@ export default function PositionAppliedForField({
   divisionSelected = true,
   pickerNotReadyMessage,
   noOptionsMessage,
+  lockedTitles = [],
+  lockNote,
 }: PositionAppliedForFieldProps) {
   const [query, setQuery] = useState('')
 
@@ -60,6 +66,8 @@ export default function PositionAppliedForField({
     )
   }, [options, selected, query])
 
+  const lockedSet = useMemo(() => new Set(lockedTitles), [lockedTitles])
+
   const handleAdd = (title: string) => {
     if (!title || selected.includes(title)) return
     onChange([...selected, title])
@@ -67,6 +75,7 @@ export default function PositionAppliedForField({
   }
 
   const handleRemove = (title: string) => {
+    if (lockedSet.has(title)) return
     onChange(selected.filter((t) => t !== title))
   }
 
@@ -134,21 +143,25 @@ export default function PositionAppliedForField({
             No positions selected
           </span>
         ) : (
-          selected.map((position) => (
+          selected.map((position) => {
+            const isLocked = lockedSet.has(position)
+            return (
             <span
               key={position}
+              title={isLocked ? 'Outside your Site PT / Area Detail — cannot be changed here' : undefined}
               style={{
                 display: 'inline-flex',
                 alignItems: 'center',
                 padding: '4px 12px',
-                backgroundColor: '#EEF2FF',
-                color: '#4F46E5',
+                backgroundColor: isLocked ? '#F3F4F6' : '#EEF2FF',
+                color: isLocked ? '#4B5563' : '#4F46E5',
                 borderRadius: '16px',
                 fontSize: '14px',
                 fontWeight: '500',
               }}
             >
               {position}
+              {isLocked ? null : (
               <button
                 type="button"
                 onClick={() => handleRemove(position)}
@@ -167,8 +180,10 @@ export default function PositionAppliedForField({
               >
                 ×
               </button>
+              )}
             </span>
-          ))
+            )
+          })
         )}
       </div>
 
@@ -241,6 +256,9 @@ export default function PositionAppliedForField({
       </div>
 
       <p style={{ marginTop: '6px', fontSize: '12px', color: '#6B7280' }}>{helperText}</p>
+      {lockNote ? (
+        <p style={{ marginTop: '4px', fontSize: '12px', color: '#6B7280' }}>{lockNote}</p>
+      ) : null}
     </div>
   )
 }

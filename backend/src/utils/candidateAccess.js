@@ -26,7 +26,8 @@ function buildHiringManagerFptkScope(user = {}) {
  * Ensures the user may access/modify the given candidate (scoped roles only).
  * Unrestricted roles (SUPER_ADMIN, TA_HO, CHRO, TA_SITE) pass through.
  *
- * TA_SITE may list and view all candidates, but create/update are denied in routes.
+ * TA_SITE may list, view, create, and update candidates. Position attachment is
+ * scoped to their PT / Site / Area Detail. Delete is denied at the route level.
  */
 async function assertUserCanAccessCandidate(user, candidateId) {
   if (!user) {

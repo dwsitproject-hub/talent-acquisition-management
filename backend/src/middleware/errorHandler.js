@@ -32,8 +32,20 @@ function errorHandler(err, req, res, next) {
                           errorStackStr.indexOf('Account is locked') !== -1;
   const isAccountDeactivated = errorMsgStr.indexOf('Account is deactivated') !== -1 ||
                                errorStackStr.indexOf('Account is deactivated') !== -1;
-  
-  const isAuthError = isInvalidCredentials || isAccountLocked || isAccountDeactivated;
+  const errName = String(err?.name || '');
+  const isJoseAuthError =
+    errName.startsWith('JWT') ||
+    errName.startsWith('JWS') ||
+    errName.startsWith('JWE') ||
+    errName.startsWith('JWKS');
+  const isSsoAuthError =
+    errorMsgStr.indexOf('SSO') !== -1 ||
+    errorMsgStr.indexOf('No local account found') !== -1 ||
+    errorMsgStr.indexOf('OIDC') !== -1 ||
+    errorMsgStr.indexOf('handoff token') !== -1 ||
+    isJoseAuthError;
+
+  const isAuthError = isInvalidCredentials || isAccountLocked || isAccountDeactivated || isSsoAuthError;
   
   // If any auth error is detected, return 401 immediately
   if (isAuthError) {
