@@ -9,6 +9,7 @@ interface AuthContextType {
   isLoading: boolean
   isAuthenticated: boolean
   login: (email: string, password: string) => Promise<void>
+  completeSsoLogin: (handoff: string) => Promise<void>
   logout: () => void
   refreshToken: () => Promise<void>
   refreshUser: () => Promise<void>
@@ -62,6 +63,18 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     initAuth()
   }, [])
 
+  const persistSession = (accessToken: string, refreshTokenValue: string, nextUser: User) => {
+    if (typeof window !== 'undefined') {
+      try {
+        localStorage.setItem('authToken', accessToken)
+        localStorage.setItem('refreshToken', refreshTokenValue)
+      } catch (e) {
+        console.warn('Could not save auth tokens to localStorage:', e)
+      }
+    }
+    setUser(nextUser)
+  }
+
   const login = async (email: string, password: string) => {
     try {
       const response = await api.post<AuthResponse>('/auth/login', {
@@ -70,19 +83,22 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       })
 
       const { user, accessToken, refreshToken } = response.data.data
-
-      // Only set localStorage if in browser
-      if (typeof window !== 'undefined') {
-        try {
-          localStorage.setItem('authToken', accessToken)
-          localStorage.setItem('refreshToken', refreshToken)
-        } catch (e) {
-          console.warn('Could not save auth tokens to localStorage:', e)
-        }
-      }
-      setUser(user)
+      persistSession(accessToken, refreshToken, user)
     } catch (error: any) {
       throw new Error(error.response?.data?.message || 'Login failed')
+    }
+  }
+
+  const completeSsoLogin = async (handoff: string) => {
+    try {
+      const response = await api.post<AuthResponse>('/auth/oidc/complete', {
+        handoff,
+      })
+
+      const { user, accessToken, refreshToken } = response.data.data
+      persistSession(accessToken, refreshToken, user)
+    } catch (error: any) {
+      throw new Error(error.response?.data?.message || 'SSO login failed')
     }
   }
 
@@ -163,6 +179,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     isLoading,
     isAuthenticated,
     login,
+    completeSsoLogin,
     logout,
     refreshToken,
     refreshUser,

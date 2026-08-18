@@ -1,6 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const authController = require('../controllers/authController');
+const oidcController = require('../controllers/oidcController');
 const { authenticate } = require('../middleware/auth');
 const { validate, validationRules } = require('../middleware/validator');
 const { loginLimiter, registrationLimiter, passwordResetLimiter } = require('../middleware/rateLimiter');
@@ -30,6 +31,27 @@ router.post(
   validate,
   authController.login
 );
+
+/**
+ * @route   GET /api/auth/oidc/login
+ * @desc    Start DWS Hub OIDC login (SP-initiated)
+ * @access  Public
+ */
+router.get('/oidc/login', oidcController.login);
+
+/**
+ * @route   GET /api/auth/oidc/callback
+ * @desc    OIDC callback (SP-initiated and IdP-initiated)
+ * @access  Public
+ */
+router.get('/oidc/callback', oidcController.callback);
+
+/**
+ * @route   POST /api/auth/oidc/complete
+ * @desc    Exchange SSO handoff token for app JWTs
+ * @access  Public
+ */
+router.post('/oidc/complete', loginLimiter, oidcController.complete);
 
 /**
  * @route   POST /api/auth/refresh

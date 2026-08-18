@@ -11,6 +11,60 @@ const {
 const logger = require('../utils/logger');
 const auditService = require('./auditService');
 
+function mapEnumToRole(role) {
+  const roleMap = {
+    SUPER_ADMIN: 'SUPER_ADMIN',
+    CHRO: 'Management',
+    DEPARTMENT_HEAD: 'Head of Division',
+    HRBP: 'HRBP',
+    TA_SITE: 'TA_SITE',
+    TA_HO: 'TA_HO',
+    HIRING_MANAGER: 'HIRING_MANAGER',
+    INTERVIEWER: 'INTERVIEWER',
+    CANDIDATE: 'CANDIDATE',
+  };
+  return roleMap[role] || role;
+}
+
+function toPublicUser(user) {
+  return {
+    id: user.id,
+    email: user.email,
+    firstName: user.firstName,
+    lastName: user.lastName,
+    role: mapEnumToRole(user.role),
+    department: user.department,
+    division: user.division,
+    pt: user.pt,
+    area: user.area,
+    areaDetail: user.areaDetail,
+  };
+}
+
+/**
+ * Issue access + refresh tokens and record LOGIN audit for an authenticated user.
+ */
+async function issueSession(user, metadata = {}) {
+  const accessToken = generateAccessToken({
+    userId: user.id,
+    email: user.email,
+    role: user.role,
+  });
+
+  const refreshToken = generateRefreshToken({
+    userId: user.id,
+  });
+
+  await saveRefreshToken(user.id, refreshToken, metadata);
+  await auditService.recordAuthEvent('LOGIN', user.id, metadata);
+
+  return {
+    accessToken,
+    refreshToken,
+    user: toPublicUser(user),
+  };
+}
+
 /**
  * Register a new candidate user
  */
@@ -117,7 +171,7 @@ async function login(email, password, metadata = {}) {
   }
 
   // Reset failed login count and update last login
-  await prisma.user.update({
+  const updatedUser = await prisma.user.update({
     where: { id: user.id },
     data: {
       failedLoginCount: 0,
@@ -126,56 +180,121 @@ async function login(email, password, metadata = {}) {
     },
   });
 
-  // Generate tokens
-  const accessToken = generateAccessToken({
-    userId: user.id,
-    email: user.email,
-    role: user.role,
-  });
-
-  const refreshToken = generateRefreshToken({
-    userId: user.id,
-  });
-
-  // Save refresh token
-  await saveRefreshToken(user.id, refreshToken, metadata);
-
   logger.info(`User logged in: ${email}`);
 
-  await auditService.recordAuthEvent('LOGIN', user.id, metadata);
+  return issueSession(updatedUser, metadata);
+}
 
-  // Map backend enum to frontend role name
-  const mapEnumToRole = (role) => {
-    const roleMap = {
-      'SUPER_ADMIN': 'SUPER_ADMIN',
-      'CHRO': 'Management',
-      'DEPARTMENT_HEAD': 'Head of Division',
-      'HRBP': 'HRBP',
-      'TA_SITE': 'TA_SITE',
-      'TA_HO': 'TA_HO',
-      'HIRING_MANAGER': 'HIRING_MANAGER',
-      'INTERVIEWER': 'INTERVIEWER',
-      'CANDIDATE': 'CANDIDATE',
-    };
-    return roleMap[role] || role;
-  };
+/**
+ * Link-only OIDC identity resolution: match existing staff user by oidcSub or email.
+ * Does not auto-create users or issue tokens. Rejects CANDIDATE role.
+ */
+async function resolveOidcUser({ sub, email }) {
+  const normalizedSub = String(sub || '').trim();
+  const normalizedEmail = String(email || '').trim().toLowerCase();
 
-  return {
-    accessToken,
-    refreshToken,
-    user: {
-      id: user.id,
-      email: user.email,
-      firstName: user.firstName,
-      lastName: user.lastName,
-      role: mapEnumToRole(user.role),
-      department: user.department,
-      division: user.division,
-      pt: user.pt,
-      area: user.area,
-      areaDetail: user.areaDetail,
+  if (!normalizedSub) {
+    throw new Error('Invalid token payload (no subject)');
+  }
+  if (!normalizedEmail) {
+    throw new Error('Invalid token payload (no email)');
+  }
+
+  let user = await prisma.user.findUnique({
+    where: { oidcSub: normalizedSub },
+  });
+
+  if (!user) {
+    user = await prisma.user.findFirst({
+      where: {
+        email: {
+          equals: normalizedEmail,
+          mode: 'insensitive',
+        },
+      },
+    });
+  }
+
+  if (!user) {
+    throw new Error('No local account found for this SSO identity. Contact an administrator.');
+  }
+
+  if (user.role === 'CANDIDATE') {
+    throw new Error('SSO login is not available for candidate accounts');
+  }
+
+  if (user.lockedUntil && user.lockedUntil > new Date()) {
+    const minutesLeft = Math.ceil((user.lockedUntil - new Date()) / 60000);
+    throw new Error(`Account is locked. Try again in ${minutesLeft} minutes`);
+  }
+
+  if (!user.isActive) {
+    throw new Error('Account is deactivated');
+  }
+
+  if (user.oidcSub && user.oidcSub !== normalizedSub) {
+    throw new Error('SSO identity does not match this account');
+  }
+
+  if (!user.oidcSub) {
+    const conflict = await prisma.user.findUnique({
+      where: { oidcSub: normalizedSub },
+      select: { id: true },
+    });
+    if (conflict && conflict.id !== user.id) {
+      throw new Error('SSO identity is already linked to another account');
+    }
+  }
+
+  const updatedUser = await prisma.user.update({
+    where: { id: user.id },
+    data: {
+      oidcSub: normalizedSub,
+      isEmailVerified: true,
+      emailVerifiedAt: user.emailVerifiedAt || new Date(),
     },
-  };
+  });
+
+  logger.info(`OIDC identity linked: ${updatedUser.email}`);
+  return updatedUser;
+}
+
+/**
+ * Complete SSO after short-lived handoff token exchange.
+ */
+async function completeSsoHandoff(userId, metadata = {}) {
+  const user = await prisma.user.findUnique({
+    where: { id: userId },
+  });
+
+  if (!user) {
+    throw new Error('User not found');
+  }
+
+  if (user.role === 'CANDIDATE') {
+    throw new Error('SSO login is not available for candidate accounts');
+  }
+
+  if (!user.isActive) {
+    throw new Error('Account is deactivated');
+  }
+
+  if (user.lockedUntil && user.lockedUntil > new Date()) {
+    const minutesLeft = Math.ceil((user.lockedUntil - new Date()) / 60000);
+    throw new Error(`Account is locked. Try again in ${minutesLeft} minutes`);
+  }
+
+  const updatedUser = await prisma.user.update({
+    where: { id: user.id },
+    data: {
+      failedLoginCount: 0,
+      lockedUntil: null,
+      lastLoginAt: new Date(),
+    },
+  });
+
+  logger.info(`OIDC login: ${updatedUser.email}`);
+  return issueSession(updatedUser, metadata);
 }
 
 /**
@@ -350,9 +469,11 @@ async function updateCurrentUser(userId, data) {
 module.exports = {
   registerCandidate,
   login,
+  resolveOidcUser,
+  completeSsoHandoff,
+  issueSession,
   refreshAccessToken,
   logout,
   changePassword,
   updateCurrentUser,
 };
-
