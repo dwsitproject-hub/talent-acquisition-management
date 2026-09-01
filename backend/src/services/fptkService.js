@@ -542,6 +542,7 @@ async function syncFptkApplicationsTx(tx, fptkId, appliedCandidates, options = {
 
   const existingByCandidate = new Map(existingApplications.map((app) => [app.candidateId, app]));
   const incomingIds = new Set(normalized.map((item) => item.candidateId));
+  let leftOnboardingByWithdraw = false;
 
   const toDelete = existingApplications
     .filter((app) => !incomingIds.has(app.candidateId))
@@ -607,6 +608,9 @@ async function syncFptkApplicationsTx(tx, fptkId, appliedCandidates, options = {
       const hasInterviewResult = Array.isArray(item.interviews)
         && item.interviews.some((iv) => iv && (iv.results || '').toString().trim().length > 0);
       assertAllowedStatusTransition(existing.status, status, { hasInterviewResult });
+      if (existing.status === 'ONBOARDING' && status === 'WITHDRAWN') {
+        leftOnboardingByWithdraw = true;
+      }
     }
 
     if (existing) {
@@ -776,6 +780,9 @@ async function syncFptkApplicationsTx(tx, fptkId, appliedCandidates, options = {
   }
 
   await ensureFptkCloseIfAnyOnBoardingTx(tx, fptkId);
+  if (leftOnboardingByWithdraw) {
+    await ensureFptkReopenIfNoOnBoardingTx(tx, fptkId);
+  }
 }
 
 async function ensureFptkCloseIfAnyOnBoardingTx(tx, fptkId) {
@@ -795,6 +802,25 @@ async function ensureFptkCloseIfAnyOnBoardingTx(tx, fptkId) {
       },
     });
   }
+}
+
+/** Return Close → Re-Open only when no ONBOARDING applications remain. */
+async function ensureFptkReopenIfNoOnBoardingTx(tx, fptkId) {
+  const onboardingCount = await tx.application.count({
+    where: { fptkId, status: 'ONBOARDING' },
+  });
+  if (onboardingCount > 0) return;
+
+  const current = await tx.fPTK.findUnique({
+    where: { id: fptkId },
+    select: { currentStatus: true },
+  });
+  if (String(current?.currentStatus || '').trim().toLowerCase() !== 'close') return;
+
+  await tx.fPTK.update({
+    where: { id: fptkId },
+    data: { currentStatus: 'Re-Open', closedAt: null },
+  });
 }
 
 async function getFptkWithRelations(fptkId) {
