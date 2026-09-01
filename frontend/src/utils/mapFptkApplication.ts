@@ -14,6 +14,32 @@ function parseJsonField(value: unknown): Record<string, unknown> | null {
   return null
 }
 
+/** Map a stored Interview row to the FPTK edit/view form fields. */
+export function mapInterviewToUiFields(interview: any) {
+  const storedName =
+    typeof interview?.interviewerName === 'string' ? interview.interviewerName.trim() : ''
+  let interviewerName = storedName
+  // Prefer the name the user saved. The linked user can be a false match
+  // from the old first-name contains lookup (e.g. Dani Tamin → Dani Gordon).
+  if (!interviewerName && interview?.interviewer) {
+    interviewerName =
+      `${interview.interviewer.firstName || ''} ${interview.interviewer.lastName || ''}`.trim() ||
+      interview.interviewer.email ||
+      ''
+  }
+
+  const scheduled = interview?.scheduledAt ? new Date(interview.scheduledAt) : null
+  const iso =
+    scheduled && !Number.isNaN(scheduled.getTime()) ? scheduled.toISOString() : ''
+
+  return {
+    interviewer: interviewerName,
+    date: iso ? iso.slice(0, 10) : '',
+    time: iso ? iso.slice(11, 16) : '',
+    results: interview?.notes || '',
+  }
+}
+
 /** Map a backend Application row (with candidate + interviews) to applied-candidate UI shape. */
 export function mapApplicationToAppliedCandidate(application: any) {
   const candidate = application?.candidate || {}
@@ -36,27 +62,7 @@ export function mapApplicationToAppliedCandidate(application: any) {
       : []
 
   const interviews = Array.isArray(application.interviews)
-    ? application.interviews.map((interview: any) => {
-        let interviewerName = ''
-        if (interview.interviewer) {
-          interviewerName =
-            `${interview.interviewer.firstName || ''} ${interview.interviewer.lastName || ''}`.trim() ||
-            interview.interviewer.email ||
-            ''
-        } else if (interview.interviewerName) {
-          interviewerName = interview.interviewerName
-        }
-        return {
-          interviewer: interviewerName,
-          date: interview.scheduledAt
-            ? new Date(interview.scheduledAt).toISOString().split('T')[0]
-            : '',
-          time: interview.scheduledAt
-            ? new Date(interview.scheduledAt).toTimeString().split(' ')[0].slice(0, 5)
-            : '',
-          results: interview.notes || '',
-        }
-      })
+    ? application.interviews.map(mapInterviewToUiFields)
     : []
 
   return {

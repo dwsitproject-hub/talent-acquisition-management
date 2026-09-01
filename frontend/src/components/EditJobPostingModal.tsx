@@ -4,8 +4,9 @@ import { useState, useEffect, useMemo, useRef } from 'react'
 import { useModalEscape } from '@/hooks/useModalEscape'
 import { XMarkIcon } from '@heroicons/react/24/outline'
 import { FPTK } from '@/types'
-import { MasterOfficeLocationAPI, MasterDivisionAPI, CandidatesAPI, AdminUsersAPI, ApplicationsAPI } from '@/lib/api'
+import { MasterOfficeLocationAPI, MasterDivisionAPI, CandidatesAPI, ApplicationsAPI } from '@/lib/api'
 import { loadHiringManagerOptions } from '@/lib/hiringManagerOptions'
+import { loadInterviewerOptions } from '@/lib/interviewerOptions'
 import ApplicationHistoryModal from './ApplicationHistoryModal'
 import { fetchApplicationsForFptk } from '@/utils/mapFptkApplication'
 import { useAuth } from '@/contexts/AuthContext'
@@ -263,17 +264,12 @@ export default function EditJobPostingModal({
 
     const loadTeamMembers = async () => {
       try {
-        const users = await AdminUsersAPI.list('', '') // Load all users
+        const users = await loadInterviewerOptions()
         if (isMounted) {
-          setTeamMembers(users.map((u: any) => ({
-            id: u.id,
-            firstName: u.firstName || '',
-            lastName: u.lastName || '',
-            email: u.email || ''
-          })))
+          setTeamMembers(users)
         }
       } catch (error) {
-        console.error('Error loading team members:', error)
+        console.error('Error loading interviewer options:', error)
         setTeamMembers([])
       }
     }

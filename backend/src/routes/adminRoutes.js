@@ -9,7 +9,7 @@ const auditController = require('../controllers/auditController');
 router.use(authenticate);
 
 // List users
-router.get('/users', authorize('SUPER_ADMIN', 'HRBP', 'TA_SITE', 'TA_HO'), adminUserController.listUsers);
+router.get('/users', authorize('SUPER_ADMIN', 'HRBP', 'TA_SITE', 'TA_HO', 'HIRING_MANAGER', 'CHRO', 'DEPARTMENT_HEAD'), adminUserController.listUsers);
 
 // Download bulk upload template
 router.get('/users/bulk-template', authorize('SUPER_ADMIN', 'TA_HO'), adminUserController.bulkTemplate);
