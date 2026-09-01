@@ -14,6 +14,7 @@ const {
   assertAllowedStatusTransition,
 } = require('../utils/applicationStatus');
 const { getPositionSlaBucket } = require('../utils/positionSla');
+const { buildInterviewerLookupWhere, parseInterviewScheduledAt } = require('../utils/interviewFields');
 const { runWithAuditSuppressed } = require('../utils/auditContext');
 const auditService = require('./auditService');
 
@@ -718,15 +719,9 @@ async function syncFptkApplicationsTx(tx, fptkId, appliedCandidates, options = {
         }
 
         try {
-          // Parse date and time if provided
-          let scheduledAt = new Date();
-          if (interviewData.date) {
-            const dateStr = interviewData.date;
-            const timeStr = interviewData.time || '00:00';
-            const [hours, minutes] = timeStr.split(':').map(Number);
-            scheduledAt = new Date(dateStr);
-            scheduledAt.setHours(hours || 0, minutes || 0, 0, 0);
-          }
+          // Parse date and time as UTC calendar values so they round-trip.
+          // scheduledAt is required on the model; use now only when no date was entered.
+          const scheduledAt = parseInterviewScheduledAt(interviewData.date, interviewData.time) || new Date();
 
           // Determine interview status based on data
           let interviewStatus = 'SCHEDULED';
@@ -734,22 +729,12 @@ async function syncFptkApplicationsTx(tx, fptkId, appliedCandidates, options = {
             interviewStatus = 'COMPLETED';
           }
 
-          // Try to find interviewer by name/email if interviewer field is provided
+          // Link interviewerId only on an exact email or full-name match.
           let interviewerId = null;
-          if (interviewData.interviewer && interviewData.interviewer.trim()) {
-            // Try to find user by email or name
-            const interviewerParts = interviewData.interviewer.trim().split(' ');
-            const firstName = interviewerParts[0] || '';
-            const lastName = interviewerParts.slice(1).join(' ') || '';
-            
+          const interviewerWhere = buildInterviewerLookupWhere(interviewData.interviewer);
+          if (interviewerWhere) {
             const interviewer = await tx.user.findFirst({
-              where: {
-                OR: [
-                  { email: { contains: interviewData.interviewer.trim(), mode: 'insensitive' } },
-                  ...(firstName ? [{ firstName: { contains: firstName, mode: 'insensitive' } }] : []),
-                  ...(lastName ? [{ lastName: { contains: lastName, mode: 'insensitive' } }] : []),
-                ],
-              },
+              where: interviewerWhere,
               select: { id: true },
             });
             if (interviewer) {

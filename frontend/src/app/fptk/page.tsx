@@ -28,6 +28,7 @@ import {
 import { FPTKAPI, MasterOfficeLocationAPI, MenuAccessAPI } from '@/lib/api'
 import MultiSelectDropdown from '@/components/MultiSelectDropdown'
 import { mapUiStatusToApplicationStatus } from '@/utils/applicationStatusUi'
+import { mapInterviewToUiFields } from '@/utils/mapFptkApplication'
 import { resolveFptkEditPermissions, resolveRoleNameFromUser } from '@/utils/fptkEditPermissions'
 
 const DEFAULT_CURRENT_STATUS = 'Pending FKTK'
@@ -170,28 +171,8 @@ export const mapApiFptk = (fptk: any): FPTK => {
             ? languagesData.yearsOfExperience
             : 0
 
-        // Map interviews from backend format to frontend format
         const interviews = Array.isArray(application.interviews)
-          ? application.interviews.map((interview: any) => {
-              // Get interviewer name: prefer from relation, fallback to stored name
-              let interviewerName = ''
-              if (interview.interviewer) {
-                interviewerName = `${interview.interviewer.firstName || ''} ${interview.interviewer.lastName || ''}`.trim() || interview.interviewer.email || ''
-              } else if (interview.interviewerName) {
-                interviewerName = interview.interviewerName
-              }
-              
-              return {
-                interviewer: interviewerName,
-                date: interview.scheduledAt
-                  ? new Date(interview.scheduledAt).toISOString().split('T')[0]
-                  : '',
-                time: interview.scheduledAt
-                  ? new Date(interview.scheduledAt).toTimeString().split(' ')[0].slice(0, 5)
-                  : '',
-                results: interview.notes || '',
-              }
-            })
+          ? application.interviews.map(mapInterviewToUiFields)
           : []
 
         return {
