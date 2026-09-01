@@ -173,7 +173,7 @@ export const STATUS_TRANSITIONS: Record<string, string[]> = {
   'Offer Accepted': ['MCU', 'Withdrawn'],
   MCU: ['On Boarding', 'Withdrawn', REJECTED_UI_STATUS],
   'Keep In View': ['Offering Creation'],
-  'On Boarding': [],
+  'On Boarding': ['Withdrawn'],
   [REJECTED_UI_STATUS]: [],
   Withdrawn: [],
 }

@@ -160,7 +160,7 @@ const STATUS_TRANSITIONS = {
   'Offer Accepted': ['MCU', 'Withdrawn'],
   MCU: ['On Boarding', 'Withdrawn', REJECTED_UI_STATUS],
   'Keep In View': ['Offering Creation'],
-  'On Boarding': [],
+  'On Boarding': ['Withdrawn'],
   [REJECTED_UI_STATUS]: [],
   Withdrawn: [],
 };

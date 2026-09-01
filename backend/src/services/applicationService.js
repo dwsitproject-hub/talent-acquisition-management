@@ -433,6 +433,28 @@ async function getAllApplications(filters, pagination, user = null) {
 }
 
 /**
+ * When the last On Boarding candidate withdraws, return a Close FPTK to Re-Open.
+ * Does not touch Cancel / Internal Movement / already-open statuses.
+ */
+async function reopenFptkIfNoOnboardingLeft(fptkId, db = prisma) {
+  const remaining = await db.application.count({
+    where: { fptkId, status: 'ONBOARDING' },
+  });
+  if (remaining > 0) return;
+
+  const current = await db.fPTK.findUnique({
+    where: { id: fptkId },
+    select: { currentStatus: true },
+  });
+  if (String(current?.currentStatus || '').trim().toLowerCase() !== 'close') return;
+
+  await db.fPTK.update({
+    where: { id: fptkId },
+    data: { currentStatus: 'Re-Open', closedAt: null },
+  });
+}
+
+/**
  * Update application status
  */
 async function updateApplicationStatus(applicationId, newStatus, userId, reason = null, options = {}) {
@@ -525,6 +547,10 @@ async function updateApplicationStatus(applicationId, newStatus, userId, reason 
       where: { id: application.fptkId },
       data: { currentStatus: 'Close' },
     });
+  }
+
+  if (oldStatus === 'ONBOARDING' && newStatus === 'WITHDRAWN' && application.fptkId) {
+    await reopenFptkIfNoOnboardingLeft(application.fptkId);
   }
 
   // Resolve the actor's display name for the audit trail
