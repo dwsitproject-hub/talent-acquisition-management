@@ -920,7 +920,8 @@ export default function EditJobPostingModal({
         backendStatus: mapUiStatusToApplicationStatus(newStatus),
       }
       const normalized = (newStatus || '').toString().trim().toLowerCase()
-      if (normalized.startsWith('rejected')) {
+      const isOfferRejected = normalized === 'offer rejected' || normalized === 'reject offer'
+      if (normalized.startsWith('rejected') || isOfferRejected) {
         updateData.rejectedDate = new Date().toISOString()
         updateData.withdrawDate = null
         updateData.rejectionReason = reason || null
@@ -972,7 +973,11 @@ export default function EditJobPostingModal({
   const handleCandidateStatusChange = async (candidateId: string, newStatus: string) => {
     if (statusSaving) return
     const normalized = (newStatus || '').toString().trim().toLowerCase()
-    const needsReason = normalized.startsWith('rejected') || normalized === 'withdrawn'
+    const needsReason =
+      normalized.startsWith('rejected') ||
+      normalized === 'withdrawn' ||
+      normalized === 'offer rejected' ||
+      normalized === 'reject offer'
 
     if (needsReason) {
       setStatusChangeReason('')
@@ -2322,7 +2327,9 @@ export default function EditJobPostingModal({
                               Blacklisted
                             </div>
                           )}
-                          {(candidate.status || '').toString().toLowerCase().startsWith('rejected') && candidate.rejectedDate ? (
+                          {((candidate.status || '').toString().toLowerCase().startsWith('rejected') ||
+                            (candidate.status || '').toString().toLowerCase() === 'offer rejected') &&
+                          candidate.rejectedDate ? (
                             <div style={{ marginTop: '6px', fontSize: '11px', color: '#b91c1c' }}>
                               Rejected Date: {formatDate(candidate.rejectedDate)}
                             </div>
@@ -3108,7 +3115,9 @@ export default function EditJobPostingModal({
               {/* Header */}
               <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100">
                 <h3 className="text-base font-semibold text-gray-900">
-                  {(pendingStatusChange.newStatus || '').toLowerCase().startsWith('rejected')
+                  {(pendingStatusChange.newStatus || '').toLowerCase().startsWith('rejected') ||
+                  (pendingStatusChange.newStatus || '').toLowerCase() === 'offer rejected' ||
+                  (pendingStatusChange.newStatus || '').toLowerCase() === 'reject offer'
                     ? 'Rejection Reason'
                     : 'Withdrawal Reason'}
                 </h3>
@@ -3130,9 +3139,12 @@ export default function EditJobPostingModal({
                     value={statusChangeReason}
                     onChange={(e) => setStatusChangeReason(e.target.value)}
                     placeholder={
-                      (pendingStatusChange.newStatus || '').toLowerCase().startsWith('rejected')
-                        ? 'e.g. Did not meet technical requirements...'
-                        : 'e.g. Candidate withdrew due to another offer...'
+                      (pendingStatusChange.newStatus || '').toLowerCase() === 'offer rejected' ||
+                      (pendingStatusChange.newStatus || '').toLowerCase() === 'reject offer'
+                        ? 'e.g. Candidate declined the offer...'
+                        : (pendingStatusChange.newStatus || '').toLowerCase().startsWith('rejected')
+                          ? 'e.g. Did not meet technical requirements...'
+                          : 'e.g. Candidate withdrew due to another offer...'
                     }
                     className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 resize-none"
                   />

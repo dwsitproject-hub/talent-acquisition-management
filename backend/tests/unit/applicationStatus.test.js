@@ -18,4 +18,13 @@ describe('applicationStatus transitions', () => {
       /Cannot change candidate status from "On Boarding"/
     );
   });
+
+  it('allows Offer Rejected from Offer Sent', () => {
+    const allowed = getAllowedNextStatuses('Offer Sent');
+    expect(allowed).toEqual(expect.arrayContaining(['Offer Sent', 'Offer Rejected']));
+  });
+
+  it('accepts OFFER_SENT → OFFER_REJECTED', () => {
+    expect(() => assertAllowedStatusTransition('OFFER_SENT', 'OFFER_REJECTED')).not.toThrow();
+  });
 });

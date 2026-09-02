@@ -525,7 +525,7 @@ async function updateApplicationStatus(applicationId, newStatus, userId, reason 
     updateData.offeredAt = new Date();
   } else if (newStatus === 'HIRED') {
     updateData.hiredAt = new Date();
-  } else if (newStatus === 'REJECTED') {
+  } else if (newStatus === 'REJECTED' || newStatus === 'OFFER_REJECTED') {
     updateData.rejectedAt = new Date();
     updateData.rejectionReason = reason;
   } else if (newStatus === 'WITHDRAWN') {

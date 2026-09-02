@@ -591,7 +591,7 @@ async function syncFptkApplicationsTx(tx, fptkId, appliedCandidates, options = {
     let rejectedAtValue = null;
     let withdrawnAtValue = null;
 
-    if (status === 'REJECTED') {
+    if (status === 'REJECTED' || status === 'OFFER_REJECTED') {
       rejectedAtValue = item.rejectedDate ? new Date(item.rejectedDate) : new Date();
       withdrawnAtValue = null;
     } else if (status === 'WITHDRAWN') {
