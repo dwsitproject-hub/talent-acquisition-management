@@ -14,7 +14,9 @@ RUN npm ci
 # Build
 FROM base AS build
 ARG NEXT_PUBLIC_API_URL
+ARG NEXT_PUBLIC_OIDC_ENABLED
 ENV NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_URL}
+ENV NEXT_PUBLIC_OIDC_ENABLED=${NEXT_PUBLIC_OIDC_ENABLED}
 COPY --from=dependencies /app/node_modules ./node_modules
 COPY . .
 RUN npm run build

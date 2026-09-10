@@ -171,10 +171,10 @@ async function verifyIdToken(idToken, meta, expectedNonce) {
 }
 
 /**
- * Complete OIDC callback for both SP-initiated and IdP-initiated flows.
- * IdP-initiated: Hub passes code_verifier in the query string.
+ * Pick PKCE verifier + nonce for SP-initiated (cookies) vs IdP-initiated (Hub query).
+ * Hub tile clicks never hit /oidc/login, so they send code_verifier on the callback.
  */
-async function completeOidcCallback({
+function resolveCallbackSecrets({
   code,
   state,
   codeVerifierFromQuery,
@@ -186,25 +186,43 @@ async function completeOidcCallback({
     throw new Error('Missing authorization code');
   }
 
-  let codeVerifier;
-  let expectedNonce;
-
   if (codeVerifierFromQuery) {
-    // IdP-initiated — no local state cookie to validate
-    codeVerifier = codeVerifierFromQuery;
-  } else {
-    if (!cookieState || !state || cookieState !== state) {
-      throw new Error('Invalid OIDC state');
-    }
-    if (!cookieVerifier) {
-      throw new Error('Missing PKCE code verifier');
-    }
-    if (!cookieNonce) {
-      throw new Error('Missing OIDC nonce');
-    }
-    codeVerifier = cookieVerifier;
-    expectedNonce = cookieNonce;
+    return { codeVerifier: String(codeVerifierFromQuery), expectedNonce: undefined };
   }
+
+  if (!cookieState || !state || cookieState !== state) {
+    throw new Error('Invalid OIDC state');
+  }
+  if (!cookieVerifier) {
+    throw new Error('Missing PKCE code verifier');
+  }
+  if (!cookieNonce) {
+    throw new Error('Missing OIDC nonce');
+  }
+
+  return { codeVerifier: cookieVerifier, expectedNonce: cookieNonce };
+}
+
+/**
+ * Complete OIDC callback for both SP-initiated and IdP-initiated flows.
+ * IdP-initiated: Hub passes code_verifier in the query string.
+ */
+async function completeOidcCallback({
+  code,
+  state,
+  codeVerifierFromQuery,
+  cookieState,
+  cookieVerifier,
+  cookieNonce,
+}) {
+  const { codeVerifier, expectedNonce } = resolveCallbackSecrets({
+    code,
+    state,
+    codeVerifierFromQuery,
+    cookieState,
+    cookieVerifier,
+    cookieNonce,
+  });
 
   const { tokenResponse, meta } = await exchangeCodeForTokens({
     code,
@@ -253,22 +271,37 @@ async function verifyHandoffToken(token) {
   return { userId: String(payload.userId) };
 }
 
+function useSecureCookies() {
+  if (process.env.COOKIE_SECURE === 'true') return true;
+  if (process.env.COOKIE_SECURE === 'false') return false;
+  const frontend = (process.env.FRONTEND_URL || '').trim();
+  const redirectUri = (process.env.OIDC_REDIRECT_URI || '').trim();
+  if (frontend.startsWith('https://') || redirectUri.startsWith('https://')) {
+    return true;
+  }
+  if (frontend.startsWith('http://') || redirectUri.startsWith('http://')) {
+    return false;
+  }
+  return process.env.NODE_ENV === 'production';
+}
+
 function oidcCookieOptions() {
   return {
     httpOnly: true,
-    secure: process.env.NODE_ENV === 'production',
+    secure: useSecureCookies(),
     sameSite: process.env.COOKIE_SAME_SITE || 'lax',
     maxAge: 10 * 60 * 1000, // 10 minutes
-    path: '/api/auth/oidc',
+    // Cover both /api/auth/oidc/* and Hub-documented /auth/oidc/* aliases
+    path: '/',
   };
 }
 
 function clearOidcCookieOptions() {
   return {
     httpOnly: true,
-    secure: process.env.NODE_ENV === 'production',
+    secure: useSecureCookies(),
     sameSite: process.env.COOKIE_SAME_SITE || 'lax',
-    path: '/api/auth/oidc',
+    path: '/',
   };
 }
 
@@ -283,9 +316,11 @@ module.exports = {
   generateState,
   generateNonce,
   buildAuthorizeUrl,
+  resolveCallbackSecrets,
   completeOidcCallback,
   createHandoffToken,
   verifyHandoffToken,
+  useSecureCookies,
   oidcCookieOptions,
   clearOidcCookieOptions,
   // exported for tests / diagnostics

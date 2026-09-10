@@ -33,6 +33,13 @@ router.post(
 );
 
 /**
+ * @route   GET /api/auth/oidc/status
+ * @desc    Whether DWS Hub OIDC is configured (used to auto-start SSO)
+ * @access  Public
+ */
+router.get('/oidc/status', oidcController.status);
+
+/**
  * @route   GET /api/auth/oidc/login
  * @desc    Start DWS Hub OIDC login (SP-initiated)
  * @access  Public
@@ -45,6 +52,7 @@ router.get('/oidc/login', oidcController.login);
  * @access  Public
  */
 router.get('/oidc/callback', oidcController.callback);
+router.post('/oidc/callback', oidcController.callback);
 
 /**
  * @route   POST /api/auth/oidc/complete

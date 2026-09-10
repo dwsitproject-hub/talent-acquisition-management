@@ -14,6 +14,7 @@ const auditContextMiddleware = require('./middleware/auditContext');
 
 // Import routes
 const authRoutes = require('./routes/authRoutes');
+const oidcController = require('./controllers/oidcController');
 const candidateRoutes = require('./routes/candidateRoutes');
 const fptkRoutes = require('./routes/fptkRoutes');
 const applicationRoutes = require('./routes/applicationRoutes');
@@ -162,6 +163,12 @@ app.get('/health', (req, res) => {
 // Apply rate limiting to API routes (excludes /api/auth via limiter skip logic)
 app.use('/api', generalLimiter);
 app.use('/api/auth', authRoutes);
+
+// Hub docs register /auth/oidc/* (no /api prefix). Keep both paths working.
+app.get('/auth/oidc/status', oidcController.status);
+app.get('/auth/oidc/login', oidcController.login);
+app.get('/auth/oidc/callback', oidcController.callback);
+app.post('/auth/oidc/callback', oidcController.callback);
 app.use('/api/candidates', candidateRoutes);
 app.use('/api/fptk', fptkRoutes);
 app.use('/api/applications', applicationRoutes);
