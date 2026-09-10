@@ -54,6 +54,22 @@ export function getOidcLoginUrl(): string {
   return `${base}/auth/oidc/login`
 }
 
+/** Forward Hub callbacks that landed on the Next.js origin to the API callback. */
+export function getOidcCallbackUrl(search: string): string {
+  const base = getApiBaseUrl().replace(/\/+$/, '')
+  const qs = !search ? '' : search.startsWith('?') ? search : `?${search}`
+  return `${base}/auth/oidc/callback${qs}`
+}
+
+export async function fetchOidcEnabled(): Promise<boolean> {
+  try {
+    const res = await api.get('/auth/oidc/status', { timeout: 5000 })
+    return Boolean(res.data?.data?.enabled)
+  } catch {
+    return false
+  }
+}
+
 // Create axios instance with dynamic baseURL
 // We'll set the baseURL dynamically on each request to ensure it's always current
 export const api = axios.create({

@@ -4,10 +4,10 @@ import { Suspense, useEffect, useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import { useAuth } from '@/contexts/AuthContext'
-import { getOidcLoginUrl } from '@/lib/api'
+import { fetchOidcEnabled, getOidcLoginUrl } from '@/lib/api'
 import { EyeIcon, EyeSlashIcon } from '@heroicons/react/24/outline'
 
-const oidcEnabled = process.env.NEXT_PUBLIC_OIDC_ENABLED === 'true'
+const oidcBuildFlag = process.env.NEXT_PUBLIC_OIDC_ENABLED === 'true'
 
 function LoginForm() {
   const [email, setEmail] = useState('')
@@ -15,17 +15,76 @@ function LoginForm() {
   const [showPassword, setShowPassword] = useState(false)
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState('')
+  const [ssoAvailable, setSsoAvailable] = useState(oidcBuildFlag)
+  const [checkingSso, setCheckingSso] = useState(true)
 
-  const { login } = useAuth()
+  const { login, isAuthenticated, isLoading: authLoading } = useAuth()
   const router = useRouter()
   const searchParams = useSearchParams()
 
   useEffect(() => {
+    let cancelled = false
     const ssoError = searchParams.get('ssoError')
+    const useLocal = searchParams.get('local') === '1'
+
     if (ssoError) {
       setError(ssoError)
     }
-  }, [searchParams])
+
+    if (authLoading) {
+      return () => {
+        cancelled = true
+      }
+    }
+
+    if (isAuthenticated) {
+      router.replace('/')
+      return () => {
+        cancelled = true
+      }
+    }
+
+    if (ssoError || useLocal) {
+      if (!oidcBuildFlag) {
+        fetchOidcEnabled().then((enabled) => {
+          if (!cancelled) setSsoAvailable(enabled)
+        })
+      }
+      setCheckingSso(false)
+      return () => {
+        cancelled = true
+      }
+    }
+
+    const startSso = async () => {
+      if (oidcBuildFlag) {
+        window.location.replace(getOidcLoginUrl())
+        return
+      }
+
+      try {
+        const enabled = await fetchOidcEnabled()
+        if (cancelled) return
+        setSsoAvailable(enabled)
+        if (enabled) {
+          window.location.replace(getOidcLoginUrl())
+          return
+        }
+      } catch {
+        // Fall through to the local login form
+      }
+
+      if (!cancelled) {
+        setCheckingSso(false)
+      }
+    }
+
+    startSso()
+
+    return () => {
+      cancelled = true
+    }
+  }, [authLoading, isAuthenticated, router, searchParams])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -44,6 +103,17 @@ function LoginForm() {
 
   const handleOidcLogin = () => {
     window.location.href = getOidcLoginUrl()
+  }
+
+  if (checkingSso || authLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-50 py-12 px-4 sm:px-6 lg:px-8">
+        <div className="max-w-md w-full text-center space-y-3">
+          <h2 className="text-2xl font-bold text-gray-900">Signing you in…</h2>
+          <p className="text-sm text-gray-600">Using your DWS Hub session if SSO is enabled</p>
+        </div>
+      </div>
+    )
   }
 
   return (
@@ -129,7 +199,7 @@ function LoginForm() {
             </button>
           </div>
 
-          {oidcEnabled && (
+          {ssoAvailable && (
             <div className="space-y-4">
               <div className="relative">
                 <div className="absolute inset-0 flex items-center">
@@ -156,7 +226,13 @@ function LoginForm() {
 
 export default function LoginPage() {
   return (
-    <Suspense>
+    <Suspense
+      fallback={
+        <div className="min-h-screen flex items-center justify-center bg-gray-50">
+          <p className="text-sm text-gray-600">Loading…</p>
+        </div>
+      }
+    >
       <LoginForm />
     </Suspense>
   )

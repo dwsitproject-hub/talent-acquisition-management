@@ -13,6 +13,7 @@ services:
       target: production
       args:
         NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL}
+        NEXT_PUBLIC_OIDC_ENABLED: ${NEXT_PUBLIC_OIDC_ENABLED:-false}
     container_name: tas_staging_frontend
     restart: unless-stopped
     environment:
