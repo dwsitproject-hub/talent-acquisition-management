@@ -8,7 +8,7 @@ import clsx from 'clsx'
 type Option = { value: string; label?: string }
 
 type Props = {
-  label: string
+  label?: string
   options: Array<Option | string>
   value: string[]
   onChange: (next: string[]) => void
@@ -67,7 +67,9 @@ export default function MultiSelectDropdown({
   if (disabled) {
     return (
       <div className={className}>
-        <label className="block text-xs font-medium text-gray-500 mb-1">{label}</label>
+        {label ? (
+          <label className="block text-xs font-medium text-gray-500 mb-1">{label}</label>
+        ) : null}
         <div className="w-full border border-gray-200 rounded-md px-3 py-2 text-sm bg-gray-50 text-gray-700 min-h-[38px]">
           {value.length === 0 ? (
             <span className="text-gray-400">{placeholder}</span>
@@ -81,7 +83,9 @@ export default function MultiSelectDropdown({
 
   return (
     <div className={className}>
-      <label className="block text-xs font-medium text-gray-500 mb-1">{label}</label>
+      {label ? (
+        <label className="block text-xs font-medium text-gray-500 mb-1">{label}</label>
+      ) : null}
       <Popover className="relative">
         {({ open }) => (
           <>
