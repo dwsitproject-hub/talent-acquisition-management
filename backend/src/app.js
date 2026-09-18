@@ -118,6 +118,9 @@ const corsOptions = {
 };
 app.use(cors(corsOptions));
 
+// Serve NAS files before body parsers / fileUpload so HEAD/GET /uploads always hit this.
+app.use('/uploads', serveUploads);
+
 // Body parsing middleware
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
@@ -143,10 +146,6 @@ if (process.env.NODE_ENV === 'development') {
     },
   }));
 }
-
-// Uploaded documents. Read via createReadStream so CIFS/Synology mounts work
-// (express.static/sendfile often 404s on SMB even when ls can see the file).
-app.use('/uploads', serveUploads);
 
 // Health check endpoint (no auth required)
 app.get('/health', (req, res) => {

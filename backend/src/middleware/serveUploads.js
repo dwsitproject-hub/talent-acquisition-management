@@ -34,22 +34,20 @@ function normalizeUploadRelativePath(urlPath) {
 
 function statUploadFile(full) {
   try {
-    const st = fs.statSync(full);
-    if (st.isFile()) return { full, size: st.size };
-  } catch {
+    const fd = fs.openSync(full, 'r');
     try {
-      const fd = fs.openSync(full, 'r');
-      try {
-        const st = fs.fstatSync(fd);
-        if (st.isFile()) return { full, size: st.size };
-      } finally {
-        fs.closeSync(fd);
+      const st = fs.fstatSync(fd);
+      if (st.isDirectory() && !path.extname(full)) {
+        return null;
       }
-    } catch {
-      return null;
+      return { full, size: Number(st.size) || 0 };
+    } finally {
+      fs.closeSync(fd);
     }
+  } catch (err) {
+    logger.warn(`[uploads] cannot open ${full}: ${err.code || ''} ${err.message}`);
+    return null;
   }
-  return null;
 }
 
 function resolveUploadedFile(relativeUrlPath) {
@@ -69,25 +67,36 @@ function resolveUploadedFile(relativeUrlPath) {
 }
 
 function serveUploads(req, res, next) {
-  if (req.method !== 'GET' && req.method !== 'HEAD') {
+  const method = req.method;
+  if (method !== 'GET' && method !== 'HEAD') {
     return next();
   }
 
   const found = resolveUploadedFile(req.originalUrl || req.url || req.path);
+  res.setHeader('X-TAS-Uploads', found ? 'hit' : 'miss');
+  res.setHeader('Cross-Origin-Resource-Policy', 'cross-origin');
+
   if (!found) {
+    const rel = normalizeUploadRelativePath(req.originalUrl || req.url || req.path);
     logger.warn(
-      `[uploads] not found ${req.method} ${req.originalUrl} roots=${getUploadStaticRoots().join('|')}`
+      `[uploads] not found ${method} ${req.originalUrl} rel=${rel} roots=${getUploadStaticRoots().join('|')}`
     );
-    return next();
+    return res.status(404).json({
+      success: false,
+      message: 'Upload file not found',
+      path: rel,
+      roots: getUploadStaticRoots(),
+    });
   }
 
   const ext = path.extname(found.full).toLowerCase();
   res.setHeader('Content-Type', MIME_TYPES[ext] || 'application/octet-stream');
-  res.setHeader('Content-Length', found.size);
-  res.setHeader('Cross-Origin-Resource-Policy', 'cross-origin');
+  if (found.size) {
+    res.setHeader('Content-Length', found.size);
+  }
   res.setHeader('X-Content-Type-Options', 'nosniff');
 
-  if (req.method === 'HEAD') {
+  if (method === 'HEAD') {
     return res.status(200).end();
   }
 
