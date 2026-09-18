@@ -90,10 +90,15 @@ services:
       SMTP_FROM_EMAIL: ${SMTP_FROM_EMAIL:-}
       SMTP_FROM_NAME: ${SMTP_FROM_NAME:-}
       SMTP_REJECT_UNAUTHORIZED: ${SMTP_REJECT_UNAUTHORIZED:-true}
+      # Synology production: /mnt/synology/TAS (no prod/ folder). Do not set STORAGE_LOCAL_PATH / UPLOAD_DIR / STORAGE_DEPLOYMENT.
+      STORAGE_TYPE: ${STORAGE_TYPE:-local}
+      STORAGE_SYNOLOGY_ROOT: ${STORAGE_SYNOLOGY_ROOT:-/mnt/synology}
+      STORAGE_PROJECT_SLUG: ${STORAGE_PROJECT_SLUG:-TAS}
     ports:
       - "4000:4000"
     volumes:
-      - ./backend/uploads:/app/uploads
+      # Host NAS share → container path used by STORAGE_SYNOLOGY_ROOT. Recreate the container after changing this.
+      - ${STORAGE_HOST_MOUNT:-/mnt/synology}:${STORAGE_SYNOLOGY_ROOT:-/mnt/synology}
       - ./backend/logs:/app/logs
     depends_on:
       postgres:

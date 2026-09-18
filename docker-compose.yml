@@ -87,6 +87,9 @@ services:
       SMTP_FROM_EMAIL: ${SMTP_FROM_EMAIL:-}
       SMTP_FROM_NAME: ${SMTP_FROM_NAME:-}
       SMTP_REJECT_UNAUTHORIZED: ${SMTP_REJECT_UNAUTHORIZED:-true}
+      # Laptop / local Docker without NAS — keep files on this machine
+      STORAGE_TYPE: local
+      STORAGE_LOCAL_PATH: /app/uploads
     volumes:
       - ./backend/uploads:/app/uploads
       - ./backend/logs:/app/logs

@@ -53,7 +53,10 @@ services:
       # File Uploads
       MAX_FILE_SIZE: 10485760
       ALLOWED_FILE_TYPES: pdf,doc,docx,jpg,jpeg,png,xls,xlsx
-      UPLOAD_DIR: ./uploads
+      # Synology production: /mnt/synology/TAS (no prod/ folder). Do not set STORAGE_LOCAL_PATH / UPLOAD_DIR / STORAGE_DEPLOYMENT.
+      STORAGE_TYPE: ${STORAGE_TYPE:-local}
+      STORAGE_SYNOLOGY_ROOT: ${STORAGE_SYNOLOGY_ROOT:-/mnt/synology}
+      STORAGE_PROJECT_SLUG: ${STORAGE_PROJECT_SLUG:-TAS}
 
       # DWS Hub OIDC — routes stay 404 until all three required vars are set
       OIDC_DISCOVERY_URL: ${OIDC_DISCOVERY_URL:-}
@@ -72,7 +75,8 @@ services:
       SMTP_FROM_NAME: ${SMTP_FROM_NAME:-}
       SMTP_REJECT_UNAUTHORIZED: ${SMTP_REJECT_UNAUTHORIZED:-true}
     volumes:
-      - ./backend/uploads:/app/uploads
+      # Host NAS share → container path used by STORAGE_SYNOLOGY_ROOT. Recreate the container after changing this.
+      - ${STORAGE_HOST_MOUNT:-/mnt/synology}:${STORAGE_SYNOLOGY_ROOT:-/mnt/synology}
       - ./backend/logs:/app/logs
     depends_on:
       - redis

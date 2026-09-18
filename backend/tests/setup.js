@@ -10,6 +10,7 @@ process.env.DATABASE_URL = process.env.DATABASE_URL || 'postgresql://tas_user:ta
 process.env.REDIS_URL = process.env.REDIS_URL || 'redis://localhost:6379';
 process.env.CORS_ORIGIN = 'http://localhost:3000,http://localhost:4001';
 process.env.CORS_CREDENTIALS = 'true';
+process.env.STORAGE_LOCAL_PATH = process.env.STORAGE_LOCAL_PATH || './uploads';
 
 // Increase timeout for async operations
 jest.setTimeout(30000);

@@ -91,7 +91,11 @@ services:
       PRISMA_MIGRATE_ON_START: ${PRISMA_MIGRATE_ON_START:-true}
       MAX_FILE_SIZE: ${MAX_FILE_SIZE:-10485760}
       ALLOWED_FILE_TYPES: ${ALLOWED_FILE_TYPES:-pdf,doc,docx,jpg,jpeg,png,xls,xlsx}
-      UPLOAD_DIR: ${UPLOAD_DIR:-./uploads}
+      # Synology staging: /mnt/synology/dev/TAS — do not set STORAGE_LOCAL_PATH / UPLOAD_DIR
+      STORAGE_TYPE: ${STORAGE_TYPE:-local}
+      STORAGE_SYNOLOGY_ROOT: ${STORAGE_SYNOLOGY_ROOT:-/mnt/synology}
+      STORAGE_DEPLOYMENT: ${STORAGE_DEPLOYMENT:-dev}
+      STORAGE_PROJECT_SLUG: ${STORAGE_PROJECT_SLUG:-TAS}
       # DWS Hub OIDC — routes stay 404 until all three required vars are set
       OIDC_DISCOVERY_URL: ${OIDC_DISCOVERY_URL:-}
       OIDC_CLIENT_ID: ${OIDC_CLIENT_ID:-}
@@ -111,7 +115,8 @@ services:
     ports:
       - "${BACKEND_HOST_PORT}:${BACKEND_PORT}"
     volumes:
-      - ./backend/uploads:/app/uploads
+      # Host NAS share → container path used by STORAGE_SYNOLOGY_ROOT. Recreate the container after changing this.
+      - ${STORAGE_HOST_MOUNT:-/mnt/synology}:${STORAGE_SYNOLOGY_ROOT:-/mnt/synology}
       - ./backend/logs:/app/logs
     depends_on:
       redis:

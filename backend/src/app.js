@@ -5,9 +5,9 @@ const morgan = require('morgan');
 const cookieParser = require('cookie-parser');
 const compression = require('compression');
 const fileUpload = require('express-fileupload');
-const path = require('path');
 
 const logger = require('./utils/logger');
+const { getStorageRoot } = require('./config/storage');
 const { errorHandler, notFoundHandler } = require('./middleware/errorHandler');
 const { generalLimiter } = require('./middleware/rateLimiter');
 const auditContextMiddleware = require('./middleware/auditContext');
@@ -144,8 +144,8 @@ if (process.env.NODE_ENV === 'development') {
   }));
 }
 
-// Static files (for uploaded documents)
-app.use('/uploads', express.static(path.join(__dirname, '../uploads')));
+// Static files (for uploaded documents). Physical root is Synology or local uploads.
+app.use('/uploads', express.static(getStorageRoot()));
 
 // Health check endpoint (no auth required)
 app.get('/health', (req, res) => {

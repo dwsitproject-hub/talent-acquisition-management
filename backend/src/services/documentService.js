@@ -3,6 +3,7 @@ const fs = require('fs/promises');
 const { v4: uuidv4 } = require('uuid');
 
 const prisma = require('../config/database');
+const { getStoragePath } = require('../config/storage');
 const logger = require('../utils/logger');
 
 const ALLOWED_EXTENSIONS = ['.pdf', '.doc', '.docx', '.jpg', '.jpeg', '.png', '.xlsx', '.xls'];
@@ -90,8 +91,7 @@ async function uploadCandidateDocument(candidateId, file, options = {}) {
     throw new Error('Candidate not found');
   }
 
-  const uploadsRoot = path.join(__dirname, '../../uploads');
-  const candidateDirectory = path.join(uploadsRoot, 'candidates', candidateId);
+  const candidateDirectory = getStoragePath('candidates', candidateId);
   
   try {
     await ensureDirectory(candidateDirectory);
