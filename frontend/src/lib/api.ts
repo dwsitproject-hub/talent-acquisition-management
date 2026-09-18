@@ -22,32 +22,14 @@ export function getApiBaseUrl(): string {
 
 /**
  * Origin for uploaded files such as `/uploads/fptk/...` (no `/api` suffix).
- * Admin UI on :4001 does not serve files — those live on the API (:4000) or nginx :80/:443.
+ * Files are served by the API backend, so always derive this from the API base
+ * URL (NEXT_PUBLIC_API_URL or its fallback) — never guess ports from the
+ * browser location, since the API port differs per deployment (4000, 4001, ...).
  */
 export function getPublicFileBaseUrl(): string {
-  if (typeof window !== 'undefined') {
-    const port = window.location.port
-    if (!port || port === '80' || port === '443') {
-      return window.location.origin
-    }
-    if (port === '4001' || port === '3000' || port === '4002') {
-      return `${window.location.protocol}//${window.location.hostname}:4000`
-    }
-  }
-
   const apiBase = getApiBaseUrl().replace(/\/api\/?$/i, '').replace(/\/+$/, '')
   try {
-    const url = new URL(apiBase)
-    if (url.port === '4001' || url.port === '3000' || url.port === '4002') {
-      url.port = '4000'
-    }
-    if (url.protocol === 'https:' && url.port === '443') {
-      url.port = ''
-    }
-    if (url.protocol === 'http:' && url.port === '80') {
-      url.port = ''
-    }
-    return url.origin
+    return new URL(apiBase).origin
   } catch {
     return apiBase
   }
