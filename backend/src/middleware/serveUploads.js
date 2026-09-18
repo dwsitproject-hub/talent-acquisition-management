@@ -24,10 +24,36 @@ function resolveUnderRoot(root, relativePath) {
   return full;
 }
 
-function resolveUploadedFile(relativeUrlPath) {
-  const rel = String(relativeUrlPath || '')
+function normalizeUploadRelativePath(urlPath) {
+  return String(urlPath || '')
+    .split('?')[0]
+    .replace(/^\/uploads(?=\/|$)/i, '')
     .replace(/^\/+/, '')
     .replace(/\\/g, '/');
+}
+
+function statUploadFile(full) {
+  try {
+    const st = fs.statSync(full);
+    if (st.isFile()) return { full, size: st.size };
+  } catch {
+    try {
+      const fd = fs.openSync(full, 'r');
+      try {
+        const st = fs.fstatSync(fd);
+        if (st.isFile()) return { full, size: st.size };
+      } finally {
+        fs.closeSync(fd);
+      }
+    } catch {
+      return null;
+    }
+  }
+  return null;
+}
+
+function resolveUploadedFile(relativeUrlPath) {
+  const rel = normalizeUploadRelativePath(relativeUrlPath);
   if (!rel || rel.includes('\0') || rel.split('/').includes('..')) {
     return null;
   }
@@ -36,14 +62,8 @@ function resolveUploadedFile(relativeUrlPath) {
   for (const root of getUploadStaticRoots()) {
     const full = resolveUnderRoot(root, relFs);
     if (!full) continue;
-    try {
-      const st = fs.statSync(full);
-      if (st.isFile()) {
-        return { full, size: st.size };
-      }
-    } catch {
-      // CIFS/stat miss — try the next root
-    }
+    const found = statUploadFile(full);
+    if (found) return found;
   }
   return null;
 }
@@ -53,9 +73,11 @@ function serveUploads(req, res, next) {
     return next();
   }
 
-  const found = resolveUploadedFile(req.path);
+  const found = resolveUploadedFile(req.originalUrl || req.url || req.path);
   if (!found) {
-    logger.warn(`[uploads] not found ${req.method} ${req.originalUrl} roots=${getUploadStaticRoots().join('|')}`);
+    logger.warn(
+      `[uploads] not found ${req.method} ${req.originalUrl} roots=${getUploadStaticRoots().join('|')}`
+    );
     return next();
   }
 
@@ -84,4 +106,5 @@ function serveUploads(req, res, next) {
 module.exports = {
   serveUploads,
   resolveUploadedFile,
+  normalizeUploadRelativePath,
 };
