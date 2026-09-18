@@ -22,7 +22,7 @@ export function getApiBaseUrl(): string {
 
 /**
  * Origin for uploaded files such as `/uploads/fptk/...` (no `/api` suffix).
- * Production is reverse-proxied on 80/443, so a hardcoded :4000 breaks downloads.
+ * Admin UI on :4001 does not serve files — those live on the API (:4000) or nginx :80/:443.
  */
 export function getPublicFileBaseUrl(): string {
   if (typeof window !== 'undefined') {
@@ -30,12 +30,18 @@ export function getPublicFileBaseUrl(): string {
     if (!port || port === '80' || port === '443') {
       return window.location.origin
     }
+    if (port === '4001' || port === '3000' || port === '4002') {
+      return `${window.location.protocol}//${window.location.hostname}:4000`
+    }
   }
 
   const apiBase = getApiBaseUrl().replace(/\/api\/?$/i, '').replace(/\/+$/, '')
   try {
     const url = new URL(apiBase)
-    if (url.protocol === 'https:' && (url.port === '4000' || url.port === '443')) {
+    if (url.port === '4001' || url.port === '3000' || url.port === '4002') {
+      url.port = '4000'
+    }
+    if (url.protocol === 'https:' && url.port === '443') {
       url.port = ''
     }
     if (url.protocol === 'http:' && url.port === '80') {
@@ -44,6 +50,27 @@ export function getPublicFileBaseUrl(): string {
     return url.origin
   } catch {
     return apiBase
+  }
+}
+
+/** Point stored document URLs at the origin that actually serves /uploads. */
+export function resolvePublicUploadUrl(url: string): string {
+  if (!url) return url
+  try {
+    const parsed = new URL(url, typeof window !== 'undefined' ? window.location.origin : 'http://localhost')
+    if (!parsed.pathname.startsWith('/uploads/')) {
+      if (typeof window !== 'undefined' && window.location.protocol === 'https:' && url.startsWith('http://')) {
+        return `https://${url.slice('http://'.length)}`
+      }
+      return url
+    }
+    let href = `${getPublicFileBaseUrl().replace(/\/+$/, '')}${parsed.pathname}${parsed.search}`
+    if (typeof window !== 'undefined' && window.location.protocol === 'https:' && href.startsWith('http://')) {
+      href = `https://${href.slice('http://'.length)}`
+    }
+    return href
+  } catch {
+    return url
   }
 }
 

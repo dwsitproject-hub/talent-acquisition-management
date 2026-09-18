@@ -6,7 +6,7 @@ import { XMarkIcon, DocumentArrowDownIcon, EyeIcon, PrinterIcon } from '@heroico
 import { Candidate } from '@/types'
 import { generateFormDataDiriPDF } from '@/utils/pdfGenerator'
 import { formatFileSize } from '@/utils/fileCompression'
-import { ApplicationsAPI } from '@/lib/api'
+import { ApplicationsAPI, resolvePublicUploadUrl } from '@/lib/api'
 import { getApplicationStatusPillClass, mapApplicationStatusToUi } from '@/utils/applicationStatusUi'
 import PositionEditOverlay from '@/components/PositionEditOverlay'
 import { usePositionEditOverlay } from '@/hooks/usePositionEditOverlay'
@@ -109,12 +109,7 @@ export default function ViewCandidateModal({ isOpen, onClose, candidate }: ViewC
   // API_BASE_URL misconfigured without SSL). Loading that from an https:// page gets hard
   // blocked by the browser as mixed content. Since this app is always served over the same
   // host, it's safe to upgrade the scheme to match the current page before fetching.
-  const resolveFileUrl = (url: string): string => {
-    if (typeof window !== 'undefined' && window.location.protocol === 'https:' && url.startsWith('http://')) {
-      return `https://${url.slice('http://'.length)}`
-    }
-    return url
-  }
+  const resolveFileUrl = (url: string): string => resolvePublicUploadUrl(url)
 
   // Opening `file.url` directly via `window.open` silently fails when the file is
   // missing/unreachable on the server: the browser briefly opens a blank tab and closes
