@@ -15,17 +15,13 @@ function resolveConfiguredPath(value) {
 
 /**
  * Document storage root:
- * 1. STORAGE_LOCAL_PATH if set (laptop / explicit override)
- * 2. Else Synology:
- *    - staging: {STORAGE_SYNOLOGY_ROOT}/{STORAGE_DEPLOYMENT}/{STORAGE_PROJECT_SLUG}
- *      e.g. /mnt/synology/dev/TAS
- *    - production: {STORAGE_SYNOLOGY_ROOT}/{STORAGE_PROJECT_SLUG} (no deployment folder)
- *      e.g. /mnt/synology/TAS
+ * 1. STORAGE_LOCAL_PATH if set — used on laptops (./uploads) and on the TAS
+ *    app server after CIFS is mounted (e.g. /mnt/synology-tas for APPs/dev/TAS).
+ * 2. Else Synology composition:
+ *    - with STORAGE_DEPLOYMENT: {root}/{deployment}/{slug}
+ *    - without: {root}/{slug}
  * 3. Else legacy UPLOAD_DIR
  * 4. Else backend/uploads
- *
- * Do not set STORAGE_LOCAL_PATH on the app server when using the Synology layout —
- * it overrides the composed NAS path.
  */
 function resolveStorageLocalPath() {
   const explicit = trimEnv('STORAGE_LOCAL_PATH');
@@ -57,6 +53,35 @@ function getStoragePath(...segments) {
   return path.join(getStorageRoot(), ...segments);
 }
 
+/**
+ * Directories Express should serve under /uploads.
+ * Includes `{root}/dev/TAS` so files written when the mount was already TAS
+ * (File Station: APPs/TAS/dev/TAS/candidates) still download at /uploads/candidates/...
+ */
+function getUploadStaticRoots() {
+  const root = getStorageRoot();
+  const roots = [root];
+  const nested = path.join(root, 'dev', 'TAS');
+  if (nested !== root) {
+    roots.push(nested);
+  }
+  const mountRoot = trimEnv('STORAGE_LOCAL_PATH') || trimEnv('STORAGE_SYNOLOGY_ROOT');
+  if (mountRoot) {
+    const resolved = resolveConfiguredPath(mountRoot);
+    if (resolved && !roots.includes(resolved)) {
+      roots.push(resolved);
+    }
+  }
+  const extra = trimEnv('STORAGE_UPLOAD_FALLBACK_ROOT');
+  if (extra) {
+    const resolved = resolveConfiguredPath(extra);
+    if (resolved && !roots.includes(resolved)) {
+      roots.push(resolved);
+    }
+  }
+  return roots;
+}
+
 function ensureStorageRoot() {
   const root = getStorageRoot();
   fs.mkdirSync(root, { recursive: true });
@@ -67,5 +92,6 @@ module.exports = {
   resolveStorageLocalPath,
   getStorageRoot,
   getStoragePath,
+  getUploadStaticRoots,
   ensureStorageRoot,
 };

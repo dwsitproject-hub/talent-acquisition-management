@@ -88,10 +88,11 @@ async function startServer() {
     process.exit(1);
   }
 
-  const { getStorageRoot, ensureStorageRoot } = require('./config/storage');
+  const { getStorageRoot, getUploadStaticRoots, ensureStorageRoot } = require('./config/storage');
   try {
     const storageRoot = ensureStorageRoot();
     logger.info(`Document storage root: ${storageRoot}`);
+    logger.info(`Document download roots: ${getUploadStaticRoots().join(', ')}`);
   } catch (error) {
     logger.error(`Failed to initialize document storage at ${getStorageRoot()}: ${error.message}`);
     logger.error('Uploads will fail until STORAGE_* env and the Synology bind mount are correct');

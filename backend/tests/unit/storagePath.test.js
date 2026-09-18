@@ -1,5 +1,5 @@
 const path = require('path');
-const { resolveStorageLocalPath, getStoragePath } = require('../../src/config/storage');
+const { resolveStorageLocalPath, getStoragePath, getUploadStaticRoots } = require('../../src/config/storage');
 
 const BACKEND_ROOT = path.resolve(__dirname, '../..');
 const KEYS = [
@@ -78,5 +78,16 @@ describe('storage path resolution', () => {
       path.join('/mnt/synology', 'TAS', 'candidates', 'abc')
     );
     expect(getStoragePath('fptk')).toBe(path.join('/mnt/synology', 'TAS', 'fptk'));
+  });
+
+  test('download roots include nested leftover and the CIFS mount root', () => {
+    process.env.STORAGE_SYNOLOGY_ROOT = '/mnt/synology';
+    process.env.STORAGE_DEPLOYMENT = 'dev';
+    process.env.STORAGE_PROJECT_SLUG = 'TAS';
+    expect(getUploadStaticRoots()).toEqual([
+      path.join('/mnt/synology', 'dev', 'TAS'),
+      path.join('/mnt/synology', 'dev', 'TAS', 'dev', 'TAS'),
+      '/mnt/synology',
+    ]);
   });
 });

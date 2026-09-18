@@ -7,8 +7,8 @@ const compression = require('compression');
 const fileUpload = require('express-fileupload');
 
 const logger = require('./utils/logger');
-const { getStorageRoot } = require('./config/storage');
 const { errorHandler, notFoundHandler } = require('./middleware/errorHandler');
+const { serveUploads } = require('./middleware/serveUploads');
 const { generalLimiter } = require('./middleware/rateLimiter');
 const auditContextMiddleware = require('./middleware/auditContext');
 
@@ -144,8 +144,9 @@ if (process.env.NODE_ENV === 'development') {
   }));
 }
 
-// Static files (for uploaded documents). Physical root is Synology or local uploads.
-app.use('/uploads', express.static(getStorageRoot()));
+// Uploaded documents. Read via createReadStream so CIFS/Synology mounts work
+// (express.static/sendfile often 404s on SMB even when ls can see the file).
+app.use('/uploads', serveUploads);
 
 // Health check endpoint (no auth required)
 app.get('/health', (req, res) => {

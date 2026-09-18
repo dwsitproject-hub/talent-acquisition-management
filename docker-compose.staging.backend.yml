@@ -91,11 +91,9 @@ services:
       PRISMA_MIGRATE_ON_START: ${PRISMA_MIGRATE_ON_START:-true}
       MAX_FILE_SIZE: ${MAX_FILE_SIZE:-10485760}
       ALLOWED_FILE_TYPES: ${ALLOWED_FILE_TYPES:-pdf,doc,docx,jpg,jpeg,png,xls,xlsx}
-      # Synology staging: /mnt/synology/dev/TAS — do not set STORAGE_LOCAL_PATH / UPLOAD_DIR
+      # Synology staging: CIFS //.../APPs/dev/TAS mounted at /mnt/synology-tas (same pattern as PCT)
       STORAGE_TYPE: ${STORAGE_TYPE:-local}
-      STORAGE_SYNOLOGY_ROOT: ${STORAGE_SYNOLOGY_ROOT:-/mnt/synology}
-      STORAGE_DEPLOYMENT: ${STORAGE_DEPLOYMENT:-dev}
-      STORAGE_PROJECT_SLUG: ${STORAGE_PROJECT_SLUG:-TAS}
+      STORAGE_LOCAL_PATH: ${STORAGE_LOCAL_PATH:-/mnt/synology-tas}
       # DWS Hub OIDC — routes stay 404 until all three required vars are set
       OIDC_DISCOVERY_URL: ${OIDC_DISCOVERY_URL:-}
       OIDC_CLIENT_ID: ${OIDC_CLIENT_ID:-}
@@ -115,8 +113,8 @@ services:
     ports:
       - "${BACKEND_HOST_PORT}:${BACKEND_PORT}"
     volumes:
-      # Host NAS share → container path used by STORAGE_SYNOLOGY_ROOT. Recreate the container after changing this.
-      - ${STORAGE_HOST_MOUNT:-/mnt/synology}:${STORAGE_SYNOLOGY_ROOT:-/mnt/synology}
+      # Host NAS share → container path used by STORAGE_LOCAL_PATH. Recreate the container after changing this.
+      - ${STORAGE_HOST_MOUNT:-/mnt/synology-tas}:${STORAGE_LOCAL_PATH:-/mnt/synology-tas}
       - ./backend/logs:/app/logs
     depends_on:
       redis:
