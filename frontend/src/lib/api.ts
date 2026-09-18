@@ -22,16 +22,23 @@ export function getApiBaseUrl(): string {
 
 /**
  * Origin for uploaded files such as `/uploads/fptk/...` (no `/api` suffix).
- * Files are served by the API backend, so always derive this from the API base
- * URL (NEXT_PUBLIC_API_URL or its fallback) — never guess ports from the
- * browser location, since the API port differs per deployment (4000, 4001, ...).
+ *
+ * Resolution order:
+ * 1. NEXT_PUBLIC_FILE_BASE_URL — set this to reach the backend server directly
+ *    for document downloads (e.g. http://172.28.92.57:4001), bypassing nginx.
+ * 2. Otherwise derived from the API base URL (NEXT_PUBLIC_API_URL or its
+ *    fallback), so downloads follow the same route as API calls.
  */
 export function getPublicFileBaseUrl(): string {
-  const apiBase = getApiBaseUrl().replace(/\/api\/?$/i, '').replace(/\/+$/, '')
+  const fileBase =
+    typeof process !== 'undefined' ? process.env?.NEXT_PUBLIC_FILE_BASE_URL : undefined
+  const base = fileBase
+    ? fileBase.replace(/\/+$/, '')
+    : getApiBaseUrl().replace(/\/api\/?$/i, '').replace(/\/+$/, '')
   try {
-    return new URL(apiBase).origin
+    return new URL(base).origin
   } catch {
-    return apiBase
+    return base
   }
 }
 
