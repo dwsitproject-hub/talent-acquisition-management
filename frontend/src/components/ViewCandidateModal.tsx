@@ -6,7 +6,7 @@ import { XMarkIcon, DocumentArrowDownIcon, EyeIcon, PrinterIcon } from '@heroico
 import { Candidate } from '@/types'
 import { generateFormDataDiriPDF } from '@/utils/pdfGenerator'
 import { formatFileSize } from '@/utils/fileCompression'
-import { ApplicationsAPI, resolvePublicUploadUrl } from '@/lib/api'
+import { ApplicationsAPI, resolveDownloadFileName, resolvePublicUploadUrl } from '@/lib/api'
 import { getApplicationStatusPillClass, mapApplicationStatusToUi } from '@/utils/applicationStatusUi'
 import PositionEditOverlay from '@/components/PositionEditOverlay'
 import { usePositionEditOverlay } from '@/hooks/usePositionEditOverlay'
@@ -131,7 +131,7 @@ export default function ViewCandidateModal({ isOpen, onClose, candidate }: ViewC
       const blob = await response.blob()
       const link = document.createElement('a')
       link.href = URL.createObjectURL(blob)
-      link.download = file.name || 'download'
+      link.download = resolveDownloadFileName(file, response)
       document.body.appendChild(link)
       link.click()
       document.body.removeChild(link)

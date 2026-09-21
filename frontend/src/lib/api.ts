@@ -47,6 +47,32 @@ export function getPublicFileBaseUrl(): string {
   }
 }
 
+/** Use the original upload name from Content-Disposition when the server sends it. */
+export function filenameFromContentDisposition(header?: string | null): string | null {
+  if (!header) return null
+  const utf = /filename\*\s*=\s*(?:UTF-8'')?([^;]+)/i.exec(header)
+  if (utf?.[1]) {
+    try {
+      return decodeURIComponent(utf[1].trim().replace(/^"(.*)"$/, '$1'))
+    } catch {
+      // keep looking at the ASCII filename=
+    }
+  }
+  const quoted = /filename\s*=\s*"((?:\\.|[^"])*)"/i.exec(header)
+  if (quoted?.[1]) return quoted[1].replace(/\\"/g, '"')
+  const bare = /filename\s*=\s*([^;]+)/i.exec(header)
+  return bare?.[1]?.trim().replace(/^"(.*)"$/, '$1') || null
+}
+
+export function resolveDownloadFileName(
+  file: { name?: string },
+  response?: Response
+): string {
+  return filenameFromContentDisposition(response?.headers.get('content-disposition'))
+    || file.name
+    || 'download'
+}
+
 /** Point stored document URLs at the origin that actually serves /uploads. */
 export function resolvePublicUploadUrl(url: string): string {
   if (!url) return url

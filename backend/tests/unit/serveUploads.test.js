@@ -3,7 +3,7 @@ const os = require('os');
 const path = require('path');
 const express = require('express');
 const request = require('supertest');
-const { normalizeUploadRelativePath, serveUploads } = require('../../src/middleware/serveUploads');
+const { normalizeUploadRelativePath, serveUploads, contentDispositionAttachment } = require('../../src/middleware/serveUploads');
 
 describe('serveUploads path normalization', () => {
   test('strips /uploads prefix from originalUrl', () => {
@@ -18,6 +18,12 @@ describe('serveUploads path normalization', () => {
     expect(
       normalizeUploadRelativePath('/candidates/abc/file.pdf')
     ).toBe('candidates/abc/file.pdf');
+  });
+
+  test('Content-Disposition keeps the original upload name', () => {
+    const header = contentDispositionAttachment('PMO - Change Request PO integration.pdf');
+    expect(header).toContain('filename="PMO - Change Request PO integration.pdf"');
+    expect(header).toContain("filename*=UTF-8''PMO%20-%20Change%20Request%20PO%20integration.pdf");
   });
 });
 
@@ -47,6 +53,7 @@ describe('serveUploads end to end', () => {
     expect(res.status).toBe(200);
     expect(res.headers['content-type']).toBe('application/pdf');
     expect(res.headers['x-tas-uploads']).toBe('hit');
+    expect(res.headers['content-disposition']).toContain('filename="doc-1.pdf"');
     expect(res.body.equals(pdfBytes)).toBe(true);
   });
 

@@ -168,6 +168,7 @@ export default function ViewJobPostingModal({ isOpen, onClose, jobPosting, onSta
                       {(jobPosting as any).fptkFilePath ? (
                         <a
                           href={`${getPublicFileBaseUrl()}${(jobPosting as any).fptkFilePath}`}
+                          download={(jobPosting as any).fptkFileName || undefined}
                           target="_blank"
                           rel="noopener noreferrer"
                           style={{

@@ -3,6 +3,35 @@ const path = require('path');
 const { getUploadStaticRoots } = require('../config/storage');
 const logger = require('../utils/logger');
 
+function contentDispositionAttachment(fileName) {
+  const raw = String(fileName || 'download').replace(/[\u0000-\u001F\u007F]/g, '').trim() || 'download';
+  const fallback = raw.replace(/[^\x20-\x7E]/g, '_').replace(/["\\]/g, '_');
+  const encoded = encodeURIComponent(raw).replace(/['()]/g, (ch) => `%${ch.charCodeAt(0).toString(16).toUpperCase()}`);
+  return `attachment; filename="${fallback}"; filename*=UTF-8''${encoded}`;
+}
+
+async function lookupOriginalDownloadName(relativePath) {
+  const storedName = path.basename(String(relativePath || '').replace(/\\/g, '/'));
+  if (!storedName || process.env.JEST_WORKER_ID) return null;
+  try {
+    const prisma = require('../config/database');
+    const document = await prisma.document.findFirst({
+      where: { fileName: storedName },
+      select: { originalName: true },
+    });
+    if (document?.originalName) return document.originalName;
+
+    const fptk = await prisma.fPTK.findFirst({
+      where: { fptkFilePath: { endsWith: storedName } },
+      select: { fptkFileName: true },
+    });
+    if (fptk?.fptkFileName) return fptk.fptkFileName;
+  } catch (err) {
+    logger.warn(`[uploads] original name lookup failed for ${storedName}: ${err.message}`);
+  }
+  return null;
+}
+
 const MIME_TYPES = {
   '.pdf': 'application/pdf',
   '.doc': 'application/msword',
@@ -66,18 +95,19 @@ function resolveUploadedFile(relativeUrlPath) {
   return null;
 }
 
-function serveUploads(req, res, next) {
+async function serveUploadsAsync(req, res, next) {
   const method = req.method;
   if (method !== 'GET' && method !== 'HEAD') {
     return next();
   }
 
-  const found = resolveUploadedFile(req.originalUrl || req.url || req.path);
+  const requestPath = req.originalUrl || req.url || req.path;
+  const found = resolveUploadedFile(requestPath);
   res.setHeader('X-TAS-Uploads', found ? 'hit' : 'miss');
   res.setHeader('Cross-Origin-Resource-Policy', 'cross-origin');
 
   if (!found) {
-    const rel = normalizeUploadRelativePath(req.originalUrl || req.url || req.path);
+    const rel = normalizeUploadRelativePath(requestPath);
     logger.warn(
       `[uploads] not found ${method} ${req.originalUrl} rel=${rel} roots=${getUploadStaticRoots().join('|')}`
     );
@@ -89,11 +119,14 @@ function serveUploads(req, res, next) {
     });
   }
 
+  const rel = normalizeUploadRelativePath(requestPath);
+  const downloadName = (await lookupOriginalDownloadName(rel)) || path.basename(found.full);
   const ext = path.extname(found.full).toLowerCase();
   res.setHeader('Content-Type', MIME_TYPES[ext] || 'application/octet-stream');
   if (found.size) {
     res.setHeader('Content-Length', found.size);
   }
+  res.setHeader('Content-Disposition', contentDispositionAttachment(downloadName));
   res.setHeader('X-Content-Type-Options', 'nosniff');
 
   if (method === 'HEAD') {
@@ -112,8 +145,13 @@ function serveUploads(req, res, next) {
   return stream.pipe(res);
 }
 
+function serveUploads(req, res, next) {
+  Promise.resolve(serveUploadsAsync(req, res, next)).catch(next);
+}
+
 module.exports = {
   serveUploads,
   resolveUploadedFile,
   normalizeUploadRelativePath,
+  contentDispositionAttachment,
 };

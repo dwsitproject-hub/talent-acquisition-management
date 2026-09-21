@@ -5,7 +5,7 @@ import { useModalEscape } from '@/hooks/useModalEscape'
 import { useAuth } from '@/contexts/AuthContext'
 import { XMarkIcon, CloudArrowUpIcon, DocumentArrowUpIcon, XCircleIcon } from '@heroicons/react/24/outline'
 import { Candidate } from '@/types'
-import { MasterDivisionAPI, resolvePublicUploadUrl } from '@/lib/api'
+import { MasterDivisionAPI, resolveDownloadFileName, resolvePublicUploadUrl } from '@/lib/api'
 import {
   loadSelectablePositionOptions,
   filterPositionOptionsByDivisions,
@@ -329,7 +329,7 @@ export default function EditCandidateModal({ isOpen, onClose, onSave, candidate 
       const blob = await response.blob()
       const link = document.createElement('a')
       link.href = URL.createObjectURL(blob)
-      link.download = file.name || 'download'
+      link.download = resolveDownloadFileName(file, response)
       document.body.appendChild(link)
       link.click()
       document.body.removeChild(link)

@@ -19,8 +19,8 @@ const ALLOWED_MIME_TYPES = new Set([
 ]);
 
 function sanitizeFileName(name) {
-  const baseName = path.basename(name);
-  return baseName.replace(/[^a-zA-Z0-9.\-_]/g, '_');
+  const baseName = path.basename(String(name || 'document'));
+  return baseName.replace(/[\u0000-\u001F\u007F]/g, '').trim() || 'document';
 }
 
 async function ensureDirectory(dirPath) {
