@@ -5,6 +5,10 @@
   /* Map app theme vars to design tokens */
   --background: var(--color-bg-lighter);
   --foreground: var(--color-text-charcoal);
+  /* Public and internal UI is light-only. Keep native controls (date, select, caret)
+     from following Windows/Edge dark mode, which previously made typed text #ededed
+     on white inputs (candidate "Form Data Diri" looked like it could not accept keyboard input). */
+  color-scheme: light;
 }
 
 @theme inline {
@@ -14,11 +18,8 @@
   --font-mono: var(--font-geist-mono);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+html {
+  color-scheme: light;
 }
 
 body {
@@ -27,16 +28,36 @@ body {
   font-family: var(--font-family-primary);
 }
 
-/* Native <select> / <option>: force readable text on light backgrounds (fixes low-contrast grey on some Windows/GPU setups, including dark OS theme). */
+/* Force readable text on light form fields. Tailwind preflight uses color: inherit, so OS dark
+   mode used to paint input/textarea glyphs as --foreground (#ededed) on white boxes.
+   Selects were patched earlier; inputs/textareas had the same bug. */
+input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="file"]):not([type="hidden"]):not([type="button"]):not([type="submit"]):not([type="reset"]):not([type="image"]):not([type="color"]),
+textarea,
 select,
 select option {
   color: #111827;
   background-color: #ffffff;
-  -webkit-text-fill-color: #111827;
+  -webkit-text-fill-color: currentColor;
 }
 
+input:disabled:not([type="checkbox"]):not([type="radio"]),
+textarea:disabled,
 select:disabled,
 select:disabled option {
   color: #374151;
-  -webkit-text-fill-color: #374151;
+  background-color: #f3f4f6;
+  -webkit-text-fill-color: currentColor;
+}
+
+input::placeholder,
+textarea::placeholder {
+  color: #9ca3af;
+  -webkit-text-fill-color: #9ca3af;
+  opacity: 1;
+}
+
+input:-webkit-autofill,
+textarea:-webkit-autofill,
+select:-webkit-autofill {
+  -webkit-text-fill-color: #111827;
 }
