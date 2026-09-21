@@ -23,22 +23,27 @@ export function getApiBaseUrl(): string {
 /**
  * Origin for uploaded files such as `/uploads/fptk/...` (no `/api` suffix).
  *
- * Resolution order:
- * 1. NEXT_PUBLIC_FILE_BASE_URL — set this to reach the backend server directly
- *    for document downloads (e.g. http://172.28.92.57:4001), bypassing nginx.
- * 2. Otherwise derived from the API base URL (NEXT_PUBLIC_API_URL or its
- *    fallback), so downloads follow the same route as API calls.
+ * In the browser this is always the current page origin so downloads stay
+ * same-origin (browser → this frontend → backend → Synology). The frontend
+ * `/uploads` route proxies to UPLOADS_PROXY_TARGET on the server side.
+ *
+ * NEXT_PUBLIC_FILE_BASE_URL is an optional override and should stay unset
+ * unless you intentionally want the browser to call another host.
  */
 export function getPublicFileBaseUrl(): string {
   const fileBase =
     typeof process !== 'undefined' ? process.env?.NEXT_PUBLIC_FILE_BASE_URL : undefined
-  const base = fileBase
-    ? fileBase.replace(/\/+$/, '')
-    : getApiBaseUrl().replace(/\/api\/?$/i, '').replace(/\/+$/, '')
+  if (fileBase) {
+    return fileBase.replace(/\/+$/, '')
+  }
+  if (typeof window !== 'undefined') {
+    return window.location.origin
+  }
+  const apiBase = getApiBaseUrl().replace(/\/api\/?$/i, '').replace(/\/+$/, '')
   try {
-    return new URL(base).origin
+    return new URL(apiBase).origin
   } catch {
-    return base
+    return apiBase
   }
 }
 

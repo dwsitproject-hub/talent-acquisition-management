@@ -20,6 +20,8 @@ services:
       NODE_ENV: ${NODE_ENV:-staging}
       NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL}
       NEXT_PUBLIC_FILE_BASE_URL: ${NEXT_PUBLIC_FILE_BASE_URL:-}
+      # Server-side proxy target for /uploads (browser never talks to this host)
+      UPLOADS_PROXY_TARGET: ${UPLOADS_PROXY_TARGET:-http://172.28.92.57:4001}
       NODE_OPTIONS: ${FRONTEND_NODE_OPTIONS:---max-old-space-size=512}
       HOSTNAME: 0.0.0.0
       PORT: ${FRONTEND_PORT}
