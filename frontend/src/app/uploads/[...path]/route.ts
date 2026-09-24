@@ -41,13 +41,13 @@ async function proxyUpload(req: NextRequest, path: string[]): Promise<NextRespon
   const url = `${target}/uploads/${path.map(encodeURIComponent).join('/')}${req.nextUrl.search}`
 
   let upstream: Response
-  const headers = new Headers()
+  const requestHeaders = new Headers()
   const authorization = req.headers.get('authorization')
-  if (authorization) headers.set('authorization', authorization)
+  if (authorization) requestHeaders.set('authorization', authorization)
   try {
     upstream = await fetch(url, {
       method: req.method,
-      headers,
+      headers: requestHeaders,
       cache: 'no-store',
       redirect: 'manual',
     })
