@@ -572,6 +572,45 @@ export default function CandidatesPage() {
     setPage(1)
   }, [searchTerm, statusFilter, experienceFilter, skillsFilter, pageSize])
 
+  // Deep-link: /candidates?view=<id> opens View Candidate modal (not for TA_SITE list-only).
+  // Must stay above the loading returns so the hook count does not change between renders.
+  useEffect(() => {
+    if (!isAuthenticated || isLoading || menuAccessLoading) return
+    if (autoViewHandledRef.current) return
+    if (typeof window === 'undefined') return
+    const viewId = new URLSearchParams(window.location.search).get('view')
+    if (!viewId) return
+
+    const { canViewDetails } = resolveCandidatePermissions(roleName, menuAccess)
+    if (!canViewDetails) {
+      autoViewHandledRef.current = true
+      return
+    }
+
+    const found = candidates.find((c) => c.id === viewId)
+    if (found) {
+      autoViewHandledRef.current = true
+      void handleViewCandidate(found)
+      return
+    }
+
+    if (candidatesLoading) return
+
+    autoViewHandledRef.current = true
+    void (async () => {
+      try {
+        const response = await CandidatesAPI.getById(viewId)
+        if (response) {
+          await handleViewCandidate(mapApiCandidate(response))
+        }
+      } catch (error) {
+        console.error('Deep-link view candidate failed:', error)
+        autoViewHandledRef.current = false
+      }
+    })()
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- handleViewCandidate omitted to avoid refetch loops
+  }, [isAuthenticated, isLoading, menuAccessLoading, candidates, candidatesLoading, roleName, menuAccess])
+
   if (isLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
@@ -804,44 +843,6 @@ export default function CandidatesPage() {
       setIsViewModalOpen(true)
     }
   }
-
-  // Deep-link: /candidates?view=<id> opens View Candidate modal (not for TA_SITE list-only)
-  useEffect(() => {
-    if (!isAuthenticated || isLoading || menuAccessLoading) return
-    if (autoViewHandledRef.current) return
-    if (typeof window === 'undefined') return
-    const viewId = new URLSearchParams(window.location.search).get('view')
-    if (!viewId) return
-
-    const { canViewDetails } = resolveCandidatePermissions(roleName, menuAccess)
-    if (!canViewDetails) {
-      autoViewHandledRef.current = true
-      return
-    }
-
-    const found = candidates.find((c) => c.id === viewId)
-    if (found) {
-      autoViewHandledRef.current = true
-      void handleViewCandidate(found)
-      return
-    }
-
-    if (candidatesLoading) return
-
-    autoViewHandledRef.current = true
-    void (async () => {
-      try {
-        const response = await CandidatesAPI.getById(viewId)
-        if (response) {
-          await handleViewCandidate(mapApiCandidate(response))
-        }
-      } catch (error) {
-        console.error('Deep-link view candidate failed:', error)
-        autoViewHandledRef.current = false
-      }
-    })()
-  // eslint-disable-next-line react-hooks/exhaustive-deps -- handleViewCandidate omitted to avoid refetch loops
-  }, [isAuthenticated, isLoading, menuAccessLoading, candidates, candidatesLoading, roleName, menuAccess])
 
   const handleEditCandidate = async (candidate: Candidate) => {
     console.log('========== handleEditCandidate CALLED ==========')
