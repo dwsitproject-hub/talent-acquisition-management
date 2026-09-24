@@ -91,6 +91,7 @@ services:
       - "${HTTPS_HOST_PORT}:443"
     volumes:
       - ./nginx/nginx.staging.conf:/etc/nginx/nginx.conf:ro
+      - ./nginx/maintenance.html:/etc/nginx/maintenance/maintenance.html:ro
       - ./ssl:/etc/nginx/ssl:ro
     depends_on:
       - frontend

@@ -1,5 +1,6 @@
 import axios, { type InternalAxiosRequestConfig } from 'axios'
 import { getAccessToken, setAccessToken, clearAuth } from './auth'
+import { notifyBackendUnreachable } from './backendHealth'
 
 export function getApiBaseUrl(): string {
   if (typeof process !== 'undefined' && process.env.NEXT_PUBLIC_API_URL) {
@@ -44,6 +45,13 @@ client.interceptors.response.use(
   (res) => res,
   async (error) => {
     const original = error.config
+    const status = error.response?.status
+    if (
+      typeof window !== 'undefined' &&
+      (status === 502 || status === 503 || status === 504 || (!error.response && error.code !== 'ERR_CANCELED'))
+    ) {
+      notifyBackendUnreachable()
+    }
     if (error.response?.status === 401 && !original._retry) {
       if (isRefreshing) {
         return new Promise((resolve, reject) => {

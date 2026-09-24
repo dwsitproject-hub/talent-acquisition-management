@@ -1,4 +1,5 @@
 import axios from 'axios'
+import { notifyBackendUnreachable } from '@/lib/backendHealth'
 
 // Dynamically determine API URL based on current hostname
 // This allows the app to work with both localhost and public IP addresses
@@ -224,12 +225,26 @@ async function refreshAccessToken(): Promise<string | null> {
   return refreshPromise
 }
 
+function isBackendInfrastructureFailure(error: {
+  response?: { status?: number }
+  code?: string
+}): boolean {
+  const status = error.response?.status
+  if (status === 502 || status === 503 || status === 504) return true
+  if (!error.response && error.code !== 'ERR_CANCELED') return true
+  return false
+}
+
 // Response interceptor to handle errors
 api.interceptors.response.use(
   (response) => response,
   async (error) => {
     const status = error.response?.status
     const originalRequest = error.config
+
+    if (typeof window !== 'undefined' && isBackendInfrastructureFailure(error)) {
+      notifyBackendUnreachable()
+    }
 
     if (!originalRequest || typeof window === 'undefined' || status !== 401) {
       return Promise.reject(error)

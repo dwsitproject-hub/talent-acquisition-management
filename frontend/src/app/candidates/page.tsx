@@ -370,37 +370,72 @@ export default function CandidatesPage() {
   const [menuAccess, setMenuAccess] = useState<Record<string, any>>({})
   const [menuAccessLoading, setMenuAccessLoading] = useState(true)
   const [deletingCandidateId, setDeletingCandidateId] = useState<string | null>(null)
+  const [candidatesLoading, setCandidatesLoading] = useState(false)
+  const [serverListTotal, setServerListTotal] = useState(0)
+  const [serverTotalPages, setServerTotalPages] = useState(1)
+
+  /** Status/experience are not on GET /candidates; filtering them requires loading all rows. */
+  const needsFullCandidateDataset =
+    statusFilter !== 'all' || experienceFilter !== 'all'
 
   useModalEscape(showLinkModal, () => setShowLinkModal(false))
 
-  // Load candidates from API
   const loadCandidates = async () => {
+    setCandidatesLoading(true)
     try {
-      const limit = 100
-      const maxPages = 100
-      let page = 1
-      let hasMore = true
-      const allCandidatesData: any[] = []
+      if (needsFullCandidateDataset) {
+        const limit = 100
+        const maxPages = 100
+        let fetchPage = 1
+        let hasMore = true
+        const allCandidatesData: any[] = []
 
-      while (hasMore && page <= maxPages) {
-        const response = await CandidatesAPI.getAll({ search: searchTerm }, { page, limit })
-        const pageData = response.data || []
-        allCandidatesData.push(...pageData)
+        while (hasMore && fetchPage <= maxPages) {
+          const response = await CandidatesAPI.getAll(
+            {
+              search: searchTerm.trim() || undefined,
+              skills: skillsFilter !== 'all' ? [skillsFilter] : undefined,
+            },
+            { page: fetchPage, limit }
+          )
+          const pageData = response.data || []
+          allCandidatesData.push(...pageData)
 
-        const totalPages = response.pagination?.totalPages
-        if (typeof totalPages === 'number') {
-          hasMore = page < totalPages
-        } else {
-          hasMore = pageData.length === limit
+          const totalPages = response.pagination?.totalPages
+          if (typeof totalPages === 'number') {
+            hasMore = fetchPage < totalPages
+          } else {
+            hasMore = pageData.length === limit
+          }
+          fetchPage += 1
         }
-        page += 1
-      }
 
-      const mappedCandidates = allCandidatesData.map((candidate: any) => mapApiCandidate(candidate))
-      setCandidates(mappedCandidates)
+        setCandidates(allCandidatesData.map((candidate: any) => mapApiCandidate(candidate)))
+        setServerListTotal(0)
+        setServerTotalPages(1)
+      } else {
+        const response = await CandidatesAPI.getAll(
+          {
+            search: searchTerm.trim() || undefined,
+            skills: skillsFilter !== 'all' ? [skillsFilter] : undefined,
+          },
+          { page, limit: pageSize }
+        )
+        const pageData = response.data || []
+        setCandidates(pageData.map((candidate: any) => mapApiCandidate(candidate)))
+        const pagination = response.pagination
+        setServerListTotal(typeof pagination?.total === 'number' ? pagination.total : pageData.length)
+        setServerTotalPages(
+          typeof pagination?.totalPages === 'number'
+            ? Math.max(1, pagination.totalPages)
+            : 1
+        )
+      }
     } catch (error: any) {
       console.error('Error loading candidates:', error)
-      // Fallback to localStorage if API fails (only in browser)
+      setCandidates([])
+      setServerListTotal(0)
+      setServerTotalPages(1)
       if (typeof window !== 'undefined') {
         try {
           const savedCandidates = localStorage.getItem('candidates')
@@ -412,38 +447,30 @@ export default function CandidatesPage() {
           console.warn('Could not load candidates from localStorage:', e)
         }
       }
+    } finally {
+      setCandidatesLoading(false)
     }
   }
 
   useEffect(() => {
-    if (isAuthenticated && !isLoading) {
-      loadCandidates()
-    }
-  }, [isAuthenticated, isLoading])
-
-  // Deep-link: /candidates?view=<id> opens View Candidate modal (not for TA_SITE list-only)
-  useEffect(() => {
     if (!isAuthenticated || isLoading) return
-    if (autoViewHandledRef.current) return
-    if (typeof window === 'undefined') return
-    const viewId = new URLSearchParams(window.location.search).get('view')
-    if (!viewId) return
-    const found = candidates.find((c) => c.id === viewId)
-    if (!found) return
-    autoViewHandledRef.current = true
-    const { canViewDetails } = resolveCandidatePermissions(roleName, menuAccess)
-    if (!canViewDetails) return
-    handleViewCandidate(found)
-  }, [isAuthenticated, isLoading, candidates, roleName, menuAccess])
-
-  // Reload candidates when search term changes (debounced)
-  useEffect(() => {
-    if (!isAuthenticated || isLoading) return
+    const debounceMs = searchTerm.trim() ? 500 : 0
     const timer = setTimeout(() => {
-      loadCandidates()
-    }, 500)
+      void loadCandidates()
+    }, debounceMs)
     return () => clearTimeout(timer)
-  }, [searchTerm, isAuthenticated, isLoading])
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- loadCandidates reads latest filter/page state
+  }, [
+    isAuthenticated,
+    isLoading,
+    searchTerm,
+    page,
+    pageSize,
+    skillsFilter,
+    statusFilter,
+    experienceFilter,
+    needsFullCandidateDataset,
+  ])
 
   useEffect(() => {
     if (!isLoading && !isAuthenticated) {
@@ -499,12 +526,15 @@ export default function CandidatesPage() {
     () =>
       candidates
         .filter(candidate => {
-          const matchesSearch = matchesTokenizedSearch(searchTerm, [
-            candidate.personalInfo.firstName,
-            candidate.personalInfo.lastName,
-            `${candidate.personalInfo.firstName} ${candidate.personalInfo.lastName}`,
-            candidate.contactInfo.email,
-          ])
+          if (needsFullCandidateDataset) {
+            const matchesSearch = matchesTokenizedSearch(searchTerm, [
+              candidate.personalInfo.firstName,
+              candidate.personalInfo.lastName,
+              `${candidate.personalInfo.firstName} ${candidate.personalInfo.lastName}`,
+              candidate.contactInfo.email,
+            ])
+            if (!matchesSearch) return false
+          }
 
           const matchesStatus = statusFilter === 'all' || candidate.status === statusFilter
 
@@ -517,38 +547,60 @@ export default function CandidatesPage() {
             (experienceFilter === '10+' && years > 10)
 
           const matchesSkill =
-            skillsFilter === 'all' ||
-            getCandidateSkills(candidate).some(
-              s => s.trim().toLowerCase() === skillsFilter.toLowerCase()
-            )
+            needsFullCandidateDataset &&
+            (skillsFilter === 'all' ||
+              getCandidateSkills(candidate).some(
+                s => s.trim().toLowerCase() === skillsFilter.toLowerCase()
+              ))
 
-          return matchesSearch && matchesStatus && matchesExperience && matchesSkill
+          if (needsFullCandidateDataset && skillsFilter !== 'all' && !matchesSkill) {
+            return false
+          }
+
+          return matchesStatus && matchesExperience
         })
         .sort((a, b) => {
           const nameA = `${a.personalInfo.firstName || ''} ${a.personalInfo.lastName || ''}`.trim().toLowerCase()
           const nameB = `${b.personalInfo.firstName || ''} ${b.personalInfo.lastName || ''}`.trim().toLowerCase()
           return nameA.localeCompare(nameB)
         }),
-    [candidates, searchTerm, statusFilter, experienceFilter, skillsFilter]
+    [candidates, searchTerm, statusFilter, experienceFilter, skillsFilter, needsFullCandidateDataset]
   )
 
   const listMeta = useMemo(() => {
-    const total = filteredCandidates.length
-    const totalPages = Math.max(1, Math.ceil(total / pageSize))
+    if (needsFullCandidateDataset) {
+      const total = filteredCandidates.length
+      const totalPages = Math.max(1, Math.ceil(total / pageSize))
+      const safePage = Math.min(page, totalPages)
+      const start = (safePage - 1) * pageSize
+      return {
+        total,
+        totalPages,
+        safePage,
+        pagedRows: filteredCandidates.slice(start, start + pageSize),
+      }
+    }
+
+    const totalPages = serverTotalPages
     const safePage = Math.min(page, totalPages)
-    const start = (safePage - 1) * pageSize
-    const end = start + pageSize
     return {
-      total,
+      total: serverListTotal,
       totalPages,
       safePage,
-      pagedRows: filteredCandidates.slice(start, end),
+      pagedRows: filteredCandidates,
     }
-  }, [filteredCandidates, page, pageSize])
+  }, [
+    filteredCandidates,
+    page,
+    pageSize,
+    needsFullCandidateDataset,
+    serverListTotal,
+    serverTotalPages,
+  ])
 
   useEffect(() => {
     setPage(1)
-  }, [searchTerm, statusFilter, pageSize])
+  }, [searchTerm, statusFilter, experienceFilter, skillsFilter, pageSize])
 
   if (isLoading) {
     return (
@@ -782,6 +834,44 @@ export default function CandidatesPage() {
       setIsViewModalOpen(true)
     }
   }
+
+  // Deep-link: /candidates?view=<id> opens View Candidate modal (not for TA_SITE list-only)
+  useEffect(() => {
+    if (!isAuthenticated || isLoading || menuAccessLoading) return
+    if (autoViewHandledRef.current) return
+    if (typeof window === 'undefined') return
+    const viewId = new URLSearchParams(window.location.search).get('view')
+    if (!viewId) return
+
+    const { canViewDetails } = resolveCandidatePermissions(roleName, menuAccess)
+    if (!canViewDetails) {
+      autoViewHandledRef.current = true
+      return
+    }
+
+    const found = candidates.find((c) => c.id === viewId)
+    if (found) {
+      autoViewHandledRef.current = true
+      void handleViewCandidate(found)
+      return
+    }
+
+    if (candidatesLoading) return
+
+    autoViewHandledRef.current = true
+    void (async () => {
+      try {
+        const response = await CandidatesAPI.getById(viewId)
+        if (response) {
+          await handleViewCandidate(mapApiCandidate(response))
+        }
+      } catch (error) {
+        console.error('Deep-link view candidate failed:', error)
+        autoViewHandledRef.current = false
+      }
+    })()
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- handleViewCandidate omitted to avoid refetch loops
+  }, [isAuthenticated, isLoading, menuAccessLoading, candidates, candidatesLoading, roleName, menuAccess])
 
   const handleEditCandidate = async (candidate: Candidate) => {
     console.log('========== handleEditCandidate CALLED ==========')
@@ -1243,6 +1333,13 @@ export default function CandidatesPage() {
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-200 bg-white">
+                    {candidatesLoading && listMeta.pagedRows.length === 0 ? (
+                      <tr>
+                        <td colSpan={7} className="py-12 text-center text-sm text-gray-500">
+                          Loading candidates…
+                        </td>
+                      </tr>
+                    ) : null}
                     {listMeta.pagedRows.map((candidate) => {
                       console.log('Candidate data:', candidate)
                       console.log('Position Applied For:', (candidate as any).positionAppliedFor)
