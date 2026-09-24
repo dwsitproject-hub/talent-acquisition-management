@@ -13,6 +13,7 @@ const nextConfig: NextConfig = {
   },
   env: {
     NEXT_PUBLIC_API_URL: process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000/api',
+    NEXT_PUBLIC_OIDC_ENABLED: process.env.NEXT_PUBLIC_OIDC_ENABLED || '',
   },
   images: {
     remotePatterns: [

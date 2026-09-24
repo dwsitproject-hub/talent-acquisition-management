@@ -24,11 +24,29 @@ function frontendLoginErrorRedirect(message) {
 function setRefreshCookie(res, refreshToken) {
   res.cookie('refreshToken', refreshToken, {
     httpOnly: true,
-    secure: process.env.NODE_ENV === 'production',
+    secure: oidcService.useSecureCookies(),
     sameSite: process.env.COOKIE_SAME_SITE || 'lax',
     maxAge: 7 * 24 * 60 * 60 * 1000,
   });
 }
+
+function firstQueryValue(value) {
+  if (Array.isArray(value)) return value[0];
+  return value;
+}
+
+/**
+ * Public probe so the login page can auto-start Hub SSO without a build-time flag.
+ * GET /api/auth/oidc/status  and  GET /auth/oidc/status
+ */
+exports.status = asyncHandler(async (req, res) => {
+  res.json({
+    success: true,
+    data: {
+      enabled: oidcService.isOidcConfigured(),
+    },
+  });
+});
 
 /**
  * Start OIDC login (SP-initiated)
@@ -64,17 +82,26 @@ exports.callback = asyncHandler(async (req, res) => {
   if (!requireOidcConfigured(req, res)) return;
 
   const clearOpts = oidcService.clearOidcCookieOptions();
+  const legacyClearOpts = { ...clearOpts, path: '/api/auth/oidc' };
   res.clearCookie(oidcService.OIDC_STATE_COOKIE, clearOpts);
   res.clearCookie(oidcService.OIDC_VERIFIER_COOKIE, clearOpts);
   res.clearCookie(oidcService.OIDC_NONCE_COOKIE, clearOpts);
+  res.clearCookie(oidcService.OIDC_STATE_COOKIE, legacyClearOpts);
+  res.clearCookie(oidcService.OIDC_VERIFIER_COOKIE, legacyClearOpts);
+  res.clearCookie(oidcService.OIDC_NONCE_COOKIE, legacyClearOpts);
 
-  const {
-    code,
-    state,
-    code_verifier: codeVerifierFromQuery,
-    error,
-    error_description: errorDescription,
-  } = req.query;
+  const code = firstQueryValue(req.query.code || req.body?.code);
+  const state = firstQueryValue(req.query.state || req.body?.state);
+  const codeVerifierFromQuery = firstQueryValue(
+    req.query.code_verifier ||
+      req.query.codeVerifier ||
+      req.body?.code_verifier ||
+      req.body?.codeVerifier
+  );
+  const error = firstQueryValue(req.query.error || req.body?.error);
+  const errorDescription = firstQueryValue(
+    req.query.error_description || req.body?.error_description
+  );
 
   if (error) {
     logger.warn(`OIDC callback error from Hub: ${error}`);

@@ -1,14 +1,59 @@
 'use client'
 
-import { useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useAuth } from '@/contexts/AuthContext'
 import { useRouter } from 'next/navigation'
 import Layout from '@/components/Layout/Layout'
+import MultiSelectDropdown from '@/components/MultiSelectDropdown'
 import { DocumentArrowDownIcon } from '@heroicons/react/24/outline'
 import { FPTKAPI } from '@/lib/api'
 
 const PRIORITY_OPTIONS = ['P0', 'P1', 'P2', 'Normal']
 const STATUS_OPTIONS = ['Open', 'Pending FKTK', 'Re-Open', 'Hold', 'Cancel', 'Internal Movement', 'Close']
+const HIRE_TYPE_OPTIONS = ['New', 'Replacement'] as const
+
+type HireType = (typeof HIRE_TYPE_OPTIONS)[number]
+
+const mapPriorityValue = (priority?: string | null) => {
+  if (!priority) return 'Normal'
+  const normalized = priority.toString().toUpperCase()
+  if (['P0', 'P1', 'P2'].includes(normalized)) return normalized
+  return 'Normal'
+}
+
+const normalizeCurrentStatus = (status?: string | null) => {
+  const raw = (status || '').toString().trim()
+  return raw || 'Pending FKTK'
+}
+
+const getPositionGrade = (position: any) => {
+  const typeGrade = (position?.typeGrade || '').toString().trim()
+  if (typeGrade) return typeGrade
+  const grade2 = (position?.grade2 || '').toString().trim()
+  if (grade2) return grade2
+  const level = (position?.level || '').toString().trim()
+  if (level && level.toLowerCase() !== 'not specified') return level
+  return ''
+}
+
+const getHireType = (position: any): HireType | '' => {
+  const raw = (position?.additionalOrReplacement || '').toString().trim().toLowerCase()
+  if (!raw) return ''
+  if (raw === 'replacement' || raw.includes('replac')) return 'Replacement'
+  if (raw === 'additional' || raw === 'new' || raw.includes('additional') || raw === 'new hire') {
+    return 'New'
+  }
+  return ''
+}
+
+const escapeCsvValue = (value: unknown) => {
+  if (value === null || value === undefined) return ''
+  const stringValue = value.toString()
+  if (stringValue.includes(',') || stringValue.includes('"') || stringValue.includes('\n')) {
+    return `"${stringValue.replace(/"/g, '""')}"`
+  }
+  return stringValue
+}
 
 export default function ReportsPage() {
   const { isAuthenticated, isLoading } = useAuth()
@@ -17,47 +62,16 @@ export default function ReportsPage() {
   const [downloading, setDownloading] = useState(false)
   const [selectedPriorities, setSelectedPriorities] = useState<string[]>([])
   const [selectedStatuses, setSelectedStatuses] = useState<string[]>([])
+  const [selectedGrades, setSelectedGrades] = useState<string[]>([])
+  const [selectedHireTypes, setSelectedHireTypes] = useState<string[]>([])
+  const [availableGrades, setAvailableGrades] = useState<string[]>([])
   const [requestDateStart, setRequestDateStart] = useState<string>('')
   const [requestDateEnd, setRequestDateEnd] = useState<string>('')
   const [errorMessage, setErrorMessage] = useState<string>('')
 
-  useEffect(() => {
-    if (!isLoading && !isAuthenticated) {
-      router.push('/login')
-    }
-  }, [isAuthenticated, isLoading, router])
+  const isDownloadDisabled = useMemo(() => downloading, [downloading])
 
-  if (isLoading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-indigo-600"></div>
-      </div>
-    )
-  }
-
-  if (!isAuthenticated) {
-    return null
-  }
-
-  const toggleSelection = (value: string, selected: string[], setter: (next: string[]) => void) => {
-    setter(selected.includes(value) ? selected.filter(item => item !== value) : [...selected, value])
-  }
-
-  const isDownloadDisabled = useMemo(() => downloading || loading, [downloading, loading])
-
-  const mapPriorityValue = (priority?: string | null) => {
-    if (!priority) return 'Normal'
-    const normalized = priority.toString().toUpperCase()
-    if (['P0', 'P1', 'P2'].includes(normalized)) return normalized
-    return 'Normal'
-  }
-
-  const normalizeCurrentStatus = (status?: string | null) => {
-    const raw = (status || '').toString().trim()
-    return raw || 'Pending FKTK'
-  }
-
-  const fetchPositions = async () => {
+  const fetchPositions = useCallback(async () => {
     const limit = 100
     let page = 1
     let allPositions: any[] = []
@@ -80,6 +94,44 @@ export default function ReportsPage() {
     }
 
     return allPositions
+  }, [])
+
+  useEffect(() => {
+    if (!isLoading && !isAuthenticated) {
+      router.push('/login')
+    }
+  }, [isAuthenticated, isLoading, router])
+
+  useEffect(() => {
+    if (isLoading || !isAuthenticated) return
+
+    let cancelled = false
+    const loadAvailableGrades = async () => {
+      try {
+        setLoading(true)
+        const positions = await fetchPositions()
+        if (cancelled) return
+        const grades = Array.from(
+          new Set(positions.map(getPositionGrade).filter((grade: string) => Boolean(grade)))
+        ).sort((a, b) => a.localeCompare(b, undefined, { numeric: true, sensitivity: 'base' }))
+        setAvailableGrades(grades)
+        setSelectedGrades((prev) => prev.filter((grade) => grades.includes(grade)))
+      } catch (error) {
+        console.error('Failed to load available grades', error)
+        if (!cancelled) setAvailableGrades([])
+      } finally {
+        if (!cancelled) setLoading(false)
+      }
+    }
+
+    loadAvailableGrades()
+    return () => {
+      cancelled = true
+    }
+  }, [isAuthenticated, isLoading, fetchPositions])
+
+  const toggleSelection = (value: string, selected: string[], setter: (next: string[]) => void) => {
+    setter(selected.includes(value) ? selected.filter(item => item !== value) : [...selected, value])
   }
 
   const matchesFilters = (position: any) => {
@@ -89,6 +141,16 @@ export default function ReportsPage() {
     if (selectedStatuses.length > 0) {
       const currentStatus = normalizeCurrentStatus(position.currentStatus || position.status)
       if (!selectedStatuses.includes(currentStatus)) return false
+    }
+
+    if (selectedGrades.length > 0) {
+      const grade = getPositionGrade(position)
+      if (!selectedGrades.includes(grade)) return false
+    }
+
+    if (selectedHireTypes.length > 0) {
+      const hireType = getHireType(position)
+      if (!hireType || !selectedHireTypes.includes(hireType)) return false
     }
 
     if (requestDateStart) {
@@ -118,6 +180,8 @@ export default function ReportsPage() {
       'Section',
       'Hiring Manager',
       'Employment Type',
+      'Grade',
+      'Type (New or Replacement)',
       'Location',
       'Current Status',
       'Request Date',
@@ -134,6 +198,8 @@ export default function ReportsPage() {
       row.section || '',
       row.hiringManager || '',
       row.employmentType || row.type || '',
+      getPositionGrade(row),
+      getHireType(row),
       row.location || '',
       normalizeCurrentStatus(row.currentStatus || row.status),
       row.requestDate ? new Date(row.requestDate).toLocaleDateString() : '',
@@ -145,14 +211,7 @@ export default function ReportsPage() {
     const allRows = [headers, ...csvRows]
 
     return allRows
-      .map(row => row.map(value => {
-        if (value === null || value === undefined) return ''
-        const stringValue = value.toString()
-        if (stringValue.includes(',') || stringValue.includes('"') || stringValue.includes('\n')) {
-          return `"${stringValue.replace(/"/g, '""')}"`
-        }
-        return stringValue
-      }).join(','))
+      .map(row => row.map(escapeCsvValue).join(','))
       .join('\n')
   }
 
@@ -186,6 +245,18 @@ export default function ReportsPage() {
     } finally {
       setDownloading(false)
     }
+  }
+
+  if (isLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-indigo-600"></div>
+      </div>
+    )
+  }
+
+  if (!isAuthenticated) {
+    return null
   }
 
   return (
@@ -240,6 +311,48 @@ export default function ReportsPage() {
                       className="h-4 w-4 text-indigo-600 border-gray-300 rounded"
                     />
                     <span>{option}</span>
+                  </label>
+                ))}
+              </div>
+            </div>
+
+            {/* Grade Filter */}
+            <div>
+              <h3 className="text-sm font-medium text-gray-700">Grade</h3>
+              <p className="text-xs text-gray-500 mb-2">Select one or more available grades</p>
+              {loading ? (
+                <p className="text-sm text-gray-500">Loading available grades...</p>
+              ) : availableGrades.length === 0 ? (
+                <p className="text-sm text-gray-500">No grades found on current positions.</p>
+              ) : (
+                <div className="max-w-md">
+                  <MultiSelectDropdown
+                    options={availableGrades}
+                    value={selectedGrades}
+                    onChange={setSelectedGrades}
+                    placeholder="All grades"
+                    searchPlaceholder="Search grade..."
+                  />
+                </div>
+              )}
+            </div>
+
+            {/* New or Replacement Filter */}
+            <div>
+              <h3 className="text-sm font-medium text-gray-700">Type (New or Replacement)</h3>
+              <p className="text-xs text-gray-500 mb-2">
+                Select new headcount (Additional) or replacement. Leave blank to include both.
+              </p>
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                {HIRE_TYPE_OPTIONS.map(option => (
+                  <label key={option} className="flex items-center space-x-2 text-sm text-gray-700">
+                    <input
+                      type="checkbox"
+                      checked={selectedHireTypes.includes(option)}
+                      onChange={() => toggleSelection(option, selectedHireTypes, setSelectedHireTypes)}
+                      className="h-4 w-4 text-indigo-600 border-gray-300 rounded"
+                    />
+                    <span>{option === 'New' ? 'New (Additional)' : option}</span>
                   </label>
                 ))}
               </div>

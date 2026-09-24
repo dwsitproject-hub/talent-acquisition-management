@@ -14,9 +14,11 @@ RUN npm ci
 # Build
 FROM base AS build
 ARG NEXT_PUBLIC_API_URL
-ENV NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_URL}
-# Optional: direct origin for /uploads document downloads (bypasses nginx)
+ARG NEXT_PUBLIC_OIDC_ENABLED
 ARG NEXT_PUBLIC_FILE_BASE_URL
+ENV NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_URL}
+ENV NEXT_PUBLIC_OIDC_ENABLED=${NEXT_PUBLIC_OIDC_ENABLED}
+# Optional override for /uploads links. Leave empty so the browser stays same-origin.
 ENV NEXT_PUBLIC_FILE_BASE_URL=${NEXT_PUBLIC_FILE_BASE_URL}
 COPY --from=dependencies /app/node_modules ./node_modules
 COPY . .
