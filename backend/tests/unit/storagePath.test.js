@@ -8,6 +8,7 @@ const KEYS = [
   'STORAGE_DEPLOYMENT',
   'STORAGE_PROJECT_SLUG',
   'UPLOAD_DIR',
+  'STORAGE_UPLOAD_INCLUDE_NESTED',
 ];
 
 describe('storage path resolution', () => {
@@ -80,14 +81,21 @@ describe('storage path resolution', () => {
     expect(getStoragePath('fptk')).toBe(path.join('/mnt/synology', 'TAS', 'fptk'));
   });
 
-  test('download roots include nested leftover and the CIFS mount root', () => {
+  test('download roots are only the TAS folder', () => {
     process.env.STORAGE_SYNOLOGY_ROOT = '/mnt/synology';
     process.env.STORAGE_DEPLOYMENT = 'dev';
     process.env.STORAGE_PROJECT_SLUG = 'TAS';
     expect(getUploadStaticRoots()).toEqual([
       path.join('/mnt/synology', 'dev', 'TAS'),
-      path.join('/mnt/synology', 'dev', 'TAS', 'dev', 'TAS'),
-      '/mnt/synology',
+    ]);
+  });
+
+  test('nested leftover root is included only when explicitly enabled', () => {
+    process.env.STORAGE_LOCAL_PATH = '/mnt/synology-tas';
+    process.env.STORAGE_UPLOAD_INCLUDE_NESTED = 'true';
+    expect(getUploadStaticRoots()).toEqual([
+      '/mnt/synology-tas',
+      path.join('/mnt/synology-tas', 'dev', 'TAS'),
     ]);
   });
 });

@@ -6,7 +6,7 @@ import { XMarkIcon, DocumentArrowDownIcon, EyeIcon, PrinterIcon } from '@heroico
 import { Candidate } from '@/types'
 import { generateFormDataDiriPDF } from '@/utils/pdfGenerator'
 import { formatFileSize } from '@/utils/fileCompression'
-import { ApplicationsAPI, resolveDownloadFileName, resolvePublicUploadUrl } from '@/lib/api'
+import { ApplicationsAPI, fetchAuthorizedUpload, resolveDownloadFileName, resolvePublicUploadUrl } from '@/lib/api'
 import { getApplicationStatusPillClass, mapApplicationStatusToUi } from '@/utils/applicationStatusUi'
 import PositionEditOverlay from '@/components/PositionEditOverlay'
 import { usePositionEditOverlay } from '@/hooks/usePositionEditOverlay'
@@ -123,7 +123,7 @@ export default function ViewCandidateModal({ isOpen, onClose, candidate }: ViewC
 
     setDownloadingFileId(file.id)
     try {
-      const response = await fetch(resolveFileUrl(file.url))
+      const response = await fetchAuthorizedUpload(resolveFileUrl(file.url), { download: true })
       if (!response.ok) {
         throw new Error(`Server responded with ${response.status} ${response.statusText}`)
       }

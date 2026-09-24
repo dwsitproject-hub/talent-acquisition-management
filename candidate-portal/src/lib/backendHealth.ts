@@ -41,6 +41,15 @@ export function getHealthCheckUrls(): string[] {
   return Array.from(new Set(candidates))
 }
 
+function probeSignal(external?: AbortSignal): AbortSignal {
+  const timeout = AbortSignal.timeout(HEALTH_TIMEOUT_MS)
+  if (!external) return timeout
+  if (typeof AbortSignal.any === 'function') {
+    return AbortSignal.any([external, timeout])
+  }
+  return external
+}
+
 export async function checkBackendHealth(signal?: AbortSignal): Promise<boolean> {
   const urls = getHealthCheckUrls()
 
@@ -50,28 +59,19 @@ export async function checkBackendHealth(signal?: AbortSignal): Promise<boolean>
         method: 'GET',
         cache: 'no-store',
         credentials: 'omit',
-        signal: signal ?? AbortSignal.timeout(HEALTH_TIMEOUT_MS),
+        signal: probeSignal(signal),
       })
 
       if (!res.ok) continue
 
       const body = await res.json().catch(() => null)
-      if (body && typeof body === 'object' && 'success' in body) {
-        return (body as { success?: boolean }).success === true
+      if (body && typeof body === 'object' && (body as { success?: boolean }).success === true) {
+        return true
       }
-      return true
     } catch {
       // try next candidate
     }
   }
 
   return false
-}
-
-export const BACKEND_UNREACHABLE_EVENT = 'tas:backend-unreachable'
-
-export function notifyBackendUnreachable(): void {
-  if (typeof window !== 'undefined') {
-    window.dispatchEvent(new CustomEvent(BACKEND_UNREACHABLE_EVENT))
-  }
 }

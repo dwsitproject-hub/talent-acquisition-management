@@ -53,6 +53,7 @@ describe('serveUploads end to end', () => {
     expect(res.status).toBe(200);
     expect(res.headers['content-type']).toBe('application/pdf');
     expect(res.headers['x-tas-uploads']).toBe('hit');
+    expect(res.headers['content-disposition']).toContain('inline;');
     expect(res.headers['content-disposition']).toContain('filename="doc-1.pdf"');
     expect(res.body.equals(pdfBytes)).toBe(true);
   });
@@ -68,5 +69,13 @@ describe('serveUploads end to end', () => {
     expect(res.status).toBe(404);
     expect(res.headers['x-tas-uploads']).toBe('miss');
     expect(res.headers['content-type']).toMatch(/application\/json/);
+    expect(res.body.roots).toBeUndefined();
+    expect(res.body.path).toBeUndefined();
+  });
+
+  test('download=1 forces attachment', async () => {
+    const res = await request(app).get('/uploads/candidates/cand-1/doc-1.pdf?download=1');
+    expect(res.status).toBe(200);
+    expect(res.headers['content-disposition']).toContain('attachment;');
   });
 });

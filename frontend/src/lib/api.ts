@@ -1,5 +1,4 @@
 import axios from 'axios'
-import { notifyBackendUnreachable } from '@/lib/backendHealth'
 
 // Dynamically determine API URL based on current hostname
 // This allows the app to work with both localhost and public IP addresses
@@ -93,6 +92,45 @@ export function resolvePublicUploadUrl(url: string): string {
   } catch {
     return url
   }
+}
+
+function readAuthToken(): string | null {
+  if (typeof window === 'undefined') return null
+  try {
+    return localStorage.getItem('authToken')
+  } catch {
+    return null
+  }
+}
+
+/** Fetch a stored file with the staff access token. Pass download to force attachment. */
+export async function fetchAuthorizedUpload(url: string, options?: { download?: boolean }): Promise<Response> {
+  const resolved = resolvePublicUploadUrl(url)
+  let target = resolved
+  if (options?.download) {
+    try {
+      const parsed = new URL(resolved, typeof window !== 'undefined' ? window.location.origin : 'http://localhost')
+      parsed.searchParams.set('download', '1')
+      target = parsed.toString()
+    } catch {
+      target = resolved.includes('?') ? `${resolved}&download=1` : `${resolved}?download=1`
+    }
+  }
+
+  const send = (token: string | null) => fetch(target, {
+    headers: token ? { Authorization: `Bearer ${token}` } : {},
+    credentials: 'include',
+  })
+
+  const firstToken = readAuthToken()
+  const response = await send(firstToken)
+  if (response.status !== 401 || typeof window === 'undefined') {
+    return response
+  }
+
+  const refreshed = await refreshAccessToken()
+  if (!refreshed) return response
+  return send(refreshed)
 }
 
 /** Full browser URL for starting DWS Hub OIDC login (not under axios base path quirks). */
@@ -225,26 +263,12 @@ async function refreshAccessToken(): Promise<string | null> {
   return refreshPromise
 }
 
-function isBackendInfrastructureFailure(error: {
-  response?: { status?: number }
-  code?: string
-}): boolean {
-  const status = error.response?.status
-  if (status === 502 || status === 503 || status === 504) return true
-  if (!error.response && error.code !== 'ERR_CANCELED') return true
-  return false
-}
-
 // Response interceptor to handle errors
 api.interceptors.response.use(
   (response) => response,
   async (error) => {
     const status = error.response?.status
     const originalRequest = error.config
-
-    if (typeof window !== 'undefined' && isBackendInfrastructureFailure(error)) {
-      notifyBackendUnreachable()
-    }
 
     if (!originalRequest || typeof window === 'undefined' || status !== 401) {
       return Promise.reject(error)

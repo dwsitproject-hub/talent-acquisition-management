@@ -3,11 +3,19 @@ const path = require('path');
 const { getUploadStaticRoots } = require('../config/storage');
 const logger = require('../utils/logger');
 
+const INLINE_EXTENSIONS = new Set(['.pdf', '.png', '.jpg', '.jpeg']);
+
+function contentDispositionFor(fileName, ext, forceDownload) {
+  const raw = String(fileName || 'download').replace(/[\u0000-\u001F\u007F]/g, '').replace(/[\\/]/g, '_').trim() || 'download';
+  const safe = raw === '.' || raw === '..' || raw.includes('..') ? 'download' : raw;
+  const fallback = safe.replace(/[^\x20-\x7E]/g, '_').replace(/["\\]/g, '_');
+  const encoded = encodeURIComponent(safe).replace(/['()]/g, (ch) => `%${ch.charCodeAt(0).toString(16).toUpperCase()}`);
+  const disposition = forceDownload || !INLINE_EXTENSIONS.has(ext) ? 'attachment' : 'inline';
+  return `${disposition}; filename="${fallback}"; filename*=UTF-8''${encoded}`;
+}
+
 function contentDispositionAttachment(fileName) {
-  const raw = String(fileName || 'download').replace(/[\u0000-\u001F\u007F]/g, '').trim() || 'download';
-  const fallback = raw.replace(/[^\x20-\x7E]/g, '_').replace(/["\\]/g, '_');
-  const encoded = encodeURIComponent(raw).replace(/['()]/g, (ch) => `%${ch.charCodeAt(0).toString(16).toUpperCase()}`);
-  return `attachment; filename="${fallback}"; filename*=UTF-8''${encoded}`;
+  return contentDispositionFor(fileName, '', true);
 }
 
 async function lookupOriginalDownloadName(relativePath) {
@@ -114,19 +122,18 @@ async function serveUploadsAsync(req, res, next) {
     return res.status(404).json({
       success: false,
       message: 'Upload file not found',
-      path: rel,
-      roots: getUploadStaticRoots(),
     });
   }
 
   const rel = normalizeUploadRelativePath(requestPath);
   const downloadName = (await lookupOriginalDownloadName(rel)) || path.basename(found.full);
   const ext = path.extname(found.full).toLowerCase();
+  const forceDownload = req.query.download === '1' || req.query.download === 'true';
   res.setHeader('Content-Type', MIME_TYPES[ext] || 'application/octet-stream');
   if (found.size) {
     res.setHeader('Content-Length', found.size);
   }
-  res.setHeader('Content-Disposition', contentDispositionAttachment(downloadName));
+  res.setHeader('Content-Disposition', contentDispositionFor(downloadName, ext, forceDownload));
   res.setHeader('X-Content-Type-Options', 'nosniff');
 
   if (method === 'HEAD') {
@@ -154,4 +161,5 @@ module.exports = {
   resolveUploadedFile,
   normalizeUploadRelativePath,
   contentDispositionAttachment,
+  contentDispositionFor,
 };

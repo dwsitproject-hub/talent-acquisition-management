@@ -273,22 +273,20 @@ restore_to_rds() {
   compose_staging stop backend || true
 
   log "Safety dump of current staging RDS -> $staging_safety"
-  if docker run --rm --network "$(pg18_rds_net)" \
+  if ! docker run --rm --network "$(pg18_rds_net)" \
         -e PGSSLMODE="${PGSSLMODE:-require}" \
         -e DATABASE_URL="$url" \
         "$PG18_IMAGE" \
         sh -c 'pg_dump --dbname="$DATABASE_URL" --no-owner --no-acl --format=plain --encoding=UTF8' \
       | gzip -9 > "$staging_safety"; then
-    if [[ -s "$staging_safety" ]]; then
-      log "Staging RDS safety dump: $(du -h "$staging_safety" | cut -f1)"
-    else
-      warn "Staging RDS safety dump was empty. Continuing."
-      rm -f "$staging_safety"
-    fi
-  else
-    warn "Could not dump current staging RDS (empty DB is OK). Continuing."
     rm -f "$staging_safety"
+    die "Safety dump of current staging RDS failed. Aborting before schema drop."
   fi
+  if [[ ! -s "$staging_safety" ]]; then
+    rm -f "$staging_safety"
+    die "Safety dump of current staging RDS is empty. Aborting before schema drop."
+  fi
+  log "Staging RDS safety dump: $(du -h "$staging_safety" | cut -f1)"
 
   log "Recreating schema public on staging ApsaraDB..."
   run_pg18_rds "$url" 'psql "$DATABASE_URL" -v ON_ERROR_STOP=1' <<SQL
@@ -342,14 +340,17 @@ restore_to_docker() {
   compose_staging stop backend || true
 
   log "Safety dump of current staging -> $staging_safety"
-  if compose_staging_local_db exec -T postgres \
+  if ! compose_staging_local_db exec -T postgres \
       pg_dump -U "$DB_USER" --no-owner --no-acl --format=plain "$DB_NAME" \
       | gzip -9 > "$staging_safety"; then
-    log "Staging safety dump: $(du -h "$staging_safety" | cut -f1)"
-  else
-    warn "Could not dump current staging (empty DB is OK). Continuing."
     rm -f "$staging_safety"
+    die "Safety dump of current staging failed. Aborting before DROP DATABASE."
   fi
+  if [[ ! -s "$staging_safety" ]]; then
+    rm -f "$staging_safety"
+    die "Safety dump of current staging is empty. Aborting before DROP DATABASE."
+  fi
+  log "Staging safety dump: $(du -h "$staging_safety" | cut -f1)"
 
   log "Terminating leftover connections and recreating $DB_NAME..."
   compose_staging_local_db exec -T postgres \

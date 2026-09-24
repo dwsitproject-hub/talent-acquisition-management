@@ -5,7 +5,7 @@ import { useModalEscape } from '@/hooks/useModalEscape'
 import { useAuth } from '@/contexts/AuthContext'
 import { XMarkIcon, CloudArrowUpIcon, DocumentArrowUpIcon, XCircleIcon } from '@heroicons/react/24/outline'
 import { Candidate } from '@/types'
-import { MasterDivisionAPI, resolveDownloadFileName, resolvePublicUploadUrl } from '@/lib/api'
+import { MasterDivisionAPI, fetchAuthorizedUpload, resolveDownloadFileName, resolvePublicUploadUrl } from '@/lib/api'
 import {
   loadSelectablePositionOptions,
   filterPositionOptionsByDivisions,
@@ -321,7 +321,7 @@ export default function EditCandidateModal({ isOpen, onClose, onSave, candidate 
 
     setDownloadingFileId(file.id)
     try {
-      const response = await fetch(resolveFileUrl(file.url))
+      const response = await fetchAuthorizedUpload(resolveFileUrl(file.url), { download: true })
       if (!response.ok) {
         throw new Error(`Server responded with ${response.status} ${response.statusText}`)
       }

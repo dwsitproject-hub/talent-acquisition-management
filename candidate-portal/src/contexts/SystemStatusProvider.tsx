@@ -9,10 +9,7 @@ import React, {
   useState,
 } from 'react'
 import UnderMaintenanceScreen from '@/components/UnderMaintenanceScreen'
-import {
-  BACKEND_UNREACHABLE_EVENT,
-  checkBackendHealth,
-} from '@/lib/backendHealth'
+import { checkBackendHealth } from '@/lib/backendHealth'
 
 type SystemStatus = 'checking' | 'online' | 'offline'
 
@@ -38,8 +35,12 @@ export function SystemStatusProvider({ children }: { children: React.ReactNode }
     const controller = new AbortController()
     abortRef.current = controller
 
-    const healthy = await checkBackendHealth(controller.signal)
+    let healthy = await checkBackendHealth(controller.signal)
     if (controller.signal.aborted) return
+    if (!healthy) {
+      healthy = await checkBackendHealth(controller.signal)
+      if (controller.signal.aborted) return
+    }
 
     setStatus(healthy ? 'online' : 'offline')
   }, [])
@@ -71,25 +72,16 @@ export function SystemStatusProvider({ children }: { children: React.ReactNode }
     return () => window.clearInterval(id)
   }, [status, runCheck])
 
-  useEffect(() => {
-    const onUnreachable = () => setStatus('offline')
-    window.addEventListener(BACKEND_UNREACHABLE_EVENT, onUnreachable)
-    return () => window.removeEventListener(BACKEND_UNREACHABLE_EVENT, onUnreachable)
-  }, [])
-
   const value: SystemStatusContextValue = { status, retryHealthCheck }
-
-  if (status === 'offline') {
-    return (
-      <SystemStatusContext.Provider value={value}>
-        <UnderMaintenanceScreen onRetry={() => void retryHealthCheck()} isRetrying={isRetrying} />
-      </SystemStatusContext.Provider>
-    )
-  }
 
   return (
     <SystemStatusContext.Provider value={value}>
       {children}
+      {status === 'offline' ? (
+        <div className="fixed inset-0 z-[100]">
+          <UnderMaintenanceScreen onRetry={() => void retryHealthCheck()} isRetrying={isRetrying} />
+        </div>
+      ) : null}
     </SystemStatusContext.Provider>
   )
 }

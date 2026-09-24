@@ -9,7 +9,8 @@ const fileUpload = require('express-fileupload');
 const logger = require('./utils/logger');
 const { errorHandler, notFoundHandler } = require('./middleware/errorHandler');
 const { serveUploads } = require('./middleware/serveUploads');
-const { generalLimiter } = require('./middleware/rateLimiter');
+const { authenticate } = require('./middleware/auth');
+const { generalLimiter, downloadLimiter } = require('./middleware/rateLimiter');
 const auditContextMiddleware = require('./middleware/auditContext');
 
 // Import routes
@@ -118,8 +119,9 @@ const corsOptions = {
 };
 app.use(cors(corsOptions));
 
-// Serve NAS files before body parsers / fileUpload so HEAD/GET /uploads always hit this.
-app.use('/uploads', serveUploads);
+// Authenticated, rate-limited file streaming. Mounted before body parsers so
+// HEAD/GET /uploads is not buffered by fileUpload.
+app.use('/uploads', downloadLimiter, authenticate, serveUploads);
 
 // Body parsing middleware
 app.use(express.json({ limit: '10mb' }));

@@ -55,28 +55,18 @@ function getStoragePath(...segments) {
 
 /**
  * Directories Express should serve under /uploads.
- * Includes `{root}/dev/TAS` so files written when the mount was already TAS
- * (File Station: APPs/TAS/dev/TAS/candidates) still download at /uploads/candidates/...
+ * Always the TAS storage root only — never a parent share.
+ * Set STORAGE_UPLOAD_INCLUDE_NESTED=true to also serve `{root}/dev/TAS`
+ * for files left over from an older mount layout.
  */
 function getUploadStaticRoots() {
   const root = getStorageRoot();
   const roots = [root];
-  const nested = path.join(root, 'dev', 'TAS');
-  if (nested !== root) {
-    roots.push(nested);
-  }
-  const mountRoot = trimEnv('STORAGE_LOCAL_PATH') || trimEnv('STORAGE_SYNOLOGY_ROOT');
-  if (mountRoot) {
-    const resolved = resolveConfiguredPath(mountRoot);
-    if (resolved && !roots.includes(resolved)) {
-      roots.push(resolved);
-    }
-  }
-  const extra = trimEnv('STORAGE_UPLOAD_FALLBACK_ROOT');
-  if (extra) {
-    const resolved = resolveConfiguredPath(extra);
-    if (resolved && !roots.includes(resolved)) {
-      roots.push(resolved);
+  const includeNested = /^(1|true|yes)$/i.test(trimEnv('STORAGE_UPLOAD_INCLUDE_NESTED'));
+  if (includeNested) {
+    const nested = path.join(root, 'dev', 'TAS');
+    if (nested !== root && !roots.includes(nested)) {
+      roots.push(nested);
     }
   }
   return roots;

@@ -19,7 +19,6 @@ import TestModal from '@/components/TestModal'
 import { PlusIcon, MagnifyingGlassIcon, LinkIcon } from '@heroicons/react/24/outline'
 import { Candidate, CandidateStatus, CandidateFile } from '@/types'
 import { saveCandidateLink } from '@/utils/candidateLink'
-import { matchesTokenizedSearch } from '@/utils/search'
 import { CandidatesAPI, MenuAccessAPI } from '@/lib/api'
 import BulkUploadModal from '@/components/BulkUploadModal'
 import { getCandidateDivisions, getCandidateYearsOfExperience, getCandidateSkills, parseLanguagesData } from '@/utils/candidateProfileShape'
@@ -395,6 +394,7 @@ export default function CandidatesPage() {
             {
               search: searchTerm.trim() || undefined,
               skills: skillsFilter !== 'all' ? [skillsFilter] : undefined,
+              sortBy: 'name',
             },
             { page: fetchPage, limit }
           )
@@ -418,6 +418,7 @@ export default function CandidatesPage() {
           {
             search: searchTerm.trim() || undefined,
             skills: skillsFilter !== 'all' ? [skillsFilter] : undefined,
+            sortBy: 'name',
           },
           { page, limit: pageSize }
         )
@@ -436,17 +437,6 @@ export default function CandidatesPage() {
       setCandidates([])
       setServerListTotal(0)
       setServerTotalPages(1)
-      if (typeof window !== 'undefined') {
-        try {
-          const savedCandidates = localStorage.getItem('candidates')
-          if (savedCandidates) {
-            const parsedCandidates = JSON.parse(savedCandidates)
-            setCandidates(parsedCandidates)
-          }
-        } catch (e) {
-          console.warn('Could not load candidates from localStorage:', e)
-        }
-      }
     } finally {
       setCandidatesLoading(false)
     }
@@ -526,16 +516,6 @@ export default function CandidatesPage() {
     () =>
       candidates
         .filter(candidate => {
-          if (needsFullCandidateDataset) {
-            const matchesSearch = matchesTokenizedSearch(searchTerm, [
-              candidate.personalInfo.firstName,
-              candidate.personalInfo.lastName,
-              `${candidate.personalInfo.firstName} ${candidate.personalInfo.lastName}`,
-              candidate.contactInfo.email,
-            ])
-            if (!matchesSearch) return false
-          }
-
           const matchesStatus = statusFilter === 'all' || candidate.status === statusFilter
 
           const years = candidate.professionalInfo.experience ?? 0
@@ -546,20 +526,10 @@ export default function CandidatesPage() {
             (experienceFilter === '6-10' && years >= 6 && years <= 10) ||
             (experienceFilter === '10+' && years > 10)
 
-          const matchesSkill =
-            needsFullCandidateDataset &&
-            (skillsFilter === 'all' ||
-              getCandidateSkills(candidate).some(
-                s => s.trim().toLowerCase() === skillsFilter.toLowerCase()
-              ))
-
-          if (needsFullCandidateDataset && skillsFilter !== 'all' && !matchesSkill) {
-            return false
-          }
-
           return matchesStatus && matchesExperience
         })
         .sort((a, b) => {
+          if (!needsFullCandidateDataset) return 0
           const nameA = `${a.personalInfo.firstName || ''} ${a.personalInfo.lastName || ''}`.trim().toLowerCase()
           const nameB = `${b.personalInfo.firstName || ''} ${b.personalInfo.lastName || ''}`.trim().toLowerCase()
           return nameA.localeCompare(nameB)
@@ -1340,11 +1310,7 @@ export default function CandidatesPage() {
                         </td>
                       </tr>
                     ) : null}
-                    {listMeta.pagedRows.map((candidate) => {
-                      console.log('Candidate data:', candidate)
-                      console.log('Position Applied For:', (candidate as any).positionAppliedFor)
-                      console.log('Professional Info:', candidate.professionalInfo)
-                      return (
+                    {listMeta.pagedRows.map((candidate) => (
                       <tr key={candidate.id}>
                         <td className="whitespace-nowrap py-4 pl-4 pr-3 text-sm sm:pl-6">
                           <div className="flex items-center">
@@ -1463,8 +1429,7 @@ export default function CandidatesPage() {
                           </div>
                         </td>
                       </tr>
-                      )
-                    })}
+                    ))}
                   </tbody>
                 </table>
               </div>
