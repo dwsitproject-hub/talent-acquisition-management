@@ -88,6 +88,16 @@ async function startServer() {
     process.exit(1);
   }
 
+  const { getStorageRoot, getUploadStaticRoots, ensureStorageRoot } = require('./config/storage');
+  try {
+    const storageRoot = ensureStorageRoot();
+    logger.info(`Document storage root: ${storageRoot}`);
+    logger.info(`Document download roots: ${getUploadStaticRoots().join(', ')}`);
+  } catch (error) {
+    logger.error(`Failed to initialize document storage at ${getStorageRoot()}: ${error.message}`);
+    logger.error('Uploads will fail until STORAGE_* env and the Synology bind mount are correct');
+  }
+
   const server = app.listen(PORT, '0.0.0.0', () => {
     logger.info(`Server running on port ${PORT} in ${process.env.NODE_ENV} mode`);
     logger.info(`API available at: http://0.0.0.0:${PORT}/api`);

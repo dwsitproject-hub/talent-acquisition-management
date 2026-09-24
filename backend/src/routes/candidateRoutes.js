@@ -278,6 +278,7 @@ router.get(
       search: req.query.search,
       skills: req.query.skills ? req.query.skills.split(',') : undefined,
       minScore: req.query.minScore,
+      sortBy: req.query.sortBy,
       forFptkId: req.query.forFptkId || undefined,
       excludeHired: req.query.excludeHired,
     };

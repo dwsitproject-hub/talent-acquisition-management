@@ -1,4 +1,5 @@
 const prisma = require('../config/database');
+const { getStoragePath } = require('../config/storage');
 const { $Enums } = require('@prisma/client');
 const logger = require('../utils/logger');
 const { buildHrbpFptkFilterFromUser, buildHrbpApplicationFptkFilterFromUser } = require('../utils/hrbpScope');
@@ -859,7 +860,7 @@ async function createFPTK(data, creatorId) {
   if (file && file.name) {
     const path = require('path');
     const fs = require('fs');
-    const uploadDir = path.join(__dirname, '../../uploads/fptk');
+    const uploadDir = getStoragePath('fptk');
     
     // Ensure upload directory exists
     if (!fs.existsSync(uploadDir)) {
@@ -1603,7 +1604,7 @@ async function updateFPTK(fptkId, data, updaterId) {
   if (file && file.name) {
     const path = require('path');
     const fs = require('fs');
-    const uploadDir = path.join(__dirname, '../../uploads/fptk');
+    const uploadDir = getStoragePath('fptk');
     
     if (!fs.existsSync(uploadDir)) {
       fs.mkdirSync(uploadDir, { recursive: true });

@@ -5,11 +5,12 @@ const morgan = require('morgan');
 const cookieParser = require('cookie-parser');
 const compression = require('compression');
 const fileUpload = require('express-fileupload');
-const path = require('path');
 
 const logger = require('./utils/logger');
 const { errorHandler, notFoundHandler } = require('./middleware/errorHandler');
-const { generalLimiter } = require('./middleware/rateLimiter');
+const { serveUploads } = require('./middleware/serveUploads');
+const { authenticate } = require('./middleware/auth');
+const { generalLimiter, downloadLimiter } = require('./middleware/rateLimiter');
 const auditContextMiddleware = require('./middleware/auditContext');
 
 // Import routes
@@ -119,6 +120,10 @@ const corsOptions = {
 };
 app.use(cors(corsOptions));
 
+// Authenticated, rate-limited file streaming. Mounted before body parsers so
+// HEAD/GET /uploads is not buffered by fileUpload.
+app.use('/uploads', downloadLimiter, authenticate, serveUploads);
+
 // Body parsing middleware
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
@@ -144,9 +149,6 @@ if (process.env.NODE_ENV === 'development') {
     },
   }));
 }
-
-// Static files (for uploaded documents)
-app.use('/uploads', express.static(path.join(__dirname, '../uploads')));
 
 // Health check endpoint (no auth required)
 app.get('/health', (req, res) => {

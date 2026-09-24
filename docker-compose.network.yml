@@ -90,10 +90,14 @@ services:
       SMTP_FROM_EMAIL: ${SMTP_FROM_EMAIL:-}
       SMTP_FROM_NAME: ${SMTP_FROM_NAME:-}
       SMTP_REJECT_UNAUTHORIZED: ${SMTP_REJECT_UNAUTHORIZED:-true}
+      # Synology production: CIFS //.../APPs/TAS mounted at /mnt/synology-tas
+      STORAGE_TYPE: ${STORAGE_TYPE:-local}
+      STORAGE_LOCAL_PATH: ${STORAGE_LOCAL_PATH:-/mnt/synology-tas}
     ports:
       - "4000:4000"
     volumes:
-      - ./backend/uploads:/app/uploads
+      # Host NAS share → container path used by STORAGE_LOCAL_PATH. Recreate the container after changing this.
+      - ${STORAGE_HOST_MOUNT:-/mnt/synology-tas}:${STORAGE_LOCAL_PATH:-/mnt/synology-tas}
       - ./backend/logs:/app/logs
     depends_on:
       postgres:

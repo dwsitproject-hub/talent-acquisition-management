@@ -22,29 +22,115 @@ export function getApiBaseUrl(): string {
 
 /**
  * Origin for uploaded files such as `/uploads/fptk/...` (no `/api` suffix).
- * Production is reverse-proxied on 80/443, so a hardcoded :4000 breaks downloads.
+ *
+ * In the browser this is always the current page origin so downloads stay
+ * same-origin (browser → this frontend → backend → Synology). The frontend
+ * `/uploads` route proxies to UPLOADS_PROXY_TARGET on the server side.
+ *
+ * NEXT_PUBLIC_FILE_BASE_URL is an optional override and should stay unset
+ * unless you intentionally want the browser to call another host.
  */
 export function getPublicFileBaseUrl(): string {
-  if (typeof window !== 'undefined') {
-    const port = window.location.port
-    if (!port || port === '80' || port === '443') {
-      return window.location.origin
-    }
+  const fileBase =
+    typeof process !== 'undefined' ? process.env?.NEXT_PUBLIC_FILE_BASE_URL : undefined
+  if (fileBase) {
+    return fileBase.replace(/\/+$/, '')
   }
-
+  if (typeof window !== 'undefined') {
+    return window.location.origin
+  }
   const apiBase = getApiBaseUrl().replace(/\/api\/?$/i, '').replace(/\/+$/, '')
   try {
-    const url = new URL(apiBase)
-    if (url.protocol === 'https:' && (url.port === '4000' || url.port === '443')) {
-      url.port = ''
-    }
-    if (url.protocol === 'http:' && url.port === '80') {
-      url.port = ''
-    }
-    return url.origin
+    return new URL(apiBase).origin
   } catch {
     return apiBase
   }
+}
+
+/** Use the original upload name from Content-Disposition when the server sends it. */
+export function filenameFromContentDisposition(header?: string | null): string | null {
+  if (!header) return null
+  const utf = /filename\*\s*=\s*(?:UTF-8'')?([^;]+)/i.exec(header)
+  if (utf?.[1]) {
+    try {
+      return decodeURIComponent(utf[1].trim().replace(/^"(.*)"$/, '$1'))
+    } catch {
+      // keep looking at the ASCII filename=
+    }
+  }
+  const quoted = /filename\s*=\s*"((?:\\.|[^"])*)"/i.exec(header)
+  if (quoted?.[1]) return quoted[1].replace(/\\"/g, '"')
+  const bare = /filename\s*=\s*([^;]+)/i.exec(header)
+  return bare?.[1]?.trim().replace(/^"(.*)"$/, '$1') || null
+}
+
+export function resolveDownloadFileName(
+  file: { name?: string },
+  response?: Response
+): string {
+  return filenameFromContentDisposition(response?.headers.get('content-disposition'))
+    || file.name
+    || 'download'
+}
+
+/** Point stored document URLs at the origin that actually serves /uploads. */
+export function resolvePublicUploadUrl(url: string): string {
+  if (!url) return url
+  try {
+    const parsed = new URL(url, typeof window !== 'undefined' ? window.location.origin : 'http://localhost')
+    if (!parsed.pathname.startsWith('/uploads/')) {
+      if (typeof window !== 'undefined' && window.location.protocol === 'https:' && url.startsWith('http://')) {
+        return `https://${url.slice('http://'.length)}`
+      }
+      return url
+    }
+    let href = `${getPublicFileBaseUrl().replace(/\/+$/, '')}${parsed.pathname}${parsed.search}`
+    if (typeof window !== 'undefined' && window.location.protocol === 'https:' && href.startsWith('http://')) {
+      href = `https://${href.slice('http://'.length)}`
+    }
+    return href
+  } catch {
+    return url
+  }
+}
+
+function readAuthToken(): string | null {
+  if (typeof window === 'undefined') return null
+  try {
+    return localStorage.getItem('authToken')
+  } catch {
+    return null
+  }
+}
+
+/** Fetch a stored file with the staff access token. Pass download to force attachment. */
+export async function fetchAuthorizedUpload(url: string, options?: { download?: boolean }): Promise<Response> {
+  const resolved = resolvePublicUploadUrl(url)
+  let target = resolved
+  if (options?.download) {
+    try {
+      const parsed = new URL(resolved, typeof window !== 'undefined' ? window.location.origin : 'http://localhost')
+      parsed.searchParams.set('download', '1')
+      target = parsed.toString()
+    } catch {
+      target = resolved.includes('?') ? `${resolved}&download=1` : `${resolved}?download=1`
+    }
+  }
+
+  const send = (token: string | null) => fetch(target, {
+    headers: token ? { Authorization: `Bearer ${token}` } : {},
+    credentials: 'include',
+  })
+
+  const firstToken = readAuthToken()
+  const response = await send(firstToken)
+  if (response.status !== 401 || typeof window === 'undefined') {
+    return response
+  }
+
+  const refreshed = await refreshAccessToken()
+  if (!refreshed) return response
+  return send(refreshed)
 }
 
 /** Full browser URL for starting DWS Hub OIDC login (not under axios base path quirks). */

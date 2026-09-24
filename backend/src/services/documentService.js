@@ -3,6 +3,7 @@ const fs = require('fs/promises');
 const { v4: uuidv4 } = require('uuid');
 
 const prisma = require('../config/database');
+const { getStoragePath } = require('../config/storage');
 const logger = require('../utils/logger');
 
 const ALLOWED_EXTENSIONS = ['.pdf', '.doc', '.docx', '.jpg', '.jpeg', '.png', '.xlsx', '.xls'];
@@ -18,8 +19,12 @@ const ALLOWED_MIME_TYPES = new Set([
 ]);
 
 function sanitizeFileName(name) {
-  const baseName = path.basename(name);
-  return baseName.replace(/[^a-zA-Z0-9.\-_]/g, '_');
+  const baseName = path.basename(String(name || 'document'));
+  const cleaned = baseName.replace(/[\u0000-\u001F\u007F\\/]/g, '').trim();
+  if (!cleaned || cleaned === '.' || cleaned === '..' || cleaned.includes('..')) {
+    return 'document';
+  }
+  return cleaned;
 }
 
 async function ensureDirectory(dirPath) {
@@ -90,8 +95,7 @@ async function uploadCandidateDocument(candidateId, file, options = {}) {
     throw new Error('Candidate not found');
   }
 
-  const uploadsRoot = path.join(__dirname, '../../uploads');
-  const candidateDirectory = path.join(uploadsRoot, 'candidates', candidateId);
+  const candidateDirectory = getStoragePath('candidates', candidateId);
   
   try {
     await ensureDirectory(candidateDirectory);

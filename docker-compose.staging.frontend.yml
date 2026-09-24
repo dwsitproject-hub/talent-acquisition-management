@@ -2,7 +2,7 @@
 # Does NOT run backend, postgres, or redis.
 # Usage:
 #   cp .env.staging.frontend.example .env.staging.frontend
-#   # Set BACKEND_UPSTREAM_HOST in nginx config / env notes before first start
+#   # Set BACKEND_UPSTREAM and UPLOADS_PROXY_TARGET in .env.staging.frontend before first start
 #   docker compose -f docker-compose.staging.frontend.yml --env-file .env.staging.frontend up -d --build
 
 services:
@@ -14,11 +14,15 @@ services:
       args:
         NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL}
         NEXT_PUBLIC_OIDC_ENABLED: ${NEXT_PUBLIC_OIDC_ENABLED:-false}
+        NEXT_PUBLIC_FILE_BASE_URL: ${NEXT_PUBLIC_FILE_BASE_URL:-}
     container_name: tas_staging_frontend
     restart: unless-stopped
     environment:
       NODE_ENV: ${NODE_ENV:-staging}
       NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL}
+      NEXT_PUBLIC_FILE_BASE_URL: ${NEXT_PUBLIC_FILE_BASE_URL:-}
+      # Server-side proxy target for /uploads (browser never talks to this host)
+      UPLOADS_PROXY_TARGET: ${UPLOADS_PROXY_TARGET:-}
       NODE_OPTIONS: ${FRONTEND_NODE_OPTIONS:---max-old-space-size=512}
       HOSTNAME: 0.0.0.0
       PORT: ${FRONTEND_PORT}
@@ -81,12 +85,17 @@ services:
     image: nginx:alpine
     container_name: tas_staging_nginx
     restart: unless-stopped
-    # Host ports from .env; container listens on 80/443 per nginx.network.conf
+    # Host ports from .env; container listens on 80 per nginx.staging.conf
+    # (staging config is HTTP-only, so no SSL certs are required)
+    environment:
+      BACKEND_UPSTREAM: ${BACKEND_UPSTREAM:?Set BACKEND_UPSTREAM to the staging API host:port}
+      NGINX_ENVSUBST_OUTPUT_DIR: /etc/nginx
     ports:
       - "${HTTP_HOST_PORT}:80"
       - "${HTTPS_HOST_PORT}:443"
     volumes:
-      - ./nginx/nginx.network.conf:/etc/nginx/nginx.conf:ro
+      - ./nginx/nginx.staging.conf:/etc/nginx/templates/nginx.conf.template:ro
+      - ./nginx/maintenance.html:/etc/nginx/maintenance/maintenance.html:ro
       - ./ssl:/etc/nginx/ssl:ro
     depends_on:
       - frontend

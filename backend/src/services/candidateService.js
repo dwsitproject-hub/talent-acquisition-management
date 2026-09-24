@@ -1145,7 +1145,12 @@ async function searchCandidates(filters, pagination, user = null) {
           },
         },
       },
-      orderBy: { createdAt: 'desc' },
+      orderBy: filters.sortBy === 'name'
+        ? [
+            { user: { firstName: 'asc' } },
+            { user: { lastName: 'asc' } },
+          ]
+        : { createdAt: 'desc' },
     }),
     prisma.candidate.count({ where: activeWhere }),
   ]);

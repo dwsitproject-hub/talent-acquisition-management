@@ -5,7 +5,7 @@ import { useModalEscape } from '@/hooks/useModalEscape'
 import { useAuth } from '@/contexts/AuthContext'
 import { XMarkIcon, CloudArrowUpIcon, DocumentArrowUpIcon, XCircleIcon } from '@heroicons/react/24/outline'
 import { Candidate } from '@/types'
-import { MasterDivisionAPI } from '@/lib/api'
+import { MasterDivisionAPI, fetchAuthorizedUpload, resolveDownloadFileName, resolvePublicUploadUrl } from '@/lib/api'
 import {
   loadSelectablePositionOptions,
   filterPositionOptionsByDivisions,
@@ -307,12 +307,7 @@ export default function EditCandidateModal({ isOpen, onClose, onSave, candidate 
   // API_BASE_URL misconfigured without SSL). Loading that from an https:// page gets hard
   // blocked by the browser as mixed content. Since this app is always served over the same
   // host, it's safe to upgrade the scheme to match the current page before fetching.
-  const resolveFileUrl = (url: string): string => {
-    if (typeof window !== 'undefined' && window.location.protocol === 'https:' && url.startsWith('http://')) {
-      return `https://${url.slice('http://'.length)}`
-    }
-    return url
-  }
+  const resolveFileUrl = (url: string): string => resolvePublicUploadUrl(url)
 
   // Opening `file.url` directly via a plain <a target="_blank"> silently fails when the
   // file is missing/unreachable on the server: the browser briefly opens a blank tab and
@@ -326,7 +321,7 @@ export default function EditCandidateModal({ isOpen, onClose, onSave, candidate 
 
     setDownloadingFileId(file.id)
     try {
-      const response = await fetch(resolveFileUrl(file.url))
+      const response = await fetchAuthorizedUpload(resolveFileUrl(file.url), { download: true })
       if (!response.ok) {
         throw new Error(`Server responded with ${response.status} ${response.statusText}`)
       }
@@ -334,7 +329,7 @@ export default function EditCandidateModal({ isOpen, onClose, onSave, candidate 
       const blob = await response.blob()
       const link = document.createElement('a')
       link.href = URL.createObjectURL(blob)
-      link.download = file.name || 'download'
+      link.download = resolveDownloadFileName(file, response)
       document.body.appendChild(link)
       link.click()
       document.body.removeChild(link)

@@ -1,10 +1,17 @@
-# Staging — Backend server only (PostgreSQL + Redis + API)
-# Usage:
-#   cp .env.staging.backend.example .env.staging.backend
-#   docker compose -f docker-compose.staging.backend.yml --env-file .env.staging.backend up -d --build
+# Staging — Backend server (Redis + API). PostgreSQL lives on ApsaraDB RDS after cutover.
+#
+# Default (ApsaraDB): requires DATABASE_URL in the env file.
+#   docker compose -f docker-compose.staging.backend.yml --env-file .env.staging.backend -p tas-staging up -d
+#
+# Before the RDS cutover, or to roll back to local Postgres 15, add the profile:
+#   docker compose -f docker-compose.staging.backend.yml --env-file .env.staging.backend -p tas-staging --profile local-db up -d
+# and set DATABASE_URL host to `postgres` (sslmode=disable). Keep the volume for >= 7 days after cutover.
+#
+# Encode special characters in DATABASE_URL via: ./scripts/setup-database-url.sh .env.staging.backend
 
 services:
   postgres:
+    profiles: ["local-db"]
     image: postgres:15-alpine
     container_name: tas_staging_postgres
     restart: unless-stopped
@@ -62,7 +69,8 @@ services:
     environment:
       NODE_ENV: ${NODE_ENV:-staging}
       PORT: ${BACKEND_PORT}
-      DATABASE_URL: postgresql://${POSTGRES_USER:-tas_user}:${POSTGRES_PASSWORD}@postgres:${POSTGRES_PORT}/${POSTGRES_DB:-tas_db}?schema=public&pool_timeout=0&connection_limit=20
+      # ApsaraDB RDS (or local postgres when --profile local-db). Must be URL-encoded.
+      DATABASE_URL: ${DATABASE_URL}
       REDIS_URL: redis://:${REDIS_PASSWORD}@redis:${REDIS_PORT}
       REDIS_PASSWORD: ${REDIS_PASSWORD}
       JWT_SECRET: ${JWT_SECRET}
@@ -83,7 +91,9 @@ services:
       PRISMA_MIGRATE_ON_START: ${PRISMA_MIGRATE_ON_START:-true}
       MAX_FILE_SIZE: ${MAX_FILE_SIZE:-10485760}
       ALLOWED_FILE_TYPES: ${ALLOWED_FILE_TYPES:-pdf,doc,docx,jpg,jpeg,png,xls,xlsx}
-      UPLOAD_DIR: ${UPLOAD_DIR:-./uploads}
+      # Synology staging: CIFS //.../APPs/dev/TAS mounted at /mnt/synology-tas (same pattern as PCT)
+      STORAGE_TYPE: ${STORAGE_TYPE:-local}
+      STORAGE_LOCAL_PATH: ${STORAGE_LOCAL_PATH:-/mnt/synology-tas}
       # DWS Hub OIDC — routes stay 404 until all three required vars are set
       OIDC_DISCOVERY_URL: ${OIDC_DISCOVERY_URL:-}
       OIDC_CLIENT_ID: ${OIDC_CLIENT_ID:-}
@@ -103,11 +113,10 @@ services:
     ports:
       - "${BACKEND_HOST_PORT}:${BACKEND_PORT}"
     volumes:
-      - ./backend/uploads:/app/uploads
+      # Host NAS share → container path used by STORAGE_LOCAL_PATH. Recreate the container after changing this.
+      - ${STORAGE_HOST_MOUNT:-/mnt/synology-tas}:${STORAGE_LOCAL_PATH:-/mnt/synology-tas}
       - ./backend/logs:/app/logs
     depends_on:
-      postgres:
-        condition: service_healthy
       redis:
         condition: service_healthy
     networks:

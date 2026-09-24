@@ -7,7 +7,7 @@ import { XMarkIcon } from '@heroicons/react/24/outline'
 import { FPTK, Candidate } from '@/types'
 import ViewCandidateModal from './ViewCandidateModal'
 import ApplicationHistoryModal from './ApplicationHistoryModal'
-import { CandidatesAPI, getPublicFileBaseUrl } from '@/lib/api'
+import { CandidatesAPI, fetchAuthorizedUpload, resolveDownloadFileName } from '@/lib/api'
 import { fetchApplicationsForFptk } from '@/utils/mapFptkApplication'
 import { mapApiCandidate } from '@/app/candidates/page'
 import { mapApplicationStatusToUi } from '@/utils/applicationStatusUi'
@@ -166,23 +166,47 @@ export default function ViewJobPostingModal({ isOpen, onClose, jobPosting, onSta
                     <label style={{ fontSize: '14px', fontWeight: '500', color: '#6b7280' }}>FPTK File</label>
                     <div style={{ marginTop: '4px' }}>
                       {(jobPosting as any).fptkFilePath ? (
-                        <a
-                          href={`${getPublicFileBaseUrl()}${(jobPosting as any).fptkFilePath}`}
-                          target="_blank"
-                          rel="noopener noreferrer"
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const filePath = (jobPosting as any).fptkFilePath as string
+                            const fileName = (jobPosting as any).fptkFileName as string | undefined
+                            void (async () => {
+                              try {
+                                const response = await fetchAuthorizedUpload(filePath, { download: true })
+                                if (!response.ok) {
+                                  throw new Error(`Server responded with ${response.status}`)
+                                }
+                                const blob = await response.blob()
+                                const link = document.createElement('a')
+                                link.href = URL.createObjectURL(blob)
+                                link.download = resolveDownloadFileName({ name: fileName }, response)
+                                document.body.appendChild(link)
+                                link.click()
+                                document.body.removeChild(link)
+                                URL.revokeObjectURL(link.href)
+                              } catch (error) {
+                                console.error('Failed to download FPTK file:', error)
+                                alert('Unable to download the FPTK file. It may have been moved or deleted.')
+                              }
+                            })()
+                          }}
                           style={{
                             display: 'inline-flex',
                             alignItems: 'center',
                             gap: '6px',
                             fontSize: '14px',
                             color: '#2563eb',
-                            textDecoration: 'none',
-                            fontWeight: '500'
+                            fontWeight: '500',
+                            background: 'none',
+                            border: 'none',
+                            padding: 0,
+                            cursor: 'pointer'
                           }}
                         >
                           <span>📄</span>
                           <span>{(jobPosting as any).fptkFileName || 'Download FPTK File'}</span>
-                        </a>
+                        </button>
                       ) : (jobPosting as any).fptkFileName ? (
                         <p style={{ fontSize: '14px', color: '#10b981', margin: 0 }}>
                           ✓ {(jobPosting as any).fptkFileName}

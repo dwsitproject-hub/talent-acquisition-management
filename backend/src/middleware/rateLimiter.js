@@ -119,10 +119,26 @@ const registrationLimiter = rateLimit({
   legacyHeaders: false,
 });
 
+/**
+ * Document download limiter. Separate store from generalLimiter so file
+ * downloads do not consume the /api request budget.
+ */
+const downloadLimiter = rateLimit({
+  windowMs: parseInt(process.env.RATE_LIMIT_WINDOW_MS) || 15 * 60 * 1000,
+  max: parseInt(process.env.DOWNLOAD_RATE_LIMIT_MAX) || 300,
+  message: {
+    success: false,
+    message: 'Too many file downloads, please try again later',
+  },
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+
 module.exports = {
   generalLimiter,
   loginLimiter,
   uploadLimiter,
+  downloadLimiter,
   aiLimiter,
   passwordResetLimiter,
   registrationLimiter,
