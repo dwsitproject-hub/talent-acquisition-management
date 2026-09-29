@@ -157,6 +157,10 @@ function setCachedSummary(key, data) {
   _summaryCache.set(key, { ts: Date.now(), data });
 }
 
+function invalidateSummaryCache() {
+  _summaryCache.clear();
+}
+
 /**
  * @route   GET /api/fptk/summary-by-position
  * @desc    Summary by Position (pre-aggregated application counts per FPTK)
@@ -378,7 +382,8 @@ router.put(
     }
     
     const fptk = await fptkService.updateFPTK(req.params.id, data, req.user.id);
-    
+    invalidateSummaryCache();
+
     res.json({
       success: true,
       message: 'FPTK updated successfully',

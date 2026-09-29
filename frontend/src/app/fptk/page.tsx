@@ -34,6 +34,11 @@ import {
 } from '@/utils/applicationStatusUi'
 import { mapInterviewToUiFields } from '@/utils/mapFptkApplication'
 import { resolveFptkEditPermissions, resolveRoleNameFromUser } from '@/utils/fptkEditPermissions'
+import {
+  compareFptkPositionNameAsc,
+  isFptkOnBoard,
+  sortFptksOpenFirstOnBoardLast,
+} from '@/utils/fptkOnBoard'
 
 const DEFAULT_CURRENT_STATUS = 'Pending FKTK'
 
@@ -1115,29 +1120,42 @@ function FPTKPageContent() {
   const canCreate = (perms.create || []).includes(roleName) || (perms.create || []).includes('*')
   const canDelete = backendRole === 'SUPER_ADMIN'
 
-  const filteredFptks = fptks
-    .sort((a, b) => {
-      if (!sortBy) return 0
-      
-      let aValue = ''
-      let bValue = ''
-      
-      if (sortBy === 'location') {
-        aValue = (a.location || '').toLowerCase()
-        bValue = (b.location || '').toLowerCase()
-      } else if (sortBy === 'areaDetail') {
-        aValue = ((a as any).areaDetail || '').toLowerCase()
-        bValue = ((b as any).areaDetail || '').toLowerCase()
-      } else if (sortBy === 'requestDate') {
-        const aTs = a.requestDate ? new Date(a.requestDate).getTime() : 0
-        const bTs = b.requestDate ? new Date(b.requestDate).getTime() : 0
-        return sortOrder === 'asc' ? aTs - bTs : bTs - aTs
-      }
-      
-      if (aValue < bValue) return sortOrder === 'asc' ? -1 : 1
-      if (aValue > bValue) return sortOrder === 'asc' ? 1 : -1
-      return 0
+  const compareWithinGroup = (a: FPTK, b: FPTK) => {
+    if (!sortBy) return compareFptkPositionNameAsc(a, b)
+
+    let aValue = ''
+    let bValue = ''
+
+    if (sortBy === 'location') {
+      aValue = (a.location || '').toLowerCase()
+      bValue = (b.location || '').toLowerCase()
+    } else if (sortBy === 'areaDetail') {
+      aValue = ((a as any).areaDetail || '').toLowerCase()
+      bValue = ((b as any).areaDetail || '').toLowerCase()
+    } else if (sortBy === 'requestDate') {
+      const aTs = a.requestDate ? new Date(a.requestDate).getTime() : 0
+      const bTs = b.requestDate ? new Date(b.requestDate).getTime() : 0
+      return sortOrder === 'asc' ? aTs - bTs : bTs - aTs
+    }
+
+    if (aValue < bValue) return sortOrder === 'asc' ? -1 : 1
+    if (aValue > bValue) return sortOrder === 'asc' ? 1 : -1
+    return compareFptkPositionNameAsc(a, b)
+  }
+
+  const filteredFptks = (() => {
+    if (!sortBy) return sortFptksOpenFirstOnBoardLast(fptks)
+
+    const open: FPTK[] = []
+    const onBoard: FPTK[] = []
+    fptks.forEach((fptk) => {
+      if (isFptkOnBoard(fptk)) onBoard.push(fptk)
+      else open.push(fptk)
     })
+    open.sort(compareWithinGroup)
+    onBoard.sort(compareWithinGroup)
+    return [...open, ...onBoard]
+  })()
   
   // Get unique statuses for filter dropdown
   const uniqueStatuses = CURRENT_STATUS_OPTIONS as unknown as string[]
