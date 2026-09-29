@@ -22,4 +22,16 @@ describe('positionSla', () => {
     const later = new Date('2026-06-01T00:00:00.000Z');
     expect(getPositionSlaBucket(job, later)).toBe('31-60 Days');
   });
+
+  it('freezes SLA at offerAcceptedAt while position is still open', () => {
+    const job = {
+      fptkReceiveDate: '2025-10-01T00:00:00.000Z',
+      currentStatus: 'Open',
+      closedAt: null,
+      offerAcceptedAt: '2025-11-15T00:00:00.000Z',
+    };
+    const later = new Date('2026-06-01T00:00:00.000Z');
+    expect(getPositionSlaBucket(job, later)).toBe('31-60 Days');
+    expect(getPositionSlaWorkingDays(job, later)).toBeLessThanOrEqual(60);
+  });
 });

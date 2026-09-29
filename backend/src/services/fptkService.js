@@ -14,7 +14,10 @@ const {
   mapApplicationStatusToUi,
   assertAllowedStatusTransition,
 } = require('../utils/applicationStatus');
-const { getPositionSlaBucket } = require('../utils/positionSla');
+const {
+  buildEarliestOfferAcceptanceAtByFptkId,
+  getPositionSlaBucket,
+} = require('../utils/positionSla');
 const { buildInterviewerLookupWhere, parseInterviewScheduledAt } = require('../utils/interviewFields');
 const { runWithAuditSuppressed } = require('../utils/auditContext');
 const auditService = require('./auditService');
@@ -1165,6 +1168,33 @@ async function getFptkCurrentStatusCounts(filters, user = null) {
   return counts;
 }
 
+function fptkListPositionSortKey(row) {
+  return (row.positionTitle || row.position || '').trim();
+}
+
+function isFptkOnBoardForList(row) {
+  const status = (row.currentStatus || '').trim().toLowerCase();
+  if (status === 'close') return true;
+  const apps = row.applications || [];
+  return apps.some((app) => String(app.status || '').toUpperCase() === 'ONBOARDING');
+}
+
+function sortFptkListRowsOpenFirstOnBoardLast(rows) {
+  const open = [];
+  const onBoard = [];
+  rows.forEach((row) => {
+    if (isFptkOnBoardForList(row)) onBoard.push(row);
+    else open.push(row);
+  });
+  const byName = (a, b) =>
+    fptkListPositionSortKey(a).localeCompare(fptkListPositionSortKey(b), undefined, {
+      sensitivity: 'base',
+    });
+  open.sort(byName);
+  onBoard.sort(byName);
+  return [...open, ...onBoard];
+}
+
 /**
  * Get all FPTKs with filters
  */
@@ -1174,16 +1204,36 @@ async function getAllFPTKs(filters, pagination, user = null) {
 
   const where = buildInternalFptkListWhere(filters, user);
 
-  const [fptks, total] = await Promise.all([
+  const [sortRows, total] = await Promise.all([
     prisma.fPTK.findMany({
       where,
-      skip,
-      take: limit,
-      include: FPTK_RELATION_INCLUDE,
-      orderBy: { positionTitle: 'asc' },
+      select: {
+        id: true,
+        positionTitle: true,
+        position: true,
+        currentStatus: true,
+        applications: {
+          where: { status: 'ONBOARDING' },
+          select: { id: true },
+          take: 1,
+        },
+      },
     }),
     prisma.fPTK.count({ where }),
   ]);
+
+  const orderedIds = sortFptkListRowsOpenFirstOnBoardLast(sortRows).map((r) => r.id);
+  const pageIds = orderedIds.slice(skip, skip + limit);
+
+  let fptks = [];
+  if (pageIds.length > 0) {
+    const rows = await prisma.fPTK.findMany({
+      where: { id: { in: pageIds } },
+      include: FPTK_RELATION_INCLUDE,
+    });
+    const byId = new Map(rows.map((r) => [r.id, r]));
+    fptks = pageIds.map((id) => byId.get(id)).filter(Boolean);
+  }
 
   return {
     fptks,
@@ -1304,7 +1354,7 @@ async function getSummaryByPosition(user = null) {
 
   // Minimal per-application select used to compute cumulative "ever reached
   // this stage" counts (see status-history aggregation below).
-  const applicationSelect = { id: true, fptkId: true, status: true };
+  const applicationSelect = { id: true, fptkId: true, status: true, updatedAt: true };
 
   const isScopedRole = Object.keys(fptkWhere).length > 0;
 
@@ -1397,9 +1447,14 @@ async function getSummaryByPosition(user = null) {
   const statusHistoryRows = applicationIds.length > 0
     ? await prisma.applicationStatusHistory.findMany({
         where: { applicationId: { in: applicationIds } },
-        select: { applicationId: true, toStatus: true },
+        select: { applicationId: true, toStatus: true, createdAt: true },
       })
     : [];
+
+  const offerAcceptedAtByFptkId = buildEarliestOfferAcceptanceAtByFptkId(
+    applications,
+    statusHistoryRows
+  );
 
   const rawStatusesByApplicationId = new Map();
   statusHistoryRows.forEach((h) => {
@@ -1436,10 +1491,18 @@ async function getSummaryByPosition(user = null) {
   // Pre-compute SLA bucket server-side (uses memoised Indonesia holiday lookups).
   // Returning it here means the browser never has to call getHolidays() at all.
   const nowDate = new Date();
-  const fptksWithSla = fptks.map((f) => ({
-    ...f,
-    sla: getPositionSlaBucket(f, nowDate),
-  }));
+  const fptksWithSla = fptks.map((f) => {
+    const offerAcceptedAt = offerAcceptedAtByFptkId[f.id] ?? null;
+    const slaJob = {
+      ...f,
+      offerAcceptedAt,
+    };
+    return {
+      ...f,
+      offerAcceptedAt: offerAcceptedAt ? offerAcceptedAt.toISOString() : null,
+      sla: getPositionSlaBucket(slaJob, nowDate),
+    };
+  });
 
   // Provide unique filter options quickly
   const priorities = new Set();
@@ -2002,6 +2065,27 @@ async function updateFilledPositions(fptkId) {
   logger.info(`FPTK ${fptkId} filled positions updated: ${filledPositions}/${fptk.numberOfPositions}`);
 }
 
+/** Earliest offer-acceptance timestamp per FPTK (for dashboard SLA lists). */
+async function loadEarliestOfferAcceptanceByFptkIds(fptkIds) {
+  const ids = (fptkIds || []).filter(Boolean);
+  if (ids.length === 0) return {};
+
+  const applications = await prisma.application.findMany({
+    where: { fptkId: { in: ids } },
+    select: { id: true, fptkId: true, status: true, updatedAt: true },
+  });
+  const applicationIds = applications.map((a) => a.id);
+  const statusHistoryRows =
+    applicationIds.length > 0
+      ? await prisma.applicationStatusHistory.findMany({
+          where: { applicationId: { in: applicationIds } },
+          select: { applicationId: true, toStatus: true, createdAt: true },
+        })
+      : [];
+
+  return buildEarliestOfferAcceptanceAtByFptkId(applications, statusHistoryRows);
+}
+
 module.exports = {
   createFPTK,
   getFPTKById,
@@ -2009,6 +2093,7 @@ module.exports = {
   getFptkPositionOptions,
   getFptkCurrentStatusCounts,
   getSummaryByPosition,
+  loadEarliestOfferAcceptanceByFptkIds,
   updateFPTK,
   syncFptkAppliedCandidates,
   deleteFPTK,

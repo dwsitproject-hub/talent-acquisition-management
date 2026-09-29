@@ -6,11 +6,13 @@ const { isDepartmentHeadRole, buildHodFptkFilterFromUser, buildHodApplicationSco
 const { withActiveCandidateOnApplication } = require('../utils/candidateVisibility');
 const {
   CLOSED_CURRENT_STATUSES,
+  OFFER_ACCEPTANCE_SLA_FREEZE_STATUSES,
   getPositionSlaBucket,
   getPositionSlaWorkingDays,
   isFptkClosedByCurrentStatus,
   isFptkOpenByCurrentStatus,
 } = require('../utils/positionSla');
+const { loadEarliestOfferAcceptanceByFptkIds } = require('./fptkService');
 
 function buildHiringManagerScopeFromUser(user = null) {
   if (!user) return null;
@@ -233,6 +235,7 @@ function buildClosedInPeriodCondition(start, end) {
 
 /** SQL set literal matching CLOSED_CURRENT_STATUSES — for $queryRawUnsafe filters. */
 const CLOSED_CURRENT_STATUS_SQL_SET = `(${CLOSED_CURRENT_STATUSES.map((s) => `'${s}'`).join(',')})`;
+const OFFER_ACCEPTANCE_STATUS_SQL_SET = `(${OFFER_ACCEPTANCE_SLA_FREEZE_STATUSES.map((s) => `'${s}'`).join(',')})`;
 
 const DETAIL_APPLICATION_STATUSES = {
   interview: ['INTERVIEW_SCHEDULED', 'INTERVIEW_COMPLETED', 'TECHNICAL_TEST'],
@@ -584,7 +587,14 @@ async function getDashboardDetailList(user = null, options = {}) {
       },
     });
     const nowDate = new Date();
+    const offerAcceptedAtByFptkId = await loadEarliestOfferAcceptanceByFptkIds(
+      rows.map((fptk) => fptk.id)
+    );
     const items = rows
+      .map((fptk) => ({
+        ...fptk,
+        offerAcceptedAt: offerAcceptedAtByFptkId[fptk.id] ?? null,
+      }))
       .filter((fptk) => !slaBucket || getPositionSlaBucket(fptk, nowDate) === slaBucket)
       .map((fptk) => formatSlaFptkDetailItem(fptk, nowDate))
       .sort((a, b) => (b.agingDays ?? 0) - (a.agingDays ?? 0));
@@ -774,11 +784,23 @@ async function getSlaByLocationSql(user, options) {
         ${AREA_EXPR}                                            AS area,
         LOWER(TRIM(COALESCE(f."statusFktk",'')))               AS status_fktk,
         COALESCE(f."fptkReceiveDate", f."requestDate", f."createdAt")::date AS sla_start,
-        CASE
-          WHEN LOWER(TRIM(COALESCE(f."currentStatus",''))) IN ${CLOSED_CURRENT_STATUS_SQL_SET}
-          THEN COALESCE(f."closedAt", NOW())::date
-          ELSE NOW()::date
-        END AS sla_end
+        LEAST(
+          COALESCE(
+            (
+              SELECT MIN(h."createdAt")::date
+              FROM applications a
+              JOIN application_status_history h ON h."applicationId" = a.id
+              WHERE a."fptkId" = f.id
+                AND h."toStatus"::text IN ${OFFER_ACCEPTANCE_STATUS_SQL_SET}
+            ),
+            CURRENT_DATE
+          ),
+          CASE
+            WHEN LOWER(TRIM(COALESCE(f."currentStatus",''))) IN ${CLOSED_CURRENT_STATUS_SQL_SET}
+            THEN COALESCE(f."closedAt", NOW())::date
+            ELSE CURRENT_DATE
+          END
+        ) AS sla_end
       FROM fptk f
       WHERE ${whereClause}
     ),

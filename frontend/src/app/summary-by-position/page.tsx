@@ -505,6 +505,7 @@ function SummaryByPositionContent() {
           createdAt: job.createdAt ?? null,
           currentStatus: job.currentStatus ?? null,
           closedAt: job.closedAt ?? null,
+          offerAcceptedAt: job.offerAcceptedAt ?? null,
         })
 
         return {
@@ -618,22 +619,21 @@ function SummaryByPositionContent() {
     'sla-91': 'Above 91 Days',
   }
 
-  const tableRows = useMemo(() => {
+  const statusScopedRows = useMemo(() => {
     let filtered = dropdownFilteredRows
-
     if (activeStatusCard === 'open') {
       filtered = filtered.filter((r) => isFptkOpenByCurrentStatus(r.currentStatus))
     } else if (activeStatusCard === 'closed') {
       filtered = filtered.filter((r) => isFptkClosedByCurrentStatus(r.currentStatus))
     }
-
-    if (activeSlaCard) {
-      const bucket = SLA_BUCKET_MAP[activeSlaCard]
-      filtered = filtered.filter((r) => r.sla === bucket)
-    }
-
     return filtered
-  }, [dropdownFilteredRows, activeStatusCard, activeSlaCard])
+  }, [dropdownFilteredRows, activeStatusCard])
+
+  const tableRows = useMemo(() => {
+    if (!activeSlaCard) return statusScopedRows
+    const bucket = SLA_BUCKET_MAP[activeSlaCard]
+    return statusScopedRows.filter((r) => r.sla === bucket)
+  }, [statusScopedRows, activeSlaCard])
 
   const openPositionCount = dropdownFilteredRows.filter((r) => isFptkOpenByCurrentStatus(r.currentStatus)).length
   const closedPositionCount = dropdownFilteredRows.filter((r) => isFptkClosedByCurrentStatus(r.currentStatus)).length
@@ -642,11 +642,11 @@ function SummaryByPositionContent() {
     const counts: Record<string, number> = {
       '0-30 Days': 0, '31-60 Days': 0, '61-90 Days': 0, 'Above 91 Days': 0,
     }
-    dropdownFilteredRows.forEach((r) => {
+    statusScopedRows.forEach((r) => {
       if (r.sla in counts) counts[r.sla] += 1
     })
     return counts
-  }, [dropdownFilteredRows])
+  }, [statusScopedRows])
 
   const sortedRows = useMemo(() => {
     return [...tableRows].sort((a, b) => {
