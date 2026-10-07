@@ -220,14 +220,32 @@ function getStoredRefreshToken(): string | null {
   }
 }
 
+/** Routes where a 401 must not hard-redirect to /login (SSO handoff / OIDC bridge). */
+export function isSsoAuthFlowPath(pathname?: string): boolean {
+  const path =
+    pathname ??
+    (typeof window !== 'undefined' ? window.location.pathname : '')
+  return (
+    path === '/login' ||
+    path === '/login/sso' ||
+    path.startsWith('/auth/oidc')
+  )
+}
+
 function clearAuthAndRedirect() {
-  try {
-    localStorage.removeItem('authToken')
-    localStorage.removeItem('refreshToken')
-  } catch (e) {
-    console.warn('Could not clear auth tokens during auth failure:', e)
+  const onSsoFlow =
+    typeof window !== 'undefined' && isSsoAuthFlowPath(window.location.pathname)
+
+  if (!onSsoFlow) {
+    try {
+      localStorage.removeItem('authToken')
+      localStorage.removeItem('refreshToken')
+    } catch (e) {
+      console.warn('Could not clear auth tokens during auth failure:', e)
+    }
   }
-  if (typeof window !== 'undefined' && window.location.pathname !== '/login') {
+
+  if (typeof window !== 'undefined' && !isSsoAuthFlowPath(window.location.pathname)) {
     window.location.href = '/login'
   }
 }
@@ -240,6 +258,11 @@ function isAuthRefreshRequest(config: { url?: string } | undefined): boolean {
 function isAuthLoginRequest(config: { url?: string } | undefined): boolean {
   const url = config?.url || ''
   return url.includes('/auth/login')
+}
+
+function isAuthOidcCompleteRequest(config: { url?: string } | undefined): boolean {
+  const url = config?.url || ''
+  return url.includes('/auth/oidc/complete')
 }
 
 let refreshPromise: Promise<string | null> | null = null
@@ -287,6 +310,10 @@ api.interceptors.response.use(
     const originalRequest = error.config
 
     if (!originalRequest || typeof window === 'undefined' || status !== 401) {
+      return Promise.reject(error)
+    }
+
+    if (isAuthOidcCompleteRequest(originalRequest)) {
       return Promise.reject(error)
     }
 
@@ -539,6 +566,10 @@ export const FPTKAPI = {
   },
   async getById(id: string) {
     const res = await api.get(`/fptk/${id}`)
+    return res.data.data
+  },
+  async getCandidatePipeline(id: string) {
+    const res = await api.get(`/fptk/${id}/candidate-pipeline`)
     return res.data.data
   },
   async create(payload: any) {

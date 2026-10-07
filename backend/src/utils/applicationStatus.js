@@ -141,6 +141,95 @@ function mapApplicationStatusToPipelineUi(status) {
 /** Shorthand used for the generic "Reject" action available on the candidate status dropdown. */
 const REJECTED_UI_STATUS = 'Rejected (Failed Interview / Assessment)';
 
+/** Summary-by-position table columns (keep in sync with frontend/src/utils/summaryByPositionColumns.ts). */
+const SUMMARY_BY_POSITION_COLUMN_KEYS = [
+  'applied',
+  'interview',
+  'rejectInterview',
+  'offerSent',
+  'offerAccepted',
+  'joinDates',
+  'offerReject',
+  'withdrawn',
+];
+
+const PIPELINE_UI_IN_SUMMARY_INTERVIEW = new Set([
+  'Under Review',
+  'Shortlisted',
+  'Interview Scheduled',
+  'Interviewed',
+  'Assessment',
+  'Document Verification',
+  'Keep In View',
+]);
+
+const PIPELINE_UI_IN_SUMMARY_OFFER_SENT = new Set([
+  'Offering Creation',
+  'Pending Feedback',
+  'Offer Sent',
+]);
+
+const PIPELINE_UI_IN_SUMMARY_OFFER_ACCEPTED = new Set([
+  'Offer Accepted',
+  'MCU',
+  'Medical Checkup Scheduled',
+  'Contract Sent',
+  'Contract Signed',
+  'Hired',
+]);
+
+function createEmptySummaryByPositionCounts() {
+  return {
+    applied: 0,
+    interview: 0,
+    rejectInterview: 0,
+    offerSent: 0,
+    offerAccepted: 0,
+    joinDates: 0,
+    offerReject: 0,
+    withdrawn: 0,
+  };
+}
+
+/**
+ * Increment summary column counts for one application (at most once per column per candidate).
+ * Uses pipeline UI labels so Offer Sent / Interview stages are not collapsed into "Under Review".
+ */
+function addApplicationToSummaryByPositionCounts(counts, rawStatusesReached) {
+  const pipelineLabels = new Set();
+  rawStatusesReached.forEach((raw) => {
+    pipelineLabels.add(mapApplicationStatusToPipelineUi(raw));
+  });
+
+  counts.applied += 1;
+
+  let interview = false;
+  let rejectInterview = false;
+  let offerSent = false;
+  let offerAccepted = false;
+  let joinDates = false;
+  let offerReject = false;
+  let withdrawn = false;
+
+  for (const label of pipelineLabels) {
+    if (PIPELINE_UI_IN_SUMMARY_INTERVIEW.has(label)) interview = true;
+    if (label === REJECTED_UI_STATUS) rejectInterview = true;
+    if (PIPELINE_UI_IN_SUMMARY_OFFER_SENT.has(label)) offerSent = true;
+    if (PIPELINE_UI_IN_SUMMARY_OFFER_ACCEPTED.has(label)) offerAccepted = true;
+    if (label === 'On Boarding') joinDates = true;
+    if (label === 'Offer Rejected') offerReject = true;
+    if (label === 'Withdrawn') withdrawn = true;
+  }
+
+  if (interview) counts.interview += 1;
+  if (rejectInterview) counts.rejectInterview += 1;
+  if (offerSent) counts.offerSent += 1;
+  if (offerAccepted) counts.offerAccepted += 1;
+  if (joinDates) counts.joinDates += 1;
+  if (offerReject) counts.offerReject += 1;
+  if (withdrawn) counts.withdrawn += 1;
+}
+
 /**
  * Candidate pipeline status workflow: maps each status to the list of statuses a user is
  * allowed to move a candidate into next. Statuses not present here are considered outside
@@ -228,6 +317,9 @@ module.exports = {
   mapApplicationStatusToUi,
   mapApplicationStatusToPipelineUi,
   REJECTED_UI_STATUS,
+  SUMMARY_BY_POSITION_COLUMN_KEYS,
+  createEmptySummaryByPositionCounts,
+  addApplicationToSummaryByPositionCounts,
   STATUS_TRANSITIONS,
   getAllowedNextStatuses,
   isInterviewResultRequired,

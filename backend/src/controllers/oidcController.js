@@ -40,10 +40,34 @@ function firstQueryValue(value) {
  * GET /api/auth/oidc/status  and  GET /auth/oidc/status
  */
 exports.status = asyncHandler(async (req, res) => {
+  const enabled = oidcService.isOidcConfigured();
+  let discoveryReachable = false;
+  let discoveryError = null;
+  let discoveryDocument = null;
+
+  if (enabled) {
+    try {
+      const meta = await oidcService.loadDiscovery();
+      discoveryReachable = true;
+      discoveryDocument = oidcService.describeDiscoveryUrl(
+        oidcService.getOidcConfig().discoveryUrl
+      );
+      if (!meta?.issuer) {
+        discoveryReachable = false;
+        discoveryError = 'Discovery document missing issuer';
+      }
+    } catch (err) {
+      discoveryError = err.message || 'Discovery failed';
+    }
+  }
+
   res.json({
     success: true,
     data: {
-      enabled: oidcService.isOidcConfigured(),
+      enabled,
+      discoveryReachable,
+      discoveryDocument,
+      discoveryError,
     },
   });
 });

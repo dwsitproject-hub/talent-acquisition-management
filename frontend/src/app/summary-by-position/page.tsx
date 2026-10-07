@@ -1,10 +1,20 @@
 "use client"
 
-import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import {
+  Suspense,
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+  type WheelEvent,
+} from 'react'
 import { createPortal } from 'react-dom'
 import { useSearchParams } from 'next/navigation'
 import Layout from '@/components/Layout/Layout'
 import PositionEditOverlay from '@/components/PositionEditOverlay'
+import PositionCandidatePipelineModal from '@/components/PositionCandidatePipelineModal'
 import { FPTKAPI } from '@/lib/api'
 import MultiSelectDropdown from '@/components/MultiSelectDropdown'
 import { usePositionEditOverlay } from '@/hooks/usePositionEditOverlay'
@@ -23,13 +33,17 @@ import {
   ExclamationCircleIcon,
   AdjustmentsHorizontalIcon,
   InformationCircleIcon,
+  PencilSquareIcon,
   XMarkIcon,
 } from '@heroicons/react/24/outline'
 import Spinner from '@/components/Spinner'
-
-interface StatusCounts {
-  [status: string]: number
-}
+import {
+  SUMMARY_PIPELINE_COLUMNS,
+  emptySummaryPipelineCounts,
+  getSummaryPipelineColumnBadgeClass,
+  type SummaryPipelineColumnKey,
+  type SummaryPipelineCounts,
+} from '@/utils/summaryByPositionColumns'
 
 interface OnboardingCandidate {
   name: string
@@ -50,7 +64,7 @@ interface SummaryRow {
   sla: string
   slaDays: number | null
   hiringManager: string
-  counts: StatusCounts
+  summaryCounts: SummaryPipelineCounts
   onboardingCandidates: OnboardingCandidate[]
   latestPipeline: LatestPipelineProgress | null
 }
@@ -63,43 +77,28 @@ function hiringManagerMatches(rowHm: string, selected: string[]): boolean {
   )
 }
 
-const DEFAULT_STATUSES: string[] = [
-  'Applied',
-  'Under Review',
-  'Shortlisted',
-  'Interview Scheduled',
-  'Interviewed',
-  'Assessment',
-  'Offering Creation',
-  'Pending Feedback',
-  'Offer Accepted',
-  'MCU',
-  'On Boarding',
-  'Offer Rejected',
-  'Rejected (Failed Interview / Assessment)',
-  'Withdrawn',
-  'Keep In View',
-]
-
-// Merged/compacted column set — Division/Section live as subtext under
-// Position, Area/Location combine into one cell, and Status/Status FKTK/
-// Remark combine into one cell. Kept as sortable keys on the underlying field.
+// Fixed columns: Position stacks division/section and area/location beneath the title.
 const FIXED_SORT_KEYS: string[] = [
-  'priority', 'position', 'location', 'sla', 'currentStatus',
+  'priority', 'position', 'sla', 'currentStatus',
 ]
 
-const TERMINAL_STATUSES = new Set([
-  'Rejected (Failed Interview / Assessment)',
-  'Offer Rejected',
-  'Withdrawn',
-])
+function formatDivisionSectionLine(division: string, section: string): string | null {
+  const div = division !== '-' ? division.trim() : ''
+  const sec = section !== '-' ? section.trim() : ''
+  if (div && sec) return `${div} > ${sec}`
+  if (div) return div
+  if (sec) return sec
+  return null
+}
 
-const POSITIVE_STATUSES = new Set([
-  'Offer Accepted',
-  'On Boarding',
-])
-
-const KIV_STATUSES = new Set(['Keep In View'])
+function formatAreaLocationLine(area: string, location: string): string | null {
+  const a = area !== '-' ? area.trim() : ''
+  const loc = location !== '-' ? location.trim() : ''
+  if (a && loc) return `${a} - ${loc}`
+  if (a) return a
+  if (loc) return loc
+  return null
+}
 
 type StatusCardKey = 'open' | 'closed'
 type SlaCardKey = 'sla-0-30' | 'sla-31-60' | 'sla-61-90' | 'sla-91'
@@ -180,14 +179,6 @@ const CARD_CONFIG: Record<SummaryCardKey, {
   },
 }
 
-function getBadgeClass(status: string, count: number): string {
-  if (count === 0) return 'bg-gray-100 text-gray-400'
-  if (TERMINAL_STATUSES.has(status)) return 'bg-red-100 text-red-700'
-  if (POSITIVE_STATUSES.has(status)) return 'bg-green-100 text-green-700'
-  if (KIV_STATUSES.has(status)) return 'bg-yellow-100 text-yellow-700'
-  return 'bg-indigo-100 text-indigo-800'
-}
-
 const SLA_BUCKET_TO_CARD_KEY: Record<string, SlaCardKey> = {
   '0-30 Days': 'sla-0-30',
   '31-60 Days': 'sla-31-60',
@@ -261,17 +252,17 @@ function StatusCell({
 }
 
 /**
- * Badge + portal tooltip for the "On Boarding" column.
+ * Badge + portal tooltip for the "Join dates" column.
  * Uses position:fixed rendered into document.body so the tooltip is never
  * clipped by the overflow-x-auto table wrapper.
  */
-function OnBoardingCell({
+function JoinDatesCell({
   count,
-  counts,
+  summaryCounts,
   onboardingCandidates,
 }: {
   count: number
-  counts: StatusCounts
+  summaryCounts: SummaryPipelineCounts
   onboardingCandidates: OnboardingCandidate[]
 }) {
   const triggerRef = useRef<HTMLSpanElement>(null)
@@ -285,18 +276,16 @@ function OnBoardingCell({
 
   const hide = useCallback(() => setCoords(null), [])
 
-  const totalApplied = counts['Applied'] ?? 0
-  const totalShortlisted = counts['Shortlisted'] ?? 0
+  const totalApplied = summaryCounts.applied
+  const totalInterview = summaryCounts.interview
   const totalRejectedWithdrawn =
-    (counts['Rejected (Failed Interview / Assessment)'] ?? 0) +
-    (counts['Withdrawn'] ?? 0) +
-    (counts['Offer Rejected'] ?? 0)
+    summaryCounts.rejectInterview + summaryCounts.withdrawn + summaryCounts.offerReject
 
   const badge =
     count === 0 ? (
       <span className="text-gray-300 text-xs">—</span>
     ) : (
-      <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${getBadgeClass('On Boarding', count)}`}>
+      <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${getSummaryPipelineColumnBadgeClass('joinDates')}`}>
         {count}
       </span>
     )
@@ -342,8 +331,8 @@ function OnBoardingCell({
                   <span className="text-xs font-bold text-blue-300">{totalApplied}</span>
                 </div>
                 <div className="flex items-center justify-between gap-4">
-                  <span className="text-gray-400 text-xs">Total Shortlisted</span>
-                  <span className="text-xs font-bold text-indigo-300">{totalShortlisted}</span>
+                  <span className="text-gray-400 text-xs">Interview stage</span>
+                  <span className="text-xs font-bold text-indigo-300">{totalInterview}</span>
                 </div>
                 <div className="flex items-center justify-between gap-4">
                   <span className="text-gray-400 text-xs">Rejected / Withdrawn</span>
@@ -398,13 +387,26 @@ function LoadingSkeleton() {
 
 const VALID_CARDS: SummaryCardKey[] = ['open', 'closed', 'sla-0-30', 'sla-31-60', 'sla-61-90', 'sla-91']
 
+function initialActiveStatusCard(cardParam: string | null): StatusCardKey | null {
+  if (cardParam && STATUS_CARD_KEYS.includes(cardParam as StatusCardKey)) {
+    return cardParam as StatusCardKey
+  }
+  // Open positions are the default lens; SLA deep-links still scope to open unless ?card=closed.
+  return 'open'
+}
+
+function slaSectionLabel(activeStatusCard: StatusCardKey | null): string {
+  if (activeStatusCard === 'closed') return 'SLA health · closed positions'
+  if (activeStatusCard === 'open') return 'SLA health · open positions'
+  return 'SLA health · all positions'
+}
+
 function SummaryByPositionContent() {
   const searchParams = useSearchParams()
   const _locationParam = searchParams.get('location')
   const _cardParam = searchParams.get('card')
 
   const [rows, setRows] = useState<SummaryRow[]>([])
-  const [allStatuses, setAllStatuses] = useState<string[]>([])
   const [loading, setLoading] = useState(true)
   const [refreshing, setRefreshing] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -416,9 +418,7 @@ function SummaryByPositionContent() {
   const [sortKey, setSortKey] = useState<string>('position')
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('asc')
   const [activeStatusCard, setActiveStatusCard] = useState<StatusCardKey | null>(
-    _cardParam && STATUS_CARD_KEYS.includes(_cardParam as StatusCardKey)
-      ? (_cardParam as StatusCardKey)
-      : null
+    () => initialActiveStatusCard(_cardParam)
   )
   const [activeSlaCard, setActiveSlaCard] = useState<SlaCardKey | null>(
     _cardParam && SLA_CARD_KEYS.includes(_cardParam as SlaCardKey)
@@ -432,14 +432,28 @@ function SummaryByPositionContent() {
   const [hiringManagers, setHiringManagers] = useState<string[]>([])
   const [locations, setLocations] = useState<string[]>([])
   const [areaToLocations, setAreaToLocations] = useState<Record<string, string[]>>({})
-  const [hiddenStatuses, setHiddenStatuses] = useState<Set<string>>(new Set())
+  const [hiddenPipelineColumns, setHiddenPipelineColumns] = useState<Set<SummaryPipelineColumnKey>>(new Set())
   const [showColumnToggle, setShowColumnToggle] = useState(false)
 
   const columnToggleRef = useRef<HTMLDivElement | null>(null)
+  const tableScrollRef = useRef<HTMLDivElement>(null)
+  const hScrollBarRef = useRef<HTMLDivElement>(null)
+  const tableRef = useRef<HTMLTableElement>(null)
+  const [tableScrollWidth, setTableScrollWidth] = useState(0)
+  const [showHorizontalScrollBar, setShowHorizontalScrollBar] = useState(false)
+  const [horizontalScrollLeft, setHorizontalScrollLeft] = useState(0)
+  const hScrollSyncLock = useRef(false)
 
   const positionEdit = usePositionEditOverlay(() => {
     void loadSummaryData({ silent: true })
   })
+
+  // Clicking a position row opens the candidate pipeline drill-down (Applied → Interview →
+  // Offer Decision → Join Date), not the position edit modal. Editing is still available via
+  // the small pencil icon next to the position title.
+  const [candidatePipelineTarget, setCandidatePipelineTarget] = useState<
+    { fptkId: string; positionLabel: string } | null
+  >(null)
 
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
@@ -467,33 +481,18 @@ function SummaryByPositionContent() {
     try {
       const payload = await FPTKAPI.getSummaryByPosition()
       const allJobPostings: any[] = payload?.fptks || []
-      const applicationCounts: Record<string, Record<string, number>> = payload?.applicationCounts || {}
+      const summaryColumnCounts: Record<string, SummaryPipelineCounts> =
+        payload?.summaryColumnCounts || {}
       const currentStatusesByFptkId: Record<string, string[]> = payload?.currentStatusesByFptkId || {}
-      // Total applicants per FPTK regardless of current status — keeps the
-      // "Applied" column cumulative (never shrinks as candidates advance).
       const totalApplicants: Record<string, number> = payload?.totalApplicants || {}
-      // Onboarding candidates per FPTK — shown in the On Boarding tooltip
       const onboardingCandidatesMap: Record<string, OnboardingCandidate[]> = payload?.onboardingCandidates || {}
 
-      const collectedStatuses = new Set<string>(DEFAULT_STATUSES)
-
       const result: SummaryRow[] = allJobPostings.map((job: any) => {
-        const counts: StatusCounts = {}
-        DEFAULT_STATUSES.forEach(s => { counts[s] = 0 })
-
-        // Backend already returns cumulative "ever reached this stage" counts,
-        // keyed and deduped by UI status label — no client-side re-mapping or
-        // re-summing needed (that used to risk double-counting a candidate who
-        // passed through several raw statuses that collapse into one UI label).
-        const rawCounts = applicationCounts[job.id] || {}
-        Object.entries(rawCounts).forEach(([uiStatus, c]) => {
-          counts[uiStatus] = Number(c) || 0
-          collectedStatuses.add(uiStatus)
-        })
-
-        // Override "Applied" with the cumulative total so it stays fixed
-        // as candidates move through later stages.
-        counts['Applied'] = totalApplicants[job.id] ?? counts['Applied'] ?? 0
+        const summaryCounts: SummaryPipelineCounts = {
+          ...emptySummaryPipelineCounts(),
+          ...(summaryColumnCounts[job.id] || {}),
+        }
+        summaryCounts.applied = totalApplicants[job.id] ?? summaryCounts.applied ?? 0
 
         // SLA bucket is pre-computed server-side using the memoised Indonesia
         // holiday lookup (same logic as dashboard). Use it directly — no browser
@@ -525,7 +524,7 @@ function SummaryByPositionContent() {
           sla: slaBucket,
           slaDays,
           hiringManager: (job.hiringManager || '').trim() || '—',
-          counts,
+          summaryCounts,
           onboardingCandidates: onboardingCandidatesMap[job.id] ?? [],
           latestPipeline: getLatestPipelineProgress(
             (currentStatusesByFptkId[job.id] || []).map((status) => ({ backendStatus: status }))
@@ -533,7 +532,6 @@ function SummaryByPositionContent() {
         }
       })
 
-      setAllStatuses(Array.from(collectedStatuses))
       setRows(result)
 
       const hmOpts =
@@ -571,7 +569,6 @@ function SummaryByPositionContent() {
       console.error('Error loading summary data:', err)
       setError(err?.message || 'An unexpected error occurred.')
       setRows([])
-      setAllStatuses([...DEFAULT_STATUSES])
       setDivisions([])
       setLocations([])
       setHiringManagers([])
@@ -654,8 +651,8 @@ function SummaryByPositionContent() {
       const isFixedKey = FIXED_SORT_KEYS.includes(sortKey)
 
       if (!isFixedKey) {
-        const av = a.counts[sortKey] ?? 0
-        const bv = b.counts[sortKey] ?? 0
+        const av = a.summaryCounts[sortKey as SummaryPipelineColumnKey] ?? 0
+        const bv = b.summaryCounts[sortKey as SummaryPipelineColumnKey] ?? 0
         return (av - bv) * dir
       }
 
@@ -675,9 +672,70 @@ function SummaryByPositionContent() {
     })
   }, [tableRows, sortKey, sortDir])
 
-  const visibleStatuses = useMemo(
-    () => allStatuses.filter(s => !hiddenStatuses.has(s)),
-    [allStatuses, hiddenStatuses]
+  const visiblePipelineColumns = useMemo(
+    () => SUMMARY_PIPELINE_COLUMNS.filter((col) => !hiddenPipelineColumns.has(col.key)),
+    [hiddenPipelineColumns]
+  )
+
+  const measureTableScrollWidth = useCallback(() => {
+    const table = tableRef.current
+    const container = tableScrollRef.current
+    if (!table) return
+    const width = table.scrollWidth
+    setTableScrollWidth(width)
+    if (container) {
+      const needsBar = width > container.clientWidth + 1
+      setShowHorizontalScrollBar(needsBar)
+      const maxScroll = Math.max(0, width - container.clientWidth)
+      setHorizontalScrollLeft((prev) => Math.min(prev, maxScroll))
+    }
+  }, [])
+
+  useLayoutEffect(() => {
+    measureTableScrollWidth()
+    const table = tableRef.current
+    const container = tableScrollRef.current
+    if (!table || typeof ResizeObserver === 'undefined') return
+    const ro = new ResizeObserver(() => measureTableScrollWidth())
+    ro.observe(table)
+    if (container) ro.observe(container)
+    return () => ro.disconnect()
+  }, [
+    measureTableScrollWidth,
+    sortedRows.length,
+    visiblePipelineColumns.length,
+    hiddenPipelineColumns,
+    loading,
+  ])
+
+  useLayoutEffect(() => {
+    const bar = hScrollBarRef.current
+    if (!bar || hScrollSyncLock.current) return
+    if (bar.scrollLeft !== horizontalScrollLeft) {
+      hScrollSyncLock.current = true
+      bar.scrollLeft = horizontalScrollLeft
+      hScrollSyncLock.current = false
+    }
+  }, [horizontalScrollLeft])
+
+  const handleBottomBarScroll = useCallback((scrollLeft: number) => {
+    if (hScrollSyncLock.current) return
+    setHorizontalScrollLeft(scrollLeft)
+  }, [])
+
+  const handleTableWheel = useCallback(
+    (e: WheelEvent<HTMLDivElement>) => {
+      if (!showHorizontalScrollBar) return
+      const container = tableScrollRef.current
+      if (!container) return
+      const maxScroll = Math.max(0, tableScrollWidth - container.clientWidth)
+      const delta =
+        Math.abs(e.deltaX) > Math.abs(e.deltaY) ? e.deltaX : e.shiftKey ? e.deltaY : 0
+      if (delta === 0) return
+      e.preventDefault()
+      setHorizontalScrollLeft((prev) => Math.min(maxScroll, Math.max(0, prev + delta)))
+    },
+    [showHorizontalScrollBar, tableScrollWidth]
   )
 
   const handleSort = (key: string) => {
@@ -735,10 +793,10 @@ function SummaryByPositionContent() {
   }
 
   const hideEmptyColumns = () => {
-    const empty = allStatuses.filter(s =>
-      dropdownFilteredRows.every(r => (r.counts[s] ?? 0) === 0)
-    )
-    setHiddenStatuses(new Set(empty))
+    const empty = SUMMARY_PIPELINE_COLUMNS.filter((col) =>
+      dropdownFilteredRows.every((r) => (r.summaryCounts[col.key] ?? 0) === 0)
+    ).map((col) => col.key)
+    setHiddenPipelineColumns(new Set(empty))
   }
 
   if (loading) return <LoadingSkeleton />
@@ -847,28 +905,37 @@ function SummaryByPositionContent() {
           />
         </div>
 
-        {/* --- All summary cards in one row --- */}
-        <div className="space-y-2">
-          <div className="flex items-center gap-3 text-xs font-semibold uppercase tracking-wider text-gray-400">
-            <span>Position Status</span>
-            <div className="h-px w-6 bg-gray-200" />
-            <span>SLA Health</span>
-            <span className="font-normal normal-case tracking-normal text-gray-300">
-              · Indonesia working days · combine both groups to cross-filter
-            </span>
+        {/* Position status (primary) then SLA buckets scoped to that selection */}
+        <div className="space-y-4">
+          <div className="space-y-2">
+            <p className="text-xs font-semibold uppercase tracking-wider text-gray-400">
+              Position status
+            </p>
+            <div className="grid grid-cols-2 gap-3 max-w-xl">
+              <StatCard cardKey="open" count={openPositionCount} />
+              <StatCard cardKey="closed" count={closedPositionCount} />
+            </div>
           </div>
-          <div className="grid grid-cols-3 lg:grid-cols-6 gap-3">
-            <StatCard cardKey="open" count={openPositionCount} />
-            <StatCard cardKey="closed" count={closedPositionCount} />
-            <StatCard cardKey="sla-0-30" count={slaCounts['0-30 Days']} />
-            <StatCard cardKey="sla-31-60" count={slaCounts['31-60 Days']} />
-            <StatCard cardKey="sla-61-90" count={slaCounts['61-90 Days']} />
-            <StatCard cardKey="sla-91" count={slaCounts['Above 91 Days']} />
+          <div className="space-y-2">
+            <div className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
+              <p className="text-xs font-semibold uppercase tracking-wider text-gray-400">
+                {slaSectionLabel(activeStatusCard)}
+              </p>
+              <span className="text-xs text-gray-300">
+                Indonesia working days · stacks with position status
+              </span>
+            </div>
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+              <StatCard cardKey="sla-0-30" count={slaCounts['0-30 Days']} />
+              <StatCard cardKey="sla-31-60" count={slaCounts['31-60 Days']} />
+              <StatCard cardKey="sla-61-90" count={slaCounts['61-90 Days']} />
+              <StatCard cardKey="sla-91" count={slaCounts['Above 91 Days']} />
+            </div>
           </div>
         </div>
 
         {/* Table card */}
-        <div className="bg-white shadow rounded-lg">
+        <div className="bg-white shadow rounded-lg flex flex-col">
           {/* Table toolbar */}
           <div className="px-4 pt-4 pb-3 sm:px-6 flex flex-wrap items-center justify-between gap-3 border-b border-gray-100">
             <div className="flex items-center gap-3 flex-wrap">
@@ -922,9 +989,9 @@ function SummaryByPositionContent() {
               >
                 <AdjustmentsHorizontalIcon className="h-4 w-4" />
                 Columns
-                {hiddenStatuses.size > 0 && (
+                {hiddenPipelineColumns.size > 0 && (
                   <span className="ml-0.5 rounded-full bg-indigo-100 px-1.5 text-indigo-700">
-                    {allStatuses.length - hiddenStatuses.size}/{allStatuses.length}
+                    {SUMMARY_PIPELINE_COLUMNS.length - hiddenPipelineColumns.size}/{SUMMARY_PIPELINE_COLUMNS.length}
                   </span>
                 )}
               </button>
@@ -933,7 +1000,7 @@ function SummaryByPositionContent() {
                 <div className="absolute right-0 top-full z-20 mt-1 w-60 rounded-lg border border-gray-200 bg-white shadow-lg p-2 max-h-80 overflow-y-auto">
                   <div className="flex items-center justify-between px-2 py-1 mb-1">
                     <span className="text-xs font-semibold text-gray-500 uppercase tracking-wide">
-                      Application Stages
+                      Pipeline columns
                     </span>
                     <div className="flex gap-2">
                       <button
@@ -943,32 +1010,32 @@ function SummaryByPositionContent() {
                         Hide empty
                       </button>
                       <button
-                        onClick={() => setHiddenStatuses(new Set())}
+                        onClick={() => setHiddenPipelineColumns(new Set())}
                         className="text-xs text-indigo-600 hover:underline"
                       >
                         Show all
                       </button>
                     </div>
                   </div>
-                  {allStatuses.map(status => (
+                  {SUMMARY_PIPELINE_COLUMNS.map((col) => (
                     <label
-                      key={status}
+                      key={col.key}
                       className="flex items-center gap-2 px-2 py-1.5 rounded hover:bg-gray-50 cursor-pointer text-sm"
                     >
                       <input
                         type="checkbox"
-                        checked={!hiddenStatuses.has(status)}
+                        checked={!hiddenPipelineColumns.has(col.key)}
                         onChange={() => {
-                          setHiddenStatuses(prev => {
+                          setHiddenPipelineColumns((prev) => {
                             const next = new Set(prev)
-                            if (next.has(status)) next.delete(status)
-                            else next.add(status)
+                            if (next.has(col.key)) next.delete(col.key)
+                            else next.add(col.key)
                             return next
                           })
                         }}
                         className="h-3.5 w-3.5 rounded border-gray-300 text-indigo-600"
                       />
-                      <span className="truncate text-gray-700">{status}</span>
+                      <span className="truncate text-gray-700">{col.label}</span>
                     </label>
                   ))}
                 </div>
@@ -976,9 +1043,24 @@ function SummaryByPositionContent() {
             </div>
           </div>
 
-          {/* Table container — overflow-auto + max-h gives a true scroll context so sticky <th> cells work correctly. KPI cards/filters are outside this container and scroll naturally with the page. */}
-          <div className="overflow-auto max-h-[calc(100dvh-220px)] min-h-[300px]">
-            <table className="min-w-full divide-y divide-gray-200">
+          {/*
+            Sticky <th> needs a vertical scroll container (max-h). Horizontal scroll uses the
+            docked bar below so you can pan columns while still at the top of the list.
+          */}
+          <div className="flex flex-col min-h-[300px] max-h-[calc(100dvh-220px)]">
+            <div
+              ref={tableScrollRef}
+              className="flex-1 min-h-0 min-w-0 overflow-y-auto overflow-x-hidden"
+              onWheel={handleTableWheel}
+            >
+              <div
+                className="relative min-w-0"
+                style={{
+                  width: tableScrollWidth > 0 ? tableScrollWidth : '100%',
+                  left: -horizontalScrollLeft,
+                }}
+              >
+            <table ref={tableRef} className="min-w-full divide-y divide-gray-200">
               {/*
                 sticky is intentionally on each <th> rather than <thead>.
                 When overflow-x:auto creates a scroll container on the wrapper,
@@ -991,7 +1073,6 @@ function SummaryByPositionContent() {
                     [
                       { key: 'priority', label: 'Priority' },
                       { key: 'position', label: 'Position', stickyLeft: true },
-                      { key: 'location', label: 'Location' },
                       { key: 'sla', label: 'SLA' },
                       { key: 'currentStatus', label: 'Status' },
                     ] as { key: string; label: string; stickyLeft?: boolean }[]
@@ -1014,53 +1095,71 @@ function SummaryByPositionContent() {
                       {col.label} {sortIndicator(col.key)}
                     </th>
                   ))}
-                  {visibleStatuses.map((status) => (
+                  {visiblePipelineColumns.map((col) => (
                     <th
-                      key={status}
-                      onClick={() => handleSort(status)}
+                      key={col.key}
+                      onClick={() => handleSort(col.key)}
                       aria-sort={
-                        sortKey === status
+                        sortKey === col.key
                           ? sortDir === 'asc' ? 'ascending' : 'descending'
                           : 'none'
                       }
                       className="sticky top-0 z-20 cursor-pointer px-3 py-1 text-left text-xs font-medium text-gray-500 uppercase tracking-wider select-none bg-gray-50 hover:bg-gray-100 transition-colors"
                     >
-                      <span className="whitespace-nowrap">{status} {sortIndicator(status)}</span>
+                      <span className="whitespace-nowrap">{col.label} {sortIndicator(col.key)}</span>
                     </th>
                   ))}
                 </tr>
               </thead>
               <tbody className="bg-white divide-y divide-gray-200">
-                {sortedRows.map((row) => (
+                {sortedRows.map((row) => {
+                  const divisionSectionLine = formatDivisionSectionLine(row.division, row.section)
+                  const areaLocationLine = formatAreaLocationLine(row.area, row.location)
+                  const positionTitle = [row.position, divisionSectionLine, areaLocationLine]
+                    .filter(Boolean)
+                    .join('\n')
+
+                  return (
                   <tr key={row.id} className="group hover:bg-gray-50 transition-colors">
                     <td className="px-3 py-1 whitespace-nowrap text-sm text-gray-900">{row.priority}</td>
                     <td
-                      className="px-3 py-1 text-sm text-gray-900 max-w-[16rem] sticky left-0 z-10 bg-white group-hover:bg-gray-50 border-r-2 border-indigo-100 shadow-[2px_0_4px_-2px_rgba(0,0,0,0.08)] transition-colors"
-                      title={row.position}
+                      className="px-3 py-1.5 text-sm text-gray-900 max-w-[18rem] sticky left-0 z-10 bg-white group-hover:bg-gray-50 border-r-2 border-indigo-100 shadow-[2px_0_4px_-2px_rgba(0,0,0,0.08)] transition-colors"
+                      title={positionTitle}
                     >
                       {row.id ? (
-                        <button
-                          type="button"
-                          onClick={() => void positionEdit.open(row.id, 'Summary')}
-                          className="text-indigo-600 hover:text-indigo-800 hover:underline font-medium text-left w-full truncate block"
-                        >
-                          {row.position}
-                        </button>
-                      ) : (
-                        <span className="truncate block">{row.position}</span>
-                      )}
-                      {(row.division !== '-' || row.section !== '-') && (
-                        <div className="text-xs text-gray-400 truncate">
-                          {row.division !== '-' ? row.division : ''}
-                          {row.division !== '-' && row.section !== '-' ? ' › ' : ''}
-                          {row.section !== '-' ? row.section : ''}
+                        <div className="flex items-center gap-1 min-w-0">
+                          <button
+                            type="button"
+                            onClick={() =>
+                              setCandidatePipelineTarget({ fptkId: row.id, positionLabel: row.position })
+                            }
+                            className="text-indigo-600 hover:text-indigo-800 hover:underline font-medium text-left truncate min-w-0"
+                            title="View candidate pipeline for this position"
+                          >
+                            {row.position}
+                          </button>
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              void positionEdit.open(row.id, 'Summary')
+                            }}
+                            className="shrink-0 text-gray-300 hover:text-indigo-600 transition-colors"
+                            title="Edit position"
+                            aria-label="Edit position"
+                          >
+                            <PencilSquareIcon className="h-3.5 w-3.5" />
+                          </button>
                         </div>
+                      ) : (
+                        <span className="truncate block font-medium">{row.position}</span>
                       )}
-                    </td>
-                    <td className="px-3 py-1 text-sm text-gray-900 max-w-[12rem] truncate" title={`${row.area} · ${row.location}`}>
-                      {row.area !== '-' ? row.area : ''}
-                      {row.area !== '-' && row.location !== '-' ? ' · ' : ''}
-                      {row.location !== '-' ? row.location : ''}
+                      {divisionSectionLine && (
+                        <div className="text-xs text-gray-500 truncate mt-0.5">{divisionSectionLine}</div>
+                      )}
+                      {areaLocationLine && (
+                        <div className="text-xs text-gray-400 truncate">{areaLocationLine}</div>
+                      )}
                     </td>
                     <td className="px-3 py-1 whitespace-nowrap">
                       <SlaHeroBadge sla={row.sla} slaDays={row.slaDays} />
@@ -1073,15 +1172,15 @@ function SummaryByPositionContent() {
                         latestPipeline={row.latestPipeline}
                       />
                     </td>
-                    {visibleStatuses.map((status) => {
-                      const count = row.counts[status] ?? 0
+                    {visiblePipelineColumns.map((col) => {
+                      const count = row.summaryCounts[col.key] ?? 0
 
-                      if (status === 'On Boarding') {
+                      if (col.key === 'joinDates') {
                         return (
-                          <td key={status} className="px-3 py-1 whitespace-nowrap text-sm">
-                            <OnBoardingCell
+                          <td key={col.key} className="px-3 py-1 whitespace-nowrap text-sm">
+                            <JoinDatesCell
                               count={count}
-                              counts={row.counts}
+                              summaryCounts={row.summaryCounts}
                               onboardingCandidates={row.onboardingCandidates}
                             />
                           </td>
@@ -1089,12 +1188,12 @@ function SummaryByPositionContent() {
                       }
 
                       return (
-                        <td key={status} className="px-3 py-1 whitespace-nowrap text-sm">
+                        <td key={col.key} className="px-3 py-1 whitespace-nowrap text-sm">
                           {count === 0 ? (
                             <span className="text-gray-300 text-xs">—</span>
                           ) : (
                             <span
-                              className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${getBadgeClass(status, count)}`}
+                              className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${getSummaryPipelineColumnBadgeClass(col.key)}`}
                             >
                               {count}
                             </span>
@@ -1103,12 +1202,13 @@ function SummaryByPositionContent() {
                       )
                     })}
                   </tr>
-                ))}
+                  )
+                })}
 
                 {rows.length === 0 && !error && (
                   <tr>
                     <td
-                      colSpan={5 + visibleStatuses.length}
+                      colSpan={4 + visiblePipelineColumns.length}
                       className="px-4 py-10 text-center text-sm text-gray-500"
                     >
                       No data available. Create some positions and applications to see the summary.
@@ -1118,7 +1218,7 @@ function SummaryByPositionContent() {
                 {rows.length > 0 && sortedRows.length === 0 && (
                   <tr>
                     <td
-                      colSpan={5 + visibleStatuses.length}
+                      colSpan={4 + visiblePipelineColumns.length}
                       className="px-4 py-10 text-center text-sm text-gray-500"
                     >
                       No rows match the selected filter.{' '}
@@ -1135,6 +1235,18 @@ function SummaryByPositionContent() {
                 )}
               </tbody>
             </table>
+              </div>
+            </div>
+            {showHorizontalScrollBar && (
+              <div
+                ref={hScrollBarRef}
+                className="shrink-0 overflow-x-auto overflow-y-hidden border-t border-gray-200 bg-gray-50"
+                onScroll={(e) => handleBottomBarScroll(e.currentTarget.scrollLeft)}
+                aria-label="Scroll table horizontally"
+              >
+                <div style={{ width: tableScrollWidth, height: 14 }} />
+              </div>
+            )}
           </div>
         </div>
       </div>
@@ -1148,6 +1260,13 @@ function SummaryByPositionContent() {
         headerBackLabel={`Back to ${positionEdit.backLabel || 'Summary'}`}
         candidateStatusOnly={positionEdit.candidateStatusOnly}
         canManagePositionCandidates={positionEdit.canManagePositionCandidates}
+      />
+
+      <PositionCandidatePipelineModal
+        isOpen={!!candidatePipelineTarget}
+        onClose={() => setCandidatePipelineTarget(null)}
+        fptkId={candidatePipelineTarget?.fptkId ?? null}
+        fallbackPositionLabel={candidatePipelineTarget?.positionLabel}
       />
     </Layout>
   )

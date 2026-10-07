@@ -13,11 +13,14 @@ const {
   mapUiStatusToApplicationStatus,
   mapApplicationStatusToUi,
   assertAllowedStatusTransition,
+  createEmptySummaryByPositionCounts,
+  addApplicationToSummaryByPositionCounts,
 } = require('../utils/applicationStatus');
 const {
   buildEarliestOfferAcceptanceAtByFptkId,
   getPositionSlaBucket,
 } = require('../utils/positionSla');
+const { buildCandidatePipelineSummary } = require('../utils/candidatePipelineSummary');
 const { buildInterviewerLookupWhere, parseInterviewScheduledAt } = require('../utils/interviewFields');
 const { runWithAuditSuppressed } = require('../utils/auditContext');
 const auditService = require('./auditService');
@@ -1058,6 +1061,95 @@ async function getFPTKById(fptkId) {
 }
 
 /**
+ * Per-candidate pipeline for the Summary by Position candidate drill-down modal.
+ * Returns one row per application on this FPTK with Applied / Interview /
+ * Offer Decision / Join Date + the two SLA metrics (see candidatePipelineSummary.js).
+ * Caller is responsible for authorizing access to this FPTK first.
+ */
+async function getPositionCandidatePipeline(fptkId) {
+  const fptk = await prisma.fPTK.findUnique({
+    where: { id: fptkId },
+    select: {
+      id: true,
+      positionTitle: true,
+      position: true,
+      department: true,
+      division: true,
+      section: true,
+      area: true,
+      areaDetail: true,
+      location: true,
+      currentStatus: true,
+    },
+  });
+
+  if (!fptk) {
+    const err = new Error('FPTK not found');
+    err.statusCode = 404;
+    throw err;
+  }
+
+  const applications = await prisma.application.findMany({
+    where: { fptkId },
+    select: {
+      id: true,
+      status: true,
+      appliedAt: true,
+      interviewedAt: true,
+      rejectedAt: true,
+      withdrawnAt: true,
+      joinDate: true,
+      updatedAt: true,
+      candidate: {
+        select: {
+          id: true,
+          user: {
+            select: { firstName: true, lastName: true, email: true },
+          },
+        },
+      },
+      statusHistory: {
+        orderBy: { createdAt: 'asc' },
+        select: { toStatus: true, createdAt: true },
+      },
+    },
+    orderBy: { updatedAt: 'desc' },
+  });
+
+  const now = new Date();
+  const candidates = applications.map((app) => {
+    const firstName = app.candidate?.user?.firstName || '';
+    const lastName = app.candidate?.user?.lastName || '';
+    const candidateName = [firstName, lastName].filter(Boolean).join(' ') || 'Unknown Candidate';
+
+    const pipeline = buildCandidatePipelineSummary(app, { now });
+
+    return {
+      applicationId: app.id,
+      candidateId: app.candidate?.id || null,
+      candidateName,
+      email: app.candidate?.user?.email || '',
+      currentStatus: mapApplicationStatusToUi(app.status),
+      updatedAt: app.updatedAt ? app.updatedAt.toISOString() : null,
+      ...pipeline,
+    };
+  });
+
+  return {
+    fptk: {
+      id: fptk.id,
+      position: fptk.positionTitle || fptk.position || '-',
+      division: fptk.department || fptk.division || '-',
+      section: fptk.section || '-',
+      area: fptk.area || '-',
+      location: fptk.areaDetail || fptk.location || '-',
+      currentStatus: fptk.currentStatus || '-',
+    },
+    candidates,
+  };
+}
+
+/**
  * Shared WHERE clause for internal FPTK list + aggregates (same access rules as list).
  */
 function buildInternalFptkListWhere(filters = {}, user = null) {
@@ -1465,6 +1557,7 @@ async function getSummaryByPosition(user = null) {
   });
 
   const countsByFptkId = {};
+  const summaryColumnCountsByFptkId = {};
   const currentStatusesByFptkId = {};
   const allStatuses = new Set();
   applications.forEach((app) => {
@@ -1486,6 +1579,14 @@ async function getSummaryByPosition(user = null) {
       allStatuses.add(uiStatus);
       countsByFptkId[app.fptkId][uiStatus] = (countsByFptkId[app.fptkId][uiStatus] || 0) + 1;
     });
+
+    if (!summaryColumnCountsByFptkId[app.fptkId]) {
+      summaryColumnCountsByFptkId[app.fptkId] = createEmptySummaryByPositionCounts();
+    }
+    addApplicationToSummaryByPositionCounts(
+      summaryColumnCountsByFptkId[app.fptkId],
+      rawStatusesReached
+    );
   });
 
   // Pre-compute SLA bucket server-side (uses memoised Indonesia holiday lookups).
@@ -1523,6 +1624,7 @@ async function getSummaryByPosition(user = null) {
   return {
     fptks: fptksWithSla,
     applicationCounts: countsByFptkId,
+    summaryColumnCounts: summaryColumnCountsByFptkId,
     currentStatusesByFptkId,
     totalApplicants: totalApplicantsByFptkId,
     onboardingCandidates: onboardingByFptkId,
@@ -2089,6 +2191,7 @@ async function loadEarliestOfferAcceptanceByFptkIds(fptkIds) {
 module.exports = {
   createFPTK,
   getFPTKById,
+  getPositionCandidatePipeline,
   getAllFPTKs,
   getFptkPositionOptions,
   getFptkCurrentStatusCounts,

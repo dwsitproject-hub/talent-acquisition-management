@@ -1,15 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { getBackendOrigin } from '@/lib/backendOrigin'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
-
-function getUploadsProxyTarget(): string {
-  const explicit = process.env.UPLOADS_PROXY_TARGET
-  if (explicit) return explicit.replace(/\/+$/, '')
-
-  const api = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000/api'
-  return api.replace(/\/api\/?$/i, '').replace(/\/+$/, '')
-}
 
 function isSafeSegment(segment: string): boolean {
   return Boolean(segment) && segment !== '.' && segment !== '..' && !segment.includes('\\')
@@ -37,7 +30,7 @@ async function proxyUpload(req: NextRequest, path: string[]): Promise<NextRespon
     return NextResponse.json({ success: false, message: 'Invalid upload path' }, { status: 400 })
   }
 
-  const target = getUploadsProxyTarget()
+  const target = getBackendOrigin()
   const url = `${target}/uploads/${path.map(encodeURIComponent).join('/')}${req.nextUrl.search}`
 
   let upstream: Response

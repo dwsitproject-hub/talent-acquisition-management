@@ -2,7 +2,7 @@
 
 import React, { createContext, useContext, useEffect, useState } from 'react'
 import { User, AuthResponse } from '@/types'
-import api from '@/lib/api'
+import api, { isSsoAuthFlowPath } from '@/lib/api'
 
 interface AuthContextType {
   user: User | null
@@ -30,6 +30,19 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         if (typeof window === 'undefined') {
           setIsLoading(false)
           return
+        }
+
+        // Do not validate stale JWT while Hub SSO handoff is in progress — parallel
+        // /auth/me 401 handling was redirecting to /login and aborting the handoff.
+        if (isSsoAuthFlowPath()) {
+          const handoffPending =
+            window.location.pathname === '/login/sso' &&
+            new URLSearchParams(window.location.search).has('handoff')
+          if (handoffPending || window.location.pathname.startsWith('/auth/oidc')) {
+            setUser(null)
+            setIsLoading(false)
+            return
+          }
         }
 
         const token = localStorage.getItem('authToken')

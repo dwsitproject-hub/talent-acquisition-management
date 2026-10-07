@@ -232,11 +232,19 @@ async function resolveOidcUser({ sub, email }) {
     throw new Error('Account is deactivated');
   }
 
+  const userEmail = String(user.email || '').trim().toLowerCase();
   if (user.oidcSub && user.oidcSub !== normalizedSub) {
-    throw new Error('SSO identity does not match this account');
+    // Hub may issue a new subject after env migration or first link used a stale value.
+    // Re-link when the verified id_token email matches this TAS account.
+    if (userEmail !== normalizedEmail) {
+      throw new Error('SSO identity does not match this account');
+    }
+    logger.warn(
+      `OIDC sub updated for ${user.email} (previous sub no longer matches Hub)`
+    );
   }
 
-  if (!user.oidcSub) {
+  if (user.oidcSub !== normalizedSub) {
     const conflict = await prisma.user.findUnique({
       where: { oidcSub: normalizedSub },
       select: { id: true },
