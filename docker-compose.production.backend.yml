@@ -1,32 +1,31 @@
-# Staging — Backend server (Redis + API). PostgreSQL lives on ApsaraDB RDS after cutover.
+# Production — Backend server (Redis + API). PostgreSQL on ApsaraDB RDS (or local profile).
 #
-# Default (ApsaraDB): requires DATABASE_URL in the env file.
-#   docker compose -f docker-compose.staging.backend.yml --env-file .env.staging.backend -p tas-staging up -d
+# Default (ApsaraDB): set DATABASE_URL in .env.production (URL-encode password if needed).
+#   docker compose -f docker-compose.production.backend.yml --env-file .env.production -p tas-production up -d --build
 #
-# Before the RDS cutover, or to roll back to local Postgres 15, add the profile:
-#   docker compose -f docker-compose.staging.backend.yml --env-file .env.staging.backend -p tas-staging --profile local-db up -d
-# and set DATABASE_URL host to `postgres` (sslmode=disable). Keep the volume for >= 7 days after cutover.
+# Optional local Postgres 15 rollback (--profile local-db):
+#   docker compose -f docker-compose.production.backend.yml --env-file .env.production -p tas-production --profile local-db up -d
 #
-# Encode special characters in DATABASE_URL via: ./scripts/setup-database-url.sh .env.staging.backend
+# Encode special characters in DATABASE_URL via: ./scripts/setup-database-url.sh .env.production
 
 services:
   postgres:
     profiles: ["local-db"]
     image: postgres:15-alpine
-    container_name: tas_staging_postgres
+    container_name: tas_postgres
     restart: unless-stopped
     environment:
       POSTGRES_USER: ${POSTGRES_USER:-tas_user}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
       POSTGRES_DB: ${POSTGRES_DB:-tas_db}
     volumes:
-      - postgres_staging_data:/var/lib/postgresql/data
+      - postgres_production_data:/var/lib/postgresql/data
       - ./database/init:/docker-entrypoint-initdb.d
       - ./backups:/backups
     ports:
       - "${POSTGRES_HOST_PORT:-5432}:5432"
     networks:
-      - tas_staging_network
+      - tas_production_network
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-tas_user} -d ${POSTGRES_DB:-tas_db}"]
       interval: 10s
@@ -35,7 +34,7 @@ services:
 
   redis:
     image: redis:7-alpine
-    container_name: tas_staging_redis
+    container_name: tas_redis
     restart: unless-stopped
     command: >
       redis-server
@@ -43,9 +42,9 @@ services:
       --maxmemory 512mb
       --maxmemory-policy allkeys-lru
     volumes:
-      - redis_staging_data:/data
+      - redis_production_data:/data
     networks:
-      - tas_staging_network
+      - tas_production_network
     healthcheck:
       test: ["CMD-SHELL", "redis-cli -a \"$${REDIS_PASSWORD}\" ping | grep -q PONG"]
       interval: 10s
@@ -57,23 +56,22 @@ services:
       context: ./backend
       dockerfile: Dockerfile
       target: production
-    container_name: tas_staging_backend
+    container_name: tas_backend
     restart: unless-stopped
     environment:
-      NODE_ENV: ${NODE_ENV:-staging}
+      NODE_ENV: ${NODE_ENV:-production}
       PORT: 4000
-      # ApsaraDB RDS (or local postgres when --profile local-db). Must be URL-encoded.
       DATABASE_URL: ${DATABASE_URL}
       REDIS_URL: redis://:${REDIS_PASSWORD}@redis:6379
       REDIS_PASSWORD: ${REDIS_PASSWORD}
       JWT_SECRET: ${JWT_SECRET}
       JWT_REFRESH_SECRET: ${JWT_REFRESH_SECRET}
       ENCRYPTION_KEY: ${ENCRYPTION_KEY}
-      JWT_EXPIRES_IN: ${JWT_EXPIRES_IN:-30m}
+      JWT_EXPIRES_IN: ${JWT_EXPIRES_IN:-15m}
       JWT_REFRESH_EXPIRES_IN: ${JWT_REFRESH_EXPIRES_IN:-7d}
       FRONTEND_URL: ${FRONTEND_URL}
       CANDIDATE_PORTAL_URL: ${CANDIDATE_PORTAL_URL}
-      API_BASE_URL: ${API_BASE_URL}
+      API_BASE_URL: ${API_BASE_URL:-}
       CORS_ORIGIN: ${CORS_ORIGIN}
       CORS_CREDENTIALS: ${CORS_CREDENTIALS:-true}
       LOG_LEVEL: ${LOG_LEVEL:-info}
@@ -81,18 +79,15 @@ services:
       RATE_LIMIT_MAX_REQUESTS: ${RATE_LIMIT_MAX_REQUESTS:-5000}
       RATE_LIMIT_LOGIN_WINDOW: ${RATE_LIMIT_LOGIN_WINDOW:-900000}
       RATE_LIMIT_LOGIN_MAX: ${RATE_LIMIT_LOGIN_MAX:-50}
-      PRISMA_MIGRATE_ON_START: ${PRISMA_MIGRATE_ON_START:-true}
+      PRISMA_MIGRATE_ON_START: ${PRISMA_MIGRATE_ON_START:-false}
       MAX_FILE_SIZE: ${MAX_FILE_SIZE:-10485760}
       ALLOWED_FILE_TYPES: ${ALLOWED_FILE_TYPES:-pdf,doc,docx,jpg,jpeg,png,xls,xlsx}
-      # Synology staging: CIFS //.../APPs/dev/TAS mounted at /mnt/synology-tas (same pattern as PCT)
       STORAGE_TYPE: ${STORAGE_TYPE:-local}
       STORAGE_LOCAL_PATH: ${STORAGE_LOCAL_PATH:-/mnt/synology-tas}
-      # DWS Hub OIDC — routes stay 404 until all three required vars are set
       OIDC_DISCOVERY_URL: ${OIDC_DISCOVERY_URL:-}
       OIDC_CLIENT_ID: ${OIDC_CLIENT_ID:-}
       OIDC_REDIRECT_URI: ${OIDC_REDIRECT_URI:-}
       OIDC_SCOPES: ${OIDC_SCOPES:-openid email profile}
-      # SMTP — interpolated from the staging env file. Required for onboarding reminders.
       SMTP_HOST: ${SMTP_HOST:-}
       SMTP_PORT: ${SMTP_PORT:-587}
       SMTP_SECURE: ${SMTP_SECURE:-false}
@@ -106,14 +101,13 @@ services:
     ports:
       - "${BACKEND_HOST_PORT:-4000}:4000"
     volumes:
-      # Host NAS share → container path used by STORAGE_LOCAL_PATH. Recreate the container after changing this.
       - ${STORAGE_HOST_MOUNT:-/mnt/synology-tas}:${STORAGE_LOCAL_PATH:-/mnt/synology-tas}
       - ./backend/logs:/app/logs
     depends_on:
       redis:
         condition: service_healthy
     networks:
-      - tas_staging_network
+      - tas_production_network
     healthcheck:
       test:
         [
@@ -128,11 +122,11 @@ services:
       start_period: 40s
 
 volumes:
-  postgres_staging_data:
+  postgres_production_data:
     driver: local
-  redis_staging_data:
+  redis_production_data:
     driver: local
 
 networks:
-  tas_staging_network:
+  tas_production_network:
     driver: bridge
