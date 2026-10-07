@@ -1,0 +1,169 @@
+const { businessDaysDiffIndonesia } = require('./indoBusinessDays');
+
+/**
+ * Per-candidate pipeline summary for the "Summary by Position" candidate drill-down.
+ * Pure function — takes one application (with statusHistory) and returns the
+ * Applied / Interview / Offer Decision / Join Date view model, including the
+ * "SLA to Interview" and "SLA to Offer Decision" working-day counts.
+ *
+ * Design notes (see conversation / PRD discussion):
+ * - "SLA to Interview" = Indonesia working days from appliedAt to the interview date.
+ *   Interview date = earliest of INTERVIEW_SCHEDULED / INTERVIEW_COMPLETED history,
+ *   falling back to the application.interviewedAt column.
+ * - "SLA to Interview" is always populated once the candidate has a terminal
+ *   interview-stage outcome, so rejections/withdrawals never show a blank SLA:
+ *     - Rejected/withdrawn BEFORE ever being interviewed → SLA runs appliedAt → that
+ *       rejection/withdrawal date (`slaBasis: 'rejection' | 'withdrawal'`).
+ *     - Rejected/withdrawn AFTER being interviewed (e.g. failed a later stage like
+ *       Assessment) → SLA still runs appliedAt → the interview date itself
+ *       (`slaBasis: 'interview'`), since the interview gate was in fact cleared.
+ *   The rejection/withdrawal date itself is shown in the Interview Result column,
+ *   not as a separate up-front "Reject" column.
+ * - "SLA to Offer Decision" = Indonesia working days from interview date to the
+ *   offer accepted/rejected date (or to the withdrawal date, if withdrawn after
+ *   interview but before a decision). Only meaningful once the candidate has
+ *   passed the interview stage.
+ * - While a stage is still in progress (no terminal date yet), the SLA is computed
+ *   against `now` and flagged `pending: true` so the UI can show it as "so far"
+ *   rather than a finalized duration.
+ */
+
+const REJECTED_STATUS = 'REJECTED'; // "Rejected (Failed Interview / Assessment)"
+
+/** Earliest createdAt per toStatus from ascending-ordered status history. */
+function buildFirstReachedMap(statusHistory) {
+  const map = {};
+  (statusHistory || []).forEach((h) => {
+    const status = (h.toStatus || '').toString().toUpperCase();
+    if (!status) return;
+    if (!map[status]) map[status] = h.createdAt;
+  });
+  return map;
+}
+
+function toDateOrNull(value) {
+  if (!value) return null;
+  const d = value instanceof Date ? value : new Date(value);
+  return isNaN(d.getTime()) ? null : d;
+}
+
+function slaDaysBetween(start, end) {
+  if (!start || !end) return null;
+  return businessDaysDiffIndonesia(start, end);
+}
+
+/**
+ * @param {object} application - { appliedAt, interviewedAt, rejectedAt, withdrawnAt, joinDate,
+ *   statusHistory: [{ toStatus, createdAt }] (ascending) }
+ * @param {{ now?: Date }} [options]
+ */
+function buildCandidatePipelineSummary(application, options = {}) {
+  const now = options.now || new Date();
+  const firstReached = buildFirstReachedMap(application.statusHistory);
+
+  const appliedAt = toDateOrNull(application.appliedAt);
+
+  const interviewDate =
+    toDateOrNull(firstReached.INTERVIEW_SCHEDULED) ||
+    toDateOrNull(firstReached.INTERVIEW_COMPLETED) ||
+    toDateOrNull(application.interviewedAt);
+
+  const rejectedAt = toDateOrNull(firstReached[REJECTED_STATUS]) || toDateOrNull(application.rejectedAt);
+  const withdrawnAt = toDateOrNull(firstReached.WITHDRAWN) || toDateOrNull(application.withdrawnAt);
+  const offerSentDate = toDateOrNull(firstReached.OFFER_SENT);
+  const offerAcceptedDate = toDateOrNull(firstReached.OFFER_ACCEPTED);
+  const offerRejectedDate = toDateOrNull(firstReached.OFFER_REJECTED);
+  const joinDate = toDateOrNull(application.joinDate);
+
+  // --- Interview stage outcome ---
+  let interview;
+  if (rejectedAt) {
+    interview = { outcome: 'rejected', date: rejectedAt };
+  } else if (withdrawnAt && (!interviewDate || withdrawnAt <= interviewDate)) {
+    interview = { outcome: 'withdrawn', date: withdrawnAt };
+  } else if (interviewDate) {
+    interview = { outcome: 'passed', date: interviewDate };
+  } else {
+    interview = { outcome: 'pending', date: null };
+  }
+
+  // SLA to Interview always resolves to a value once the candidate has either been
+  // interviewed OR exited the pipeline (rejected/withdrawn) — only genuinely open
+  // applications (still being screened, no decision yet) get a "so far" running count.
+  // `slaBasis` tells the UI what the end date actually represents, since a reject/
+  // withdraw can land before interview (no interview ever happened) or after it
+  // (interview happened, then the candidate was dropped at a later stage).
+  let slaToInterviewDays = null;
+  let slaToInterviewPending = false;
+  let slaToInterviewBasis = null; // 'interview' | 'rejection' | 'withdrawal' | 'elapsed'
+
+  if (interview.outcome === 'passed' && appliedAt && interviewDate) {
+    slaToInterviewDays = slaDaysBetween(appliedAt, interviewDate);
+    slaToInterviewBasis = 'interview';
+  } else if (interview.outcome === 'rejected' && appliedAt && rejectedAt) {
+    const interviewHappenedFirst = interviewDate && interviewDate <= rejectedAt;
+    const end = interviewHappenedFirst ? interviewDate : rejectedAt;
+    slaToInterviewDays = slaDaysBetween(appliedAt, end);
+    slaToInterviewBasis = interviewHappenedFirst ? 'interview' : 'rejection';
+  } else if (interview.outcome === 'withdrawn' && appliedAt && withdrawnAt) {
+    const interviewHappenedFirst = interviewDate && interviewDate <= withdrawnAt;
+    const end = interviewHappenedFirst ? interviewDate : withdrawnAt;
+    slaToInterviewDays = slaDaysBetween(appliedAt, end);
+    slaToInterviewBasis = interviewHappenedFirst ? 'interview' : 'withdrawal';
+  } else if (interview.outcome === 'pending' && appliedAt) {
+    // Still awaiting a decision — show elapsed time so far, not a finalized SLA.
+    slaToInterviewDays = slaDaysBetween(appliedAt, now);
+    slaToInterviewPending = true;
+    slaToInterviewBasis = 'elapsed';
+  }
+
+  // --- Offer stage outcome (only reachable once interview is passed) ---
+  let offer = { outcome: 'not_applicable', date: null };
+  let slaToOfferDecisionDays = null;
+  let slaToOfferDecisionPending = false;
+
+  if (interview.outcome === 'passed') {
+    if (offerRejectedDate) {
+      offer = { outcome: 'rejected', date: offerRejectedDate };
+    } else if (offerAcceptedDate) {
+      offer = { outcome: 'accepted', date: offerAcceptedDate };
+    } else if (withdrawnAt && withdrawnAt > interviewDate) {
+      offer = { outcome: 'withdrawn', date: withdrawnAt };
+    } else if (offerSentDate) {
+      offer = { outcome: 'pending', date: null };
+    } else {
+      offer = { outcome: 'not_yet', date: null };
+    }
+
+    const decisionEnd = offerRejectedDate || offerAcceptedDate || (offer.outcome === 'withdrawn' ? withdrawnAt : null);
+    if (decisionEnd && interviewDate) {
+      slaToOfferDecisionDays = slaDaysBetween(interviewDate, decisionEnd);
+    } else if (offer.outcome === 'pending' && interviewDate) {
+      slaToOfferDecisionDays = slaDaysBetween(interviewDate, now);
+      slaToOfferDecisionPending = true;
+    }
+  }
+
+  return {
+    appliedAt: appliedAt ? appliedAt.toISOString() : null,
+    interview: {
+      outcome: interview.outcome,
+      date: interview.date ? interview.date.toISOString() : null,
+      slaDays: slaToInterviewDays,
+      slaPending: slaToInterviewPending,
+      slaBasis: slaToInterviewBasis,
+    },
+    offer: {
+      outcome: offer.outcome,
+      sentDate: offerSentDate ? offerSentDate.toISOString() : null,
+      date: offer.date ? offer.date.toISOString() : null,
+      slaDays: slaToOfferDecisionDays,
+      slaPending: slaToOfferDecisionPending,
+    },
+    joinDate: offer.outcome === 'accepted' && joinDate ? joinDate.toISOString() : null,
+  };
+}
+
+module.exports = {
+  buildCandidatePipelineSummary,
+};

@@ -299,6 +299,29 @@ router.get(
 );
 
 /**
+ * @route   GET /api/fptk/:id/candidate-pipeline
+ * @desc    Per-candidate pipeline for the Summary by Position candidate drill-down
+ *          (Applied / Interview / Offer Decision / Join Date + SLA to Interview
+ *          and SLA to Offer Decision working-day counts).
+ * @access  Private (TA, HRBP, Admin, HM, CHRO, Dept Head — scoped to assigned positions)
+ */
+router.get(
+  '/:id/candidate-pipeline',
+  authenticate,
+  authorize('TA_HO', 'HRBP', 'TA_SITE', 'SUPER_ADMIN', 'HIRING_MANAGER', 'CHRO', 'DEPARTMENT_HEAD'),
+  validationRules.uuidParam('id'),
+  validate,
+  asyncHandler(async (req, res) => {
+    await assertUserCanAccessFptk(req.user, req.params.id);
+    const result = await fptkService.getPositionCandidatePipeline(req.params.id);
+    res.json({
+      success: true,
+      data: result,
+    });
+  })
+);
+
+/**
  * @route   PUT /api/fptk/:id/applied-candidates
  * @desc    Sync applied candidates on a position (no other FPTK field changes)
  * @access  Private (TA, HRBP, Hiring Manager, Admin)

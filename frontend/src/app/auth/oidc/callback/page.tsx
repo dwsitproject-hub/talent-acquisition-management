@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect } from 'react'
+import { useEffect, useRef } from 'react'
 import { getOidcCallbackUrl } from '@/lib/api'
 
 /**
@@ -8,7 +8,11 @@ import { getOidcCallbackUrl } from '@/lib/api'
  * Nginx may send that to Next.js; forward the code to the backend callback.
  */
 export default function OidcCallbackBridgePage() {
+  const forwarded = useRef(false)
+
   useEffect(() => {
+    if (forwarded.current) return
+    forwarded.current = true
     window.location.replace(getOidcCallbackUrl(window.location.search))
   }, [])
 

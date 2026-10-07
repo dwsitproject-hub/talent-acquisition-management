@@ -23,6 +23,7 @@
 #   STAGING_ENV_FILE    default: .env.staging.backend
 #   STAGING_APSARA_DATABASE_URL  restore/verify target after staging RDS cutover
 #   PG18_IMAGE          default: postgres:18-alpine (client for RDS 18)
+#   FORCE_PG18_DOCKER   set to 1 to always pg_dump via PG18_IMAGE (Apsara PG 18)
 #   DB_USER             default: tas_user
 #   DB_NAME             default: tas_db
 #   CONFIRM             set to OVERWRITE-STAGING to skip the interactive prompt
@@ -65,6 +66,14 @@ staging_env_path() {
   fi
 }
 
+prod_env_path() {
+  if [[ "$PROD_ENV_FILE" = /* ]]; then
+    echo "$PROD_ENV_FILE"
+  else
+    echo "$PROJECT_ROOT/$PROD_ENV_FILE"
+  fi
+}
+
 env_get() {
   local key="$1"
   local file="$2"
@@ -86,6 +95,47 @@ url_host() {
 
 redact_url() {
   echo "$1" | sed -E 's#(postgresql://[^:/?#]+:)[^@]+@#\1***@#'
+}
+
+# Prisma DATABASE_URL often includes ?schema=public&pool_timeout=... — libpq rejects those.
+libpq_dbname_url() {
+  local url="$1"
+  [[ -n "$url" ]] || { echo ""; return; }
+  if command -v python3 >/dev/null 2>&1; then
+    DATABASE_URL="$url" python3 -c "
+from urllib.parse import urlparse, urlunparse, parse_qs, urlencode
+import os
+u = urlparse(os.environ['DATABASE_URL'])
+allowed = {'sslmode', 'connect_timeout', 'application_name', 'options'}
+q = parse_qs(u.query, keep_blank_values=True)
+filtered = {k: v for k, v in q.items() if k in allowed}
+print(urlunparse((u.scheme, u.netloc, u.path, u.params, urlencode(filtered, doseq=True), u.fragment)))
+"
+  else
+    echo "$url" | sed -E 's/\?.*$//'
+  fi
+}
+
+is_local_pg_host() {
+  local host
+  host="$(echo "$1" | tr '[:upper:]' '[:lower:]')"
+  [[ -z "$host" || "$host" == "postgres" || "$host" == "localhost" || "$host" == "127.0.0.1" ]]
+}
+
+prod_database_url_for_dump() {
+  local url="${PROD_DATABASE_URL:-}"
+  if [[ -z "$url" ]]; then
+    url="$(env_get PROD_DATABASE_URL "$(prod_env_path)")"
+  fi
+  if [[ -z "$url" ]]; then
+    local dburl host
+    dburl="$(env_get DATABASE_URL "$(prod_env_path)")"
+    host="$(url_host "$dburl")"
+    if [[ -n "$dburl" ]] && ! is_local_pg_host "$host"; then
+      url="$dburl"
+    fi
+  fi
+  echo "$url"
 }
 
 staging_rds_url() {
@@ -115,6 +165,7 @@ pg18_rds_net() {
 run_pg18_rds() {
   local url="$1"
   local shell_cmd="$2"
+  url="$(libpq_dbname_url "$url")"
   docker run --rm -i --network "$(pg18_rds_net)" \
     -e PGSSLMODE="${PGSSLMODE:-require}" \
     -e DATABASE_URL="$url" \
@@ -214,18 +265,47 @@ $(count_sql)
 SQL
 }
 
+pg_dump_local_major() {
+  if ! command -v pg_dump >/dev/null 2>&1; then
+    echo 0
+    return
+  fi
+  pg_dump --version 2>/dev/null | sed -nE 's/.* ([0-9]+)\..*/\1/p' | head -1
+}
+
+dump_via_pg18_docker() {
+  local dburl="$1"
+  require_cmd docker
+  docker pull "$PG18_IMAGE" >/dev/null
+  docker run --rm --network "$(pg18_rds_net)" \
+    -e PGSSLMODE="${PGSSLMODE:-require}" \
+    "$PG18_IMAGE" \
+    pg_dump --dbname="$dburl" --no-owner --no-acl --format=plain --encoding=UTF8
+}
+
 dump_from_url() {
-  require_cmd pg_dump
   require_cmd gzip
   local outfile="$1"
-  log "Dumping via PROD_DATABASE_URL (host only, credentials not printed)..."
-  pg_dump \
-    --dbname="$PROD_DATABASE_URL" \
-    --no-owner \
-    --no-acl \
-    --format=plain \
-    --encoding=UTF8 \
-    | gzip -9 > "$outfile"
+  local dburl raw_url local_major
+  raw_url="$(prod_database_url_for_dump)"
+  [[ -n "$raw_url" ]] || die "No remote DATABASE_URL. Set PROD_DATABASE_URL or DATABASE_URL in $PROD_ENV_FILE (Apsara host)."
+  dburl="$(libpq_dbname_url "$raw_url")"
+  log "Dumping production ApsaraDB / remote Postgres (host only, credentials not printed)..."
+  local_major="$(pg_dump_local_major)"
+  if [[ "${FORCE_PG18_DOCKER:-}" == "1" ]] || [[ -z "$local_major" || "$local_major" -lt 18 ]]; then
+    if [[ "$local_major" -gt 0 && "$local_major" -lt 18 ]]; then
+      log "Local pg_dump is PostgreSQL $local_major; server is 18 — using $PG18_IMAGE."
+    fi
+    dump_via_pg18_docker "$dburl" | gzip -9 > "$outfile"
+  else
+    pg_dump \
+      --dbname="$dburl" \
+      --no-owner \
+      --no-acl \
+      --format=plain \
+      --encoding=UTF8 \
+      | gzip -9 > "$outfile"
+  fi
 }
 
 dump_from_docker() {
@@ -248,7 +328,7 @@ cmd_dump() {
   ts="$(date +%Y%m%d_%H%M%S)"
   outfile="${BACKUP_DIR}/backup_production_${ts}.sql.gz"
 
-  if [[ -n "${PROD_DATABASE_URL:-}" ]]; then
+  if [[ -n "$(prod_database_url_for_dump)" ]]; then
     dump_from_url "$outfile"
   else
     dump_from_docker "$outfile"
@@ -275,7 +355,7 @@ restore_to_rds() {
   log "Safety dump of current staging RDS -> $staging_safety"
   if ! docker run --rm --network "$(pg18_rds_net)" \
         -e PGSSLMODE="${PGSSLMODE:-require}" \
-        -e DATABASE_URL="$url" \
+        -e DATABASE_URL="$(libpq_dbname_url "$url")" \
         "$PG18_IMAGE" \
         sh -c 'pg_dump --dbname="$DATABASE_URL" --no-owner --no-acl --format=plain --encoding=UTF8' \
       | gzip -9 > "$staging_safety"; then
