@@ -122,6 +122,6 @@ if [[ "$ENV_FILE" == *staging* ]]; then
     echo "To use this with staging compose, run:"
     echo "  docker compose -f docker-compose.staging.backend.yml -f $OVERRIDE_FILE -p tas-staging --env-file $ENV_FILE up -d backend"
 else
-    echo "To use this with docker-compose, run:"
-    echo "  docker compose -f docker-compose.network.yml -f $OVERRIDE_FILE -p tas-production --env-file $ENV_FILE up -d backend"
+    echo "To use this with production backend compose (ApsaraDB — no local postgres), run:"
+    echo "  docker compose -f docker-compose.production.backend.yml -f $OVERRIDE_FILE -p tas-production --env-file $ENV_FILE up -d --build redis backend"
 fi

@@ -26,6 +26,8 @@ Real values belong in server-local `.env.production` or your organization's secr
 ## Related guides (sanitized)
 
 - `ENV_SETUP_INSTRUCTIONS.md` — environment variable setup
-- `docker-compose.production.yml` — production compose (reads from `.env.production`)
+- `docker-compose.production.backend.yml` — production backend (Redis + API, ApsaraDB)
+- `docker-compose.frontend.yml` — production frontend (UI + nginx)
+- `docker-compose.production.yml` — optional Docker Hub image compose (reads from `.env.production`)
 - `DATABASE_URL_SETUP_GUIDE.md` — database connection format
 - `AWS_DEPLOYMENT_GUIDE.md` / `ALICLOUD_DEPLOYMENT_GUIDE.md` — cloud deployment
