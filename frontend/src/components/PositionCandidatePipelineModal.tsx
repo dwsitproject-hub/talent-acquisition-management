@@ -40,6 +40,7 @@ interface CandidatePipelineRow {
   candidateName: string
   email: string
   currentStatus: string
+  updatedAt: string | null
   appliedAt: string | null
   interview: CandidateStage
   offer: CandidateStage
@@ -80,6 +81,7 @@ type SortKey =
   | 'offerResult'
   | 'slaToOfferDecision'
   | 'joinDate'
+  | 'latestUpdate'
 
 const COLUMNS: { key: SortKey; label: string }[] = [
   { key: 'candidate', label: 'Candidate' },
@@ -126,6 +128,8 @@ function getSortValue(row: CandidatePipelineRow, key: SortKey): string | number 
       return row.offer.slaDays ?? null
     case 'joinDate':
       return toTime(row.joinDate)
+    case 'latestUpdate':
+      return toTime(row.updatedAt)
     default:
       return null
   }
@@ -251,8 +255,8 @@ export default function PositionCandidatePipelineModal({
   const [error, setError] = useState<string | null>(null)
   const [data, setData] = useState<PositionCandidatePipelinePayload | null>(null)
   const [historyApplicationId, setHistoryApplicationId] = useState<string | null>(null)
-  const [sortKey, setSortKey] = useState<SortKey>('applied')
-  const [sortDir, setSortDir] = useState<'asc' | 'desc'>('asc')
+  const [sortKey, setSortKey] = useState<SortKey>('latestUpdate')
+  const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc')
 
   useModalEscape(isOpen && !historyApplicationId, onClose)
 
@@ -276,6 +280,8 @@ export default function PositionCandidatePipelineModal({
     setLoading(true)
     setError(null)
     setData(null)
+    setSortKey('latestUpdate')
+    setSortDir('desc')
     FPTKAPI.getCandidatePipeline(fptkId)
       .then((payload) => setData(payload))
       .catch((err) =>
@@ -308,7 +314,7 @@ export default function PositionCandidatePipelineModal({
   const locationLine = [fptk?.area, fptk?.location].filter((v) => v && v !== '-').join(' - ')
 
   return (
-    <div className="fixed inset-0 overflow-y-auto" style={{ zIndex: OVERLAY_Z_INDEX }}>
+    <div className="fixed inset-0 overflow-hidden" style={{ zIndex: OVERLAY_Z_INDEX }}>
       {/*
         Matches EditJobPostingModal's backdrop exactly. Uses an inline style rather than
         Tailwind's bg-opacity-* utility because this project is on Tailwind v4, which
@@ -352,8 +358,8 @@ export default function PositionCandidatePipelineModal({
             </button>
           </div>
 
-          {/* Body */}
-          <div className="flex-1 overflow-auto px-4 sm:px-6 py-4 sm:py-5">
+          {/* Body — single scroll region; table header sticks inside this container */}
+          <div className="flex-1 min-h-0 overflow-auto px-4 sm:px-6 py-4 sm:py-5">
             {loading ? (
               <div className="flex items-center justify-center py-16">
                 <div className="animate-spin h-8 w-8 rounded-full border-2 border-indigo-600 border-t-transparent" />
@@ -369,10 +375,8 @@ export default function PositionCandidatePipelineModal({
                 <p className="text-sm font-medium text-gray-700">No candidates have applied yet.</p>
               </div>
             ) : (
-              // Dedicated horizontal-scroll container (bleeds to the card edge on mobile) so the
-              // table can keep readable column widths instead of squeezing on narrow screens.
               <div className="-mx-4 sm:mx-0 overflow-x-auto">
-                <table className="min-w-[960px] sm:min-w-full w-full divide-y divide-gray-200">
+                <table className="w-full divide-y divide-gray-200">
                   <thead className="bg-gray-50">
                     <tr>
                       {COLUMNS.map((col, i) => (
@@ -383,8 +387,10 @@ export default function PositionCandidatePipelineModal({
                             sortKey === col.key ? (sortDir === 'asc' ? 'ascending' : 'descending') : 'none'
                           }
                           className={[
-                            'px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider select-none whitespace-nowrap bg-gray-50 cursor-pointer hover:bg-gray-100 transition-colors',
-                            i === 0 ? 'sticky left-0 z-10 pl-4 sm:pl-3' : '',
+                            'sticky top-0 z-20 px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider select-none whitespace-nowrap bg-gray-50 cursor-pointer hover:bg-gray-100 transition-colors',
+                            i === 0
+                              ? 'sticky left-0 z-30 pl-4 sm:pl-3 border-r border-gray-100 shadow-[2px_0_4px_-2px_rgba(0,0,0,0.06)]'
+                              : '',
                           ].join(' ')}
                         >
                           {col.label}
@@ -401,7 +407,7 @@ export default function PositionCandidatePipelineModal({
                         onClick={() => setHistoryApplicationId(row.applicationId)}
                         title="View full status history"
                       >
-                        <td className="px-3 py-2 pl-4 sm:pl-3 max-w-[16rem] sticky left-0 z-10 bg-white group-hover:bg-gray-50 transition-colors">
+                        <td className="px-3 py-2 pl-4 sm:pl-3 max-w-[16rem] sticky left-0 z-10 bg-white group-hover:bg-gray-50 border-r border-gray-100 shadow-[2px_0_4px_-2px_rgba(0,0,0,0.06)] transition-colors">
                           <div className="text-sm font-medium text-indigo-600 hover:underline truncate">
                             {row.candidateName}
                           </div>

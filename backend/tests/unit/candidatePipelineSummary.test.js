@@ -153,6 +153,27 @@ describe('buildCandidatePipelineSummary', () => {
     expect(result.offer.date).toBe(iso(13));
   });
 
+  it('shows withdrawn (not accepted) when offer was accepted then candidate withdrew', () => {
+    const result = buildCandidatePipelineSummary({
+      appliedAt: iso(0),
+      interviewedAt: null,
+      rejectedAt: null,
+      withdrawnAt: iso(20),
+      joinDate: iso(30),
+      statusHistory: [
+        { toStatus: 'INTERVIEW_SCHEDULED', createdAt: iso(5) },
+        { toStatus: 'OFFER_SENT', createdAt: iso(12) },
+        { toStatus: 'OFFER_ACCEPTED', createdAt: iso(15) },
+        { toStatus: 'WITHDRAWN', createdAt: iso(20) },
+      ],
+    });
+
+    expect(result.offer.outcome).toBe('withdrawn');
+    expect(result.offer.date).toBe(iso(20));
+    expect(result.offer.slaDays).toBeGreaterThan(0);
+    expect(result.joinDate).toBeNull();
+  });
+
   it('attributes withdrawal to the interview stage when it happens before any interview', () => {
     const result = buildCandidatePipelineSummary({
       appliedAt: iso(0),

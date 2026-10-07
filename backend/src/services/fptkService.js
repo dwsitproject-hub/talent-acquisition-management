@@ -1099,6 +1099,7 @@ async function getPositionCandidatePipeline(fptkId) {
       rejectedAt: true,
       withdrawnAt: true,
       joinDate: true,
+      updatedAt: true,
       candidate: {
         select: {
           id: true,
@@ -1112,7 +1113,7 @@ async function getPositionCandidatePipeline(fptkId) {
         select: { toStatus: true, createdAt: true },
       },
     },
-    orderBy: { appliedAt: 'asc' },
+    orderBy: { updatedAt: 'desc' },
   });
 
   const now = new Date();
@@ -1129,6 +1130,7 @@ async function getPositionCandidatePipeline(fptkId) {
       candidateName,
       email: app.candidate?.user?.email || '',
       currentStatus: mapApplicationStatusToUi(app.status),
+      updatedAt: app.updatedAt ? app.updatedAt.toISOString() : null,
       ...pipeline,
     };
   });

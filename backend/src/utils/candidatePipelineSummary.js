@@ -41,6 +41,16 @@ function buildFirstReachedMap(statusHistory) {
   return map;
 }
 
+/** Latest createdAt per toStatus — used for terminal outcomes that can repeat (e.g. accept then withdraw). */
+function buildLastReachedMap(statusHistory) {
+  const map = {};
+  (statusHistory || []).forEach((h) => {
+    const status = (h.toStatus || '').toString().toUpperCase();
+    if (status) map[status] = h.createdAt;
+  });
+  return map;
+}
+
 function toDateOrNull(value) {
   if (!value) return null;
   const d = value instanceof Date ? value : new Date(value);
@@ -60,6 +70,7 @@ function slaDaysBetween(start, end) {
 function buildCandidatePipelineSummary(application, options = {}) {
   const now = options.now || new Date();
   const firstReached = buildFirstReachedMap(application.statusHistory);
+  const lastReached = buildLastReachedMap(application.statusHistory);
 
   const appliedAt = toDateOrNull(application.appliedAt);
 
@@ -69,10 +80,10 @@ function buildCandidatePipelineSummary(application, options = {}) {
     toDateOrNull(application.interviewedAt);
 
   const rejectedAt = toDateOrNull(firstReached[REJECTED_STATUS]) || toDateOrNull(application.rejectedAt);
-  const withdrawnAt = toDateOrNull(firstReached.WITHDRAWN) || toDateOrNull(application.withdrawnAt);
+  const withdrawnAt = toDateOrNull(lastReached.WITHDRAWN) || toDateOrNull(application.withdrawnAt);
   const offerSentDate = toDateOrNull(firstReached.OFFER_SENT);
-  const offerAcceptedDate = toDateOrNull(firstReached.OFFER_ACCEPTED);
-  const offerRejectedDate = toDateOrNull(firstReached.OFFER_REJECTED);
+  const lastOfferAcceptedAt = toDateOrNull(lastReached.OFFER_ACCEPTED);
+  const lastOfferRejectedAt = toDateOrNull(lastReached.OFFER_REJECTED);
   const joinDate = toDateOrNull(application.joinDate);
 
   // --- Interview stage outcome ---
@@ -123,19 +134,39 @@ function buildCandidatePipelineSummary(application, options = {}) {
   let slaToOfferDecisionPending = false;
 
   if (interview.outcome === 'passed') {
-    if (offerRejectedDate) {
-      offer = { outcome: 'rejected', date: offerRejectedDate };
-    } else if (offerAcceptedDate) {
-      offer = { outcome: 'accepted', date: offerAcceptedDate };
-    } else if (withdrawnAt && withdrawnAt > interviewDate) {
-      offer = { outcome: 'withdrawn', date: withdrawnAt };
+    // Offer stage uses the *latest* terminal event so accept → withdraw still shows Withdrawn.
+    const offerTerminalCandidates = [];
+    if (lastOfferRejectedAt) {
+      offerTerminalCandidates.push({ outcome: 'rejected', date: lastOfferRejectedAt });
+    }
+    if (lastOfferAcceptedAt) {
+      offerTerminalCandidates.push({ outcome: 'accepted', date: lastOfferAcceptedAt });
+    }
+    if (withdrawnAt && interviewDate && withdrawnAt > interviewDate) {
+      offerTerminalCandidates.push({ outcome: 'withdrawn', date: withdrawnAt });
+    }
+
+    if (offerTerminalCandidates.length > 0) {
+      offerTerminalCandidates.sort((a, b) => b.date.getTime() - a.date.getTime());
+      offer = {
+        outcome: offerTerminalCandidates[0].outcome,
+        date: offerTerminalCandidates[0].date,
+      };
     } else if (offerSentDate) {
       offer = { outcome: 'pending', date: null };
     } else {
       offer = { outcome: 'not_yet', date: null };
     }
 
-    const decisionEnd = offerRejectedDate || offerAcceptedDate || (offer.outcome === 'withdrawn' ? withdrawnAt : null);
+    const decisionEnd =
+      offer.outcome === 'rejected'
+        ? lastOfferRejectedAt
+        : offer.outcome === 'accepted'
+          ? lastOfferAcceptedAt
+          : offer.outcome === 'withdrawn'
+            ? withdrawnAt
+            : null;
+
     if (decisionEnd && interviewDate) {
       slaToOfferDecisionDays = slaDaysBetween(interviewDate, decisionEnd);
     } else if (offer.outcome === 'pending' && interviewDate) {
