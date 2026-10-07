@@ -60,6 +60,15 @@ function generateNonce() {
   return base64UrlEncode(crypto.randomBytes(24));
 }
 
+function describeDiscoveryUrl(discoveryUrl) {
+  try {
+    const parsed = new URL(discoveryUrl);
+    return `${parsed.origin}${parsed.pathname}`;
+  } catch {
+    return discoveryUrl.slice(0, 120);
+  }
+}
+
 async function loadDiscovery(force = false) {
   const { discoveryUrl } = getOidcConfig();
   const now = Date.now();
@@ -74,7 +83,12 @@ async function loadDiscovery(force = false) {
   });
 
   if (!response.ok) {
-    throw new Error(`OIDC discovery failed: HTTP ${response.status}`);
+    const target = describeDiscoveryUrl(discoveryUrl);
+    const hint =
+      response.status === 404
+        ? ' Check OIDC_DISCOVERY_URL on the API server — it must be the DWS Hub OpenID document, not a TAS URL.'
+        : '';
+    throw new Error(`OIDC discovery failed: HTTP ${response.status} for ${target}.${hint}`);
   }
 
   const meta = await response.json();
@@ -323,6 +337,7 @@ module.exports = {
   useSecureCookies,
   oidcCookieOptions,
   clearOidcCookieOptions,
+  describeDiscoveryUrl,
   // exported for tests / diagnostics
   loadDiscovery,
 };

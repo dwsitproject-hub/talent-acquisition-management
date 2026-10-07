@@ -1,6 +1,15 @@
 "use client"
 
-import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import {
+  Suspense,
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+  type WheelEvent,
+} from 'react'
 import { createPortal } from 'react-dom'
 import { useSearchParams } from 'next/navigation'
 import Layout from '@/components/Layout/Layout'
@@ -427,6 +436,13 @@ function SummaryByPositionContent() {
   const [showColumnToggle, setShowColumnToggle] = useState(false)
 
   const columnToggleRef = useRef<HTMLDivElement | null>(null)
+  const tableScrollRef = useRef<HTMLDivElement>(null)
+  const hScrollBarRef = useRef<HTMLDivElement>(null)
+  const tableRef = useRef<HTMLTableElement>(null)
+  const [tableScrollWidth, setTableScrollWidth] = useState(0)
+  const [showHorizontalScrollBar, setShowHorizontalScrollBar] = useState(false)
+  const [horizontalScrollLeft, setHorizontalScrollLeft] = useState(0)
+  const hScrollSyncLock = useRef(false)
 
   const positionEdit = usePositionEditOverlay(() => {
     void loadSummaryData({ silent: true })
@@ -661,6 +677,67 @@ function SummaryByPositionContent() {
     [hiddenPipelineColumns]
   )
 
+  const measureTableScrollWidth = useCallback(() => {
+    const table = tableRef.current
+    const container = tableScrollRef.current
+    if (!table) return
+    const width = table.scrollWidth
+    setTableScrollWidth(width)
+    if (container) {
+      const needsBar = width > container.clientWidth + 1
+      setShowHorizontalScrollBar(needsBar)
+      const maxScroll = Math.max(0, width - container.clientWidth)
+      setHorizontalScrollLeft((prev) => Math.min(prev, maxScroll))
+    }
+  }, [])
+
+  useLayoutEffect(() => {
+    measureTableScrollWidth()
+    const table = tableRef.current
+    const container = tableScrollRef.current
+    if (!table || typeof ResizeObserver === 'undefined') return
+    const ro = new ResizeObserver(() => measureTableScrollWidth())
+    ro.observe(table)
+    if (container) ro.observe(container)
+    return () => ro.disconnect()
+  }, [
+    measureTableScrollWidth,
+    sortedRows.length,
+    visiblePipelineColumns.length,
+    hiddenPipelineColumns,
+    loading,
+  ])
+
+  useLayoutEffect(() => {
+    const bar = hScrollBarRef.current
+    if (!bar || hScrollSyncLock.current) return
+    if (bar.scrollLeft !== horizontalScrollLeft) {
+      hScrollSyncLock.current = true
+      bar.scrollLeft = horizontalScrollLeft
+      hScrollSyncLock.current = false
+    }
+  }, [horizontalScrollLeft])
+
+  const handleBottomBarScroll = useCallback((scrollLeft: number) => {
+    if (hScrollSyncLock.current) return
+    setHorizontalScrollLeft(scrollLeft)
+  }, [])
+
+  const handleTableWheel = useCallback(
+    (e: WheelEvent<HTMLDivElement>) => {
+      if (!showHorizontalScrollBar) return
+      const container = tableScrollRef.current
+      if (!container) return
+      const maxScroll = Math.max(0, tableScrollWidth - container.clientWidth)
+      const delta =
+        Math.abs(e.deltaX) > Math.abs(e.deltaY) ? e.deltaX : e.shiftKey ? e.deltaY : 0
+      if (delta === 0) return
+      e.preventDefault()
+      setHorizontalScrollLeft((prev) => Math.min(maxScroll, Math.max(0, prev + delta)))
+    },
+    [showHorizontalScrollBar, tableScrollWidth]
+  )
+
   const handleSort = (key: string) => {
     if (sortKey === key) {
       setSortDir(prev => prev === 'asc' ? 'desc' : 'asc')
@@ -858,7 +935,7 @@ function SummaryByPositionContent() {
         </div>
 
         {/* Table card */}
-        <div className="bg-white shadow rounded-lg">
+        <div className="bg-white shadow rounded-lg flex flex-col">
           {/* Table toolbar */}
           <div className="px-4 pt-4 pb-3 sm:px-6 flex flex-wrap items-center justify-between gap-3 border-b border-gray-100">
             <div className="flex items-center gap-3 flex-wrap">
@@ -966,9 +1043,24 @@ function SummaryByPositionContent() {
             </div>
           </div>
 
-          {/* Table container — overflow-auto + max-h gives a true scroll context so sticky <th> cells work correctly. KPI cards/filters are outside this container and scroll naturally with the page. */}
-          <div className="overflow-auto max-h-[calc(100dvh-220px)] min-h-[300px]">
-            <table className="min-w-full divide-y divide-gray-200">
+          {/*
+            Sticky <th> needs a vertical scroll container (max-h). Horizontal scroll uses the
+            docked bar below so you can pan columns while still at the top of the list.
+          */}
+          <div className="flex flex-col min-h-[300px] max-h-[calc(100dvh-220px)]">
+            <div
+              ref={tableScrollRef}
+              className="flex-1 min-h-0 min-w-0 overflow-y-auto overflow-x-hidden"
+              onWheel={handleTableWheel}
+            >
+              <div
+                className="relative min-w-0"
+                style={{
+                  width: tableScrollWidth > 0 ? tableScrollWidth : '100%',
+                  left: -horizontalScrollLeft,
+                }}
+              >
+            <table ref={tableRef} className="min-w-full divide-y divide-gray-200">
               {/*
                 sticky is intentionally on each <th> rather than <thead>.
                 When overflow-x:auto creates a scroll container on the wrapper,
@@ -1143,6 +1235,18 @@ function SummaryByPositionContent() {
                 )}
               </tbody>
             </table>
+              </div>
+            </div>
+            {showHorizontalScrollBar && (
+              <div
+                ref={hScrollBarRef}
+                className="shrink-0 overflow-x-auto overflow-y-hidden border-t border-gray-200 bg-gray-50"
+                onScroll={(e) => handleBottomBarScroll(e.currentTarget.scrollLeft)}
+                aria-label="Scroll table horizontally"
+              >
+                <div style={{ width: tableScrollWidth, height: 14 }} />
+              </div>
+            )}
           </div>
         </div>
       </div>

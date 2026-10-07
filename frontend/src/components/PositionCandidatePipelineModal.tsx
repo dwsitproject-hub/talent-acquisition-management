@@ -257,7 +257,6 @@ export default function PositionCandidatePipelineModal({
   const [historyApplicationId, setHistoryApplicationId] = useState<string | null>(null)
   const [sortKey, setSortKey] = useState<SortKey>('latestUpdate')
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc')
-
   useModalEscape(isOpen && !historyApplicationId, onClose)
 
   const handleSort = (key: SortKey) => {
@@ -358,8 +357,8 @@ export default function PositionCandidatePipelineModal({
             </button>
           </div>
 
-          {/* Body — single scroll region; table header sticks inside this container */}
-          <div className="flex-1 min-h-0 overflow-auto px-4 sm:px-6 py-4 sm:py-5">
+          {/* Body — single overflow-auto scroll area (vertical + horizontal) */}
+          <div className="flex-1 min-h-0 flex flex-col px-4 sm:px-6 py-4 sm:py-5">
             {loading ? (
               <div className="flex items-center justify-center py-16">
                 <div className="animate-spin h-8 w-8 rounded-full border-2 border-indigo-600 border-t-transparent" />
@@ -375,8 +374,8 @@ export default function PositionCandidatePipelineModal({
                 <p className="text-sm font-medium text-gray-700">No candidates have applied yet.</p>
               </div>
             ) : (
-              <div className="-mx-4 sm:mx-0 overflow-x-auto">
-                <table className="w-full divide-y divide-gray-200">
+              <div className="-mx-4 sm:mx-0 flex-1 min-h-0 overflow-auto">
+                <table className="min-w-[960px] w-full divide-y divide-gray-200">
                   <thead className="bg-gray-50">
                     <tr>
                       {COLUMNS.map((col, i) => (
