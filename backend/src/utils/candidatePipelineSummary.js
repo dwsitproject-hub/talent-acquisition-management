@@ -8,8 +8,9 @@ const { businessDaysDiffIndonesia } = require('./indoBusinessDays');
  *
  * Design notes (see conversation / PRD discussion):
  * - "SLA to Interview" = Indonesia working days from appliedAt to the interview date.
- *   Interview date = earliest of INTERVIEW_SCHEDULED / INTERVIEW_COMPLETED history,
- *   falling back to the application.interviewedAt column.
+ *   Interview date = earliest Interview.scheduledAt from the interview records (excluding
+ *   cancelled/rescheduled rows), falling back to application.interviewedAt, then to the
+ *   first INTERVIEW_SCHEDULED / INTERVIEW_COMPLETED status-history timestamp.
  * - "SLA to Interview" is always populated once the candidate has a terminal
  *   interview-stage outcome, so rejections/withdrawals never show a blank SLA:
  *     - Rejected/withdrawn BEFORE ever being interviewed → SLA runs appliedAt → that
@@ -85,19 +86,17 @@ function hasInterviewResultFilled(application) {
   return interviews.some((iv) => (iv?.notes || '').toString().trim().length > 0);
 }
 
-function resolveInterviewDate(application, firstReached) {
-  const fromHistory =
-    toDateOrNull(firstReached.INTERVIEW_SCHEDULED) ||
-    toDateOrNull(firstReached.INTERVIEW_COMPLETED) ||
-    toDateOrNull(application.interviewedAt);
+// Interview rows that never took place at their scheduledAt (replaced or called off).
+const IGNORED_INTERVIEW_STATUSES = new Set(['CANCELLED', 'RESCHEDULED']);
 
-  if (fromHistory) return fromHistory;
-
-  const interviews = application.interviews;
+/** Earliest `Interview.scheduledAt` among interview records that actually stand. */
+function earliestInterviewRecordDate(interviews) {
   if (!Array.isArray(interviews) || interviews.length === 0) return null;
 
   let earliest = null;
   for (const iv of interviews) {
+    const status = (iv?.status || '').toString().toUpperCase();
+    if (IGNORED_INTERVIEW_STATUSES.has(status)) continue;
     const scheduled = toDateOrNull(iv?.scheduledAt);
     if (!scheduled) continue;
     if (!earliest || scheduled.getTime() < earliest.getTime()) {
@@ -107,13 +106,27 @@ function resolveInterviewDate(application, firstReached) {
   return earliest;
 }
 
+/**
+ * Interview date = the date entered on the interview record (edit modal). Status-history
+ * timestamps only reflect when a recruiter clicked the status change — often days after
+ * the real interview when statuses are back-filled — so they are a last resort only.
+ */
+function resolveInterviewDate(application, firstReached) {
+  return (
+    earliestInterviewRecordDate(application.interviews) ||
+    toDateOrNull(application.interviewedAt) ||
+    toDateOrNull(firstReached.INTERVIEW_SCHEDULED) ||
+    toDateOrNull(firstReached.INTERVIEW_COMPLETED)
+  );
+}
+
 function interviewStageClearedForOffer(firstReached) {
   return Boolean(firstReached[DOCUMENT_VERIFICATION_STATUS]);
 }
 
 /**
  * @param {object} application - { appliedAt, interviewedAt, rejectedAt, withdrawnAt, joinDate,
- *   interviews?: [{ scheduledAt, notes }],
+ *   interviews?: [{ scheduledAt, status, notes }],
  *   statusHistory: [{ toStatus, createdAt }] (ascending) }
  * @param {{ now?: Date }} [options]
  */

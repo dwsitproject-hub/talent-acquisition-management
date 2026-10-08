@@ -74,6 +74,69 @@ describe('buildCandidatePipelineSummary', () => {
     expect(result.offer.outcome).toBe('not_applicable');
   });
 
+  it('uses the interview record date, not a back-filled INTERVIEW_SCHEDULED status timestamp', () => {
+    const result = buildCandidatePipelineSummary(
+      {
+        appliedAt: iso(0), // Wed 1 Jan 2025
+        interviewedAt: null,
+        rejectedAt: null,
+        withdrawnAt: null,
+        joinDate: null,
+        statusHistory: [
+          { toStatus: 'SUBMITTED', createdAt: iso(0) },
+          // Recruiter updated the status 12 days later, after the fact.
+          { toStatus: 'INTERVIEW_SCHEDULED', createdAt: iso(12) },
+        ],
+        interviews: [{ scheduledAt: iso(2), status: 'COMPLETED', notes: 'kiv' }], // Fri 3 Jan
+      },
+      { now: FIXED_NOW }
+    );
+
+    expect(result.interview.date).toBe(iso(2));
+    expect(result.interview.slaDays).toBe(2); // Thu 2 + Fri 3 Jan
+    expect(result.interview.slaBasis).toBe('interview');
+  });
+
+  it('ignores cancelled / rescheduled interview records when picking the interview date', () => {
+    const result = buildCandidatePipelineSummary(
+      {
+        appliedAt: iso(0),
+        interviewedAt: null,
+        rejectedAt: null,
+        withdrawnAt: null,
+        joinDate: null,
+        statusHistory: [{ toStatus: 'INTERVIEW_SCHEDULED', createdAt: iso(1) }],
+        interviews: [
+          { scheduledAt: iso(2), status: 'CANCELLED', notes: '' },
+          { scheduledAt: iso(3), status: 'RESCHEDULED', notes: '' },
+          { scheduledAt: iso(6), status: 'COMPLETED', notes: 'Proceed' },
+        ],
+      },
+      { now: FIXED_NOW }
+    );
+
+    expect(result.interview.outcome).toBe('interviewed');
+    expect(result.interview.date).toBe(iso(6));
+  });
+
+  it('falls back to status history when there is no interview record', () => {
+    const result = buildCandidatePipelineSummary({
+      appliedAt: iso(0),
+      interviewedAt: null,
+      rejectedAt: iso(9),
+      withdrawnAt: null,
+      joinDate: null,
+      statusHistory: [
+        { toStatus: 'INTERVIEW_SCHEDULED', createdAt: iso(6) },
+        { toStatus: 'REJECTED', createdAt: iso(9) },
+      ],
+      interviews: [],
+    });
+
+    expect(result.interview.slaBasis).toBe('interview');
+    expect(result.interview.slaDays).toBe(4); // Thu 2, Fri 3, Mon 6, Tue 7 Jan
+  });
+
   it('shows passed once Document Verification is reached in history', () => {
     const result = buildCandidatePipelineSummary(
       {

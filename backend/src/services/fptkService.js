@@ -1114,7 +1114,7 @@ async function getPositionCandidatePipeline(fptkId) {
       },
       interviews: {
         orderBy: { scheduledAt: 'asc' },
-        select: { scheduledAt: true, notes: true },
+        select: { scheduledAt: true, status: true, notes: true },
       },
     },
     orderBy: { updatedAt: 'desc' },
