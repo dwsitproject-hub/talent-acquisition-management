@@ -156,7 +156,7 @@ function OverviewChart({
               <span className="text-right">Closed</span>
               <span
                 className="text-right"
-                title="Average calendar days from application to offer acceptance, across the hires in brackets"
+                title="Average Indonesia working days (weekends &amp; national holidays excluded) from application to offer acceptance, across the hires in brackets"
               >
                 Avg applied → offer accepted
               </span>

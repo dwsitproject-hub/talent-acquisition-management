@@ -77,7 +77,8 @@ function buildEarliestOfferAcceptanceAtByFptkId(applications, statusHistoryRows)
  * Per-FPTK "time to offer" stats for the Summary by Position overview.
  *
  * For every application that reached offer acceptance (any status at/after
- * OFFER_ACCEPTED), measure calendar days from `appliedAt` to its EARLIEST
+ * OFFER_ACCEPTED), measure Indonesia working days (weekends and national
+ * holidays excluded — same rule as the position SLA) from `appliedAt` to its EARLIEST
  * acceptance — taken from status history, falling back to `updatedAt` when the
  * application sits in an acceptance status without history.
  *
@@ -112,7 +113,7 @@ function buildTimeToOfferByFptkId(applications, statusHistoryRows) {
     let acceptedAt = acceptedAtByAppId.get(app.id) || null;
     if (!acceptedAt && isOfferAcceptanceSlaFreezeStatus(app.status)) acceptedAt = toDate(app.updatedAt);
     if (!acceptedAt) return;
-    const days = Math.max(0, (acceptedAt.getTime() - appliedAt.getTime()) / 86400000);
+    const days = businessDaysDiffIndonesia(appliedAt, acceptedAt);
     if (!byFptkId[app.fptkId]) byFptkId[app.fptkId] = { hires: 0, totalDays: 0, acceptedAt: [] };
     byFptkId[app.fptkId].hires += 1;
     byFptkId[app.fptkId].totalDays += days;

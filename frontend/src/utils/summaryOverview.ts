@@ -68,7 +68,7 @@ export interface OverviewGroup {
   /** Open headcount/positions in the Above 91 Days bucket. */
   overdue: number
   hires: number
-  /** Hire-weighted calendar days, applied → offer accepted. */
+  /** Hire-weighted Indonesia working days, applied → offer accepted. */
   avgTimeToOfferDays: number | null
   /** Mean working-day SLA of the group's open positions. */
   avgOpenSlaDays: number | null
