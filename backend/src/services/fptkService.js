@@ -18,6 +18,7 @@ const {
 } = require('../utils/applicationStatus');
 const {
   buildEarliestOfferAcceptanceAtByFptkId,
+  buildTimeToOfferByFptkId,
   getPositionSlaBucket,
 } = require('../utils/positionSla');
 const { buildCandidatePipelineSummary } = require('../utils/candidatePipelineSummary');
@@ -1426,6 +1427,7 @@ async function getSummaryByPosition(user = null) {
     area: true,
     areaDetail: true,
     pt: true,
+    totalRequest: true,
     hiringManager: true,
     requestDate: true,
     fptkReceiveDate: true,
@@ -1451,7 +1453,7 @@ async function getSummaryByPosition(user = null) {
 
   // Minimal per-application select used to compute cumulative "ever reached
   // this stage" counts (see status-history aggregation below).
-  const applicationSelect = { id: true, fptkId: true, status: true, updatedAt: true };
+  const applicationSelect = { id: true, fptkId: true, status: true, appliedAt: true, updatedAt: true };
 
   const isScopedRole = Object.keys(fptkWhere).length > 0;
 
@@ -1553,6 +1555,9 @@ async function getSummaryByPosition(user = null) {
     statusHistoryRows
   );
 
+  // Applied → offer accepted per hired candidate (Overview tab averages).
+  const timeToOfferByFptkId = buildTimeToOfferByFptkId(applications, statusHistoryRows);
+
   const rawStatusesByApplicationId = new Map();
   statusHistoryRows.forEach((h) => {
     if (!rawStatusesByApplicationId.has(h.applicationId)) {
@@ -1633,6 +1638,7 @@ async function getSummaryByPosition(user = null) {
     currentStatusesByFptkId,
     totalApplicants: totalApplicantsByFptkId,
     onboardingCandidates: onboardingByFptkId,
+    timeToOffer: timeToOfferByFptkId,
     statuses: Array.from(allStatuses),
     priorities: Array.from(priorities),
     divisions: Array.from(divisions),

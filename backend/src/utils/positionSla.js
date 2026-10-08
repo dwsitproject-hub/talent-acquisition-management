@@ -74,6 +74,59 @@ function buildEarliestOfferAcceptanceAtByFptkId(applications, statusHistoryRows)
 }
 
 /**
+ * Per-FPTK "time to offer" stats for the Summary by Position overview.
+ *
+ * For every application that reached offer acceptance (any status at/after
+ * OFFER_ACCEPTED), measure calendar days from `appliedAt` to its EARLIEST
+ * acceptance — taken from status history, falling back to `updatedAt` when the
+ * application sits in an acceptance status without history.
+ *
+ * Returns `{ [fptkId]: { hires, totalDays, acceptedAt } }` rather than an
+ * average so callers can produce hire-weighted averages over any grouping
+ * (Σ totalDays / Σ hires) instead of averaging averages. `acceptedAt` lists each
+ * hire's acceptance timestamp (ISO, ascending) for the per-month trend chart.
+ */
+function buildTimeToOfferByFptkId(applications, statusHistoryRows) {
+  const toDate = (value) => {
+    if (value == null) return null;
+    const d = value instanceof Date ? value : new Date(value);
+    return Number.isNaN(d.getTime()) ? null : d;
+  };
+
+  /** @type {Map<string, Date>} */
+  const acceptedAtByAppId = new Map();
+  (statusHistoryRows || []).forEach((row) => {
+    if (!row?.applicationId || !isOfferAcceptanceSlaFreezeStatus(row.toStatus)) return;
+    const d = toDate(row.createdAt);
+    if (!d) return;
+    const existing = acceptedAtByAppId.get(row.applicationId);
+    if (!existing || d.getTime() < existing.getTime()) acceptedAtByAppId.set(row.applicationId, d);
+  });
+
+  /** @type {Record<string, { hires: number, totalDays: number, acceptedAt: string[] }>} */
+  const byFptkId = {};
+  (applications || []).forEach((app) => {
+    if (!app?.fptkId) return;
+    const appliedAt = toDate(app.appliedAt);
+    if (!appliedAt) return;
+    let acceptedAt = acceptedAtByAppId.get(app.id) || null;
+    if (!acceptedAt && isOfferAcceptanceSlaFreezeStatus(app.status)) acceptedAt = toDate(app.updatedAt);
+    if (!acceptedAt) return;
+    const days = Math.max(0, (acceptedAt.getTime() - appliedAt.getTime()) / 86400000);
+    if (!byFptkId[app.fptkId]) byFptkId[app.fptkId] = { hires: 0, totalDays: 0, acceptedAt: [] };
+    byFptkId[app.fptkId].hires += 1;
+    byFptkId[app.fptkId].totalDays += days;
+    byFptkId[app.fptkId].acceptedAt.push(acceptedAt.toISOString());
+  });
+
+  Object.values(byFptkId).forEach((entry) => {
+    entry.totalDays = Math.round(entry.totalDays * 10) / 10;
+    entry.acceptedAt.sort();
+  });
+  return byFptkId;
+}
+
+/**
  * SLA end: earliest of offer acceptance, position close, or today (open pipeline).
  * Keep in sync with frontend `src/utils/positionSla.ts`.
  */
@@ -132,6 +185,7 @@ module.exports = {
   CLOSED_CURRENT_STATUSES,
   OFFER_ACCEPTANCE_SLA_FREEZE_STATUSES,
   buildEarliestOfferAcceptanceAtByFptkId,
+  buildTimeToOfferByFptkId,
   getPositionSlaBucket,
   getPositionSlaWorkingDays,
   isFptkClosedByCurrentStatus,
