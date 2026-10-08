@@ -16,6 +16,7 @@ import { getApplicationStatusPillClass } from '@/utils/applicationStatusUi'
 
 type StageOutcome =
   | 'passed'
+  | 'interviewed'
   | 'rejected'
   | 'withdrawn'
   | 'pending'
@@ -185,6 +186,7 @@ const OUTCOME_CONFIG: Record<
   { label: string; icon: typeof CheckCircleIcon; className: string }
 > = {
   passed: { label: 'Passed', icon: CheckCircleIcon, className: 'text-green-600' },
+  interviewed: { label: 'Interviewed', icon: CheckCircleIcon, className: 'text-blue-600' },
   accepted: { label: 'Accepted', icon: CheckCircleIcon, className: 'text-green-600' },
   rejected: { label: 'Rejected', icon: XCircleIcon, className: 'text-red-600' },
   withdrawn: { label: 'Withdrawn', icon: ArrowUturnLeftIcon, className: 'text-gray-400' },

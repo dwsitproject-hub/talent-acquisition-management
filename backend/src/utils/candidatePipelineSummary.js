@@ -26,9 +26,16 @@ const { businessDaysDiffIndonesia } = require('./indoBusinessDays');
  * - While a stage is still in progress (no terminal date yet), the SLA is computed
  *   against `now` and flagged `pending: true` so the UI can show it as "so far"
  *   rather than a finalized duration.
+ * - Interview Result "Interviewed": interview date is before today (calendar) and at
+ *   least one interview row from the edit modal has results (`Interview.notes`).
+ * - Interview Result "Passed": candidate reached `DOCUMENT_VERIFICATION` in history
+ *   (cleared the interview gate for offer-stage columns).
+ * - Join Date: `Application.joinDate` from the position edit modal when set (not gated
+ *   on offer acceptance).
  */
 
 const REJECTED_STATUS = 'REJECTED'; // "Rejected (Failed Interview / Assessment)"
+const DOCUMENT_VERIFICATION_STATUS = 'DOCUMENT_VERIFICATION';
 
 /** Earliest createdAt per toStatus from ascending-ordered status history. */
 function buildFirstReachedMap(statusHistory) {
@@ -62,8 +69,51 @@ function slaDaysBetween(start, end) {
   return businessDaysDiffIndonesia(start, end);
 }
 
+/** Calendar day strictly before `ref` (UTC midnight comparison). */
+function isCalendarDateBefore(date, ref) {
+  if (!date || !ref) return false;
+  const d = new Date(date);
+  const r = new Date(ref);
+  d.setUTCHours(0, 0, 0, 0);
+  r.setUTCHours(0, 0, 0, 0);
+  return d.getTime() < r.getTime();
+}
+
+function hasInterviewResultFilled(application) {
+  const interviews = application.interviews;
+  if (!Array.isArray(interviews) || interviews.length === 0) return false;
+  return interviews.some((iv) => (iv?.notes || '').toString().trim().length > 0);
+}
+
+function resolveInterviewDate(application, firstReached) {
+  const fromHistory =
+    toDateOrNull(firstReached.INTERVIEW_SCHEDULED) ||
+    toDateOrNull(firstReached.INTERVIEW_COMPLETED) ||
+    toDateOrNull(application.interviewedAt);
+
+  if (fromHistory) return fromHistory;
+
+  const interviews = application.interviews;
+  if (!Array.isArray(interviews) || interviews.length === 0) return null;
+
+  let earliest = null;
+  for (const iv of interviews) {
+    const scheduled = toDateOrNull(iv?.scheduledAt);
+    if (!scheduled) continue;
+    if (!earliest || scheduled.getTime() < earliest.getTime()) {
+      earliest = scheduled;
+    }
+  }
+  return earliest;
+}
+
+function interviewStageClearedForOffer(firstReached) {
+  return Boolean(firstReached[DOCUMENT_VERIFICATION_STATUS]);
+}
+
 /**
  * @param {object} application - { appliedAt, interviewedAt, rejectedAt, withdrawnAt, joinDate,
+ *   interviews?: [{ scheduledAt, notes }],
  *   statusHistory: [{ toStatus, createdAt }] (ascending) }
  * @param {{ now?: Date }} [options]
  */
@@ -74,10 +124,9 @@ function buildCandidatePipelineSummary(application, options = {}) {
 
   const appliedAt = toDateOrNull(application.appliedAt);
 
-  const interviewDate =
-    toDateOrNull(firstReached.INTERVIEW_SCHEDULED) ||
-    toDateOrNull(firstReached.INTERVIEW_COMPLETED) ||
-    toDateOrNull(application.interviewedAt);
+  const interviewDate = resolveInterviewDate(application, firstReached);
+  const interviewResultExists = hasInterviewResultFilled(application);
+  const clearedInterviewForOffer = interviewStageClearedForOffer(firstReached);
 
   const rejectedAt = toDateOrNull(firstReached[REJECTED_STATUS]) || toDateOrNull(application.rejectedAt);
   const withdrawnAt = toDateOrNull(lastReached.WITHDRAWN) || toDateOrNull(application.withdrawnAt);
@@ -92,8 +141,14 @@ function buildCandidatePipelineSummary(application, options = {}) {
     interview = { outcome: 'rejected', date: rejectedAt };
   } else if (withdrawnAt && (!interviewDate || withdrawnAt <= interviewDate)) {
     interview = { outcome: 'withdrawn', date: withdrawnAt };
-  } else if (interviewDate) {
+  } else if (clearedInterviewForOffer && interviewDate) {
     interview = { outcome: 'passed', date: interviewDate };
+  } else if (
+    interviewDate &&
+    isCalendarDateBefore(interviewDate, now) &&
+    interviewResultExists
+  ) {
+    interview = { outcome: 'interviewed', date: interviewDate };
   } else {
     interview = { outcome: 'pending', date: null };
   }
@@ -108,7 +163,11 @@ function buildCandidatePipelineSummary(application, options = {}) {
   let slaToInterviewPending = false;
   let slaToInterviewBasis = null; // 'interview' | 'rejection' | 'withdrawal' | 'elapsed'
 
-  if (interview.outcome === 'passed' && appliedAt && interviewDate) {
+  if (
+    (interview.outcome === 'passed' || interview.outcome === 'interviewed') &&
+    appliedAt &&
+    interviewDate
+  ) {
     slaToInterviewDays = slaDaysBetween(appliedAt, interviewDate);
     slaToInterviewBasis = 'interview';
   } else if (interview.outcome === 'rejected' && appliedAt && rejectedAt) {
@@ -191,7 +250,7 @@ function buildCandidatePipelineSummary(application, options = {}) {
       slaDays: slaToOfferDecisionDays,
       slaPending: slaToOfferDecisionPending,
     },
-    joinDate: offer.outcome === 'accepted' && joinDate ? joinDate.toISOString() : null,
+    joinDate: joinDate ? joinDate.toISOString() : null,
   };
 }
 
