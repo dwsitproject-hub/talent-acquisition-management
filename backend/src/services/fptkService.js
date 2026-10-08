@@ -1425,6 +1425,7 @@ async function getSummaryByPosition(user = null) {
     location: true,
     area: true,
     areaDetail: true,
+    pt: true,
     hiringManager: true,
     requestDate: true,
     fptkReceiveDate: true,
