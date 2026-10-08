@@ -47,6 +47,21 @@ import {
   type SummaryPipelineColumnKey,
   type SummaryPipelineCounts,
 } from '@/utils/summaryByPositionColumns'
+import SummaryOverviewTab from '@/components/SummaryOverviewTab'
+import {
+  OVERDUE_SLA_BUCKET,
+  OVERVIEW_DIMENSION_LABEL,
+  REQUEST_DATE_RANGE_OPTIONS,
+  compareGroupNames,
+  divisionLabel,
+  formatSiteLabel,
+  matchesOverviewSelection,
+  matchesRequestDateRange,
+  requestDateCutoff,
+  type OverviewSelection,
+  type RequestDateRange,
+  type TimeToOfferStats,
+} from '@/utils/summaryOverview'
 
 interface OnboardingCandidate {
   name: string
@@ -71,6 +86,10 @@ interface SummaryRow {
   summaryCounts: SummaryPipelineCounts
   onboardingCandidates: OnboardingCandidate[]
   latestPipeline: LatestPipelineProgress | null
+  totalRequest: number | null
+  timeToOffer: TimeToOfferStats | null
+  offerAcceptedAt: string | null
+  referenceDate: string | null
 }
 
 function hiringManagerMatches(rowHm: string, selected: string[]): boolean {
@@ -106,20 +125,6 @@ function formatAreaLocationLine(area: string, location: string): string | null {
 
 
 // ---------- Site (PT) → Division grouping ----------
-const UNASSIGNED_SITE = 'Unassigned Site'
-const UNASSIGNED_DIVISION = 'Unassigned Division'
-const OVERDUE_SLA_BUCKET = 'Above 91 Days'
-
-/** "Karawaci (CRC)" = Area Detail + PT. Falls back gracefully when either is missing. */
-function formatSiteLabel(location: string, pt: string): string {
-  const site = location && location !== '-' ? location.trim() : ''
-  const company = pt && pt !== '-' ? pt.trim() : ''
-  if (site && company) return `${site} (${company})`
-  if (site) return site
-  if (company) return company
-  return UNASSIGNED_SITE
-}
-
 interface GroupStats {
   key: string
   name: string
@@ -151,20 +156,12 @@ function computeGroupStats(key: string, name: string, rows: SummaryRow[]): Group
   return { key, name, positionCount: rows.length, openCount, overdueCount, totals }
 }
 
-/** Sorts names alphabetically, keeping the "Unassigned …" bucket last. */
-function compareGroupNames(a: string, b: string): number {
-  const au = a === UNASSIGNED_SITE || a === UNASSIGNED_DIVISION
-  const bu = b === UNASSIGNED_SITE || b === UNASSIGNED_DIVISION
-  if (au !== bu) return au ? 1 : -1
-  return a.localeCompare(b, undefined, { sensitivity: 'base' })
-}
-
 /** Groups already-sorted rows; row order inside each division follows the table sort. */
 function buildSiteGroups(rows: SummaryRow[]): SiteGroup[] {
   const bySite = new Map<string, Map<string, SummaryRow[]>>()
   rows.forEach((r) => {
     const siteName = formatSiteLabel(r.location, r.pt)
-    const divName = r.division && r.division !== '-' ? r.division.trim() : UNASSIGNED_DIVISION
+    const divName = divisionLabel(r.division)
     if (!bySite.has(siteName)) bySite.set(siteName, new Map())
     const divMap = bySite.get(siteName)!
     if (!divMap.has(divName)) divMap.set(divName, [])
@@ -490,10 +487,22 @@ function slaSectionLabel(activeStatusCard: StatusCardKey | null): string {
   return 'SLA health · all positions'
 }
 
+type SummaryTab = 'overview' | 'detail'
+
 function SummaryByPositionContent() {
   const searchParams = useSearchParams()
   const _locationParam = searchParams.get('location')
   const _cardParam = searchParams.get('card')
+  const _tabParam = searchParams.get('tab')
+  // Dashboard deep links (?location=…&card=…) land on Detail with every request
+  // date included, so the counts match the dashboard tile that was clicked.
+  const isDeepLink = Boolean(_locationParam || _cardParam)
+
+  const [activeTab, setActiveTab] = useState<SummaryTab>(
+    _tabParam === 'detail' || _tabParam === 'overview' ? _tabParam : isDeepLink ? 'detail' : 'overview'
+  )
+  const [requestDateRange, setRequestDateRange] = useState<RequestDateRange>(isDeepLink ? 'all' : '12m')
+  const [crossFilter, setCrossFilter] = useState<OverviewSelection | null>(null)
 
   const [rows, setRows] = useState<SummaryRow[]>([])
   const [loading, setLoading] = useState(true)
@@ -577,6 +586,7 @@ function SummaryByPositionContent() {
       const currentStatusesByFptkId: Record<string, string[]> = payload?.currentStatusesByFptkId || {}
       const totalApplicants: Record<string, number> = payload?.totalApplicants || {}
       const onboardingCandidatesMap: Record<string, OnboardingCandidate[]> = payload?.onboardingCandidates || {}
+      const timeToOfferMap: Record<string, TimeToOfferStats> = payload?.timeToOffer || {}
 
       const result: SummaryRow[] = allJobPostings.map((job: any) => {
         const summaryCounts: SummaryPipelineCounts = {
@@ -621,6 +631,10 @@ function SummaryByPositionContent() {
           latestPipeline: getLatestPipelineProgress(
             (currentStatusesByFptkId[job.id] || []).map((status) => ({ backendStatus: status }))
           ),
+          totalRequest: job.totalRequest ?? null,
+          timeToOffer: timeToOfferMap[job.id] ?? null,
+          offerAcceptedAt: job.offerAcceptedAt ?? null,
+          referenceDate: job.fptkReceiveDate || job.requestDate || job.createdAt || null,
         }
       })
 
@@ -677,18 +691,26 @@ function SummaryByPositionContent() {
 
   const priorities = ['P0', 'P1', 'P2']
 
+  // Page filters — shared by both tabs. The Overview charts read these rows
+  // directly and apply the cross-filter themselves (per chart).
+  const pageFilteredRows = useMemo(() => {
+    const cutoff = requestDateCutoff(requestDateRange)
+    return rows.filter((r) => {
+      const priorityOk = priorityFilter.length === 0 || priorityFilter.includes(r.priority)
+      const areaOk = areaFilter.length === 0 || areaFilter.includes(r.area)
+      const locationOk = locationFilter.length === 0 || locationFilter.includes(r.location)
+      const divisionOk = divisionFilter.length === 0 || divisionFilter.includes(r.division)
+      const statusFktkOk = statusFktkFilter.length === 0 || statusFktkFilter.includes(r.statusFktk)
+      const hiringManagerOk = hiringManagerMatches(r.hiringManager, hiringManagerFilter)
+      const requestDateOk = matchesRequestDateRange(r.referenceDate, cutoff)
+      return priorityOk && areaOk && locationOk && divisionOk && statusFktkOk && hiringManagerOk && requestDateOk
+    })
+  }, [rows, priorityFilter, areaFilter, locationFilter, divisionFilter, statusFktkFilter, hiringManagerFilter, requestDateRange])
+
+  // Detail tab: page filters + the Overview cross-filter selection.
   const dropdownFilteredRows = useMemo(
-    () =>
-      rows.filter((r) => {
-        const priorityOk = priorityFilter.length === 0 || priorityFilter.includes(r.priority)
-        const areaOk = areaFilter.length === 0 || areaFilter.includes(r.area)
-        const locationOk = locationFilter.length === 0 || locationFilter.includes(r.location)
-        const divisionOk = divisionFilter.length === 0 || divisionFilter.includes(r.division)
-        const statusFktkOk = statusFktkFilter.length === 0 || statusFktkFilter.includes(r.statusFktk)
-        const hiringManagerOk = hiringManagerMatches(r.hiringManager, hiringManagerFilter)
-        return priorityOk && areaOk && locationOk && divisionOk && statusFktkOk && hiringManagerOk
-      }),
-    [rows, priorityFilter, areaFilter, locationFilter, divisionFilter, statusFktkFilter, hiringManagerFilter]
+    () => pageFilteredRows.filter((r) => matchesOverviewSelection(r, crossFilter)),
+    [pageFilteredRows, crossFilter]
   )
 
   // Location options visible in the dropdown, narrowed to the selected area(s)
@@ -798,6 +820,7 @@ function SummaryByPositionContent() {
     visiblePipelineColumns.length,
     hiddenPipelineColumns,
     loading,
+    activeTab,
   ])
 
   useLayoutEffect(() => {
@@ -1075,6 +1098,12 @@ function SummaryByPositionContent() {
     setHiddenPipelineColumns(new Set(empty))
   }
 
+  const switchTab = (tab: SummaryTab) => {
+    setActiveTab(tab)
+    // The docked scrollbar remounts with the table; start it at the left edge.
+    setHorizontalScrollLeft(0)
+  }
+
   if (loading) return <LoadingSkeleton />
 
   return (
@@ -1086,11 +1115,11 @@ function SummaryByPositionContent() {
         ].join(' ')}
       >
         {/* Header */}
-        <div className="flex items-center justify-between">
+        <div className="flex flex-wrap items-end justify-between gap-4">
           <div>
             <h1 className="text-2xl font-bold text-gray-900">Summary by Position</h1>
             <p className="mt-1 text-sm text-gray-500">
-              Pipeline status breakdown by Priority, Division, Section, and Position.
+              Vacancies and pipeline by Site (PT), Division and Hiring Manager.
             </p>
           </div>
           {refreshing && (
@@ -1119,7 +1148,7 @@ function SummaryByPositionContent() {
         )}
 
         {/* Filters */}
-        <div className="bg-white shadow rounded-lg p-4 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+        <div className="bg-white shadow rounded-lg p-4 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
           <MultiSelectDropdown
             label="Priority"
             options={priorities}
@@ -1179,8 +1208,102 @@ function SummaryByPositionContent() {
             placeholder="All statuses"
             searchPlaceholder="Pending or Received..."
           />
+          <div>
+            <label htmlFor="summary-request-date" className="block text-xs font-medium text-gray-500 mb-1">
+              Request date
+            </label>
+            <select
+              id="summary-request-date"
+              value={requestDateRange}
+              onChange={(e) => setRequestDateRange(e.target.value as RequestDateRange)}
+              className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm bg-white text-gray-900 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+              title="FPTK receive date (falls back to request date)"
+            >
+              {REQUEST_DATE_RANGE_OPTIONS.map((o) => (
+                <option key={o.id} value={o.id}>{o.label}</option>
+              ))}
+            </select>
+          </div>
         </div>
 
+        {/* Cross-filter chip (set by clicking a row in an Overview chart) */}
+        {crossFilter && (
+          <div className="flex flex-wrap items-center gap-2 text-sm text-gray-600">
+            <span>Cross-filter:</span>
+            <span className="inline-flex items-center gap-1 rounded-full bg-indigo-50 border border-indigo-200 px-2.5 py-0.5 text-xs font-medium text-indigo-700">
+              {OVERVIEW_DIMENSION_LABEL[crossFilter.dimension]}: {crossFilter.value}
+              <button
+                type="button"
+                onClick={() => setCrossFilter(null)}
+                className="ml-0.5 text-indigo-400 hover:text-indigo-700"
+                aria-label="Clear cross-filter"
+              >
+                <XMarkIcon className="h-3.5 w-3.5" />
+              </button>
+            </span>
+          </div>
+        )}
+
+        {/* Tabs */}
+        <div role="tablist" aria-label="Summary views" className="flex gap-1 border-b border-gray-200">
+          {(
+            [
+              { id: 'overview', label: 'Overview', count: null },
+              { id: 'detail', label: 'Detail', count: sortedRows.length },
+            ] as { id: SummaryTab; label: string; count: number | null }[]
+          ).map((tab) => {
+            const selected = activeTab === tab.id
+            return (
+              <button
+                key={tab.id}
+                type="button"
+                role="tab"
+                id={`summary-tab-${tab.id}`}
+                aria-selected={selected}
+                aria-controls={`summary-panel-${tab.id}`}
+                onClick={() => switchTab(tab.id)}
+                className={[
+                  '-mb-px inline-flex items-center gap-2 min-h-[44px] px-4 border-b-2 text-sm transition-colors',
+                  selected
+                    ? 'border-indigo-600 font-semibold text-gray-900'
+                    : 'border-transparent font-medium text-gray-500 hover:text-gray-700 hover:border-gray-300',
+                ].join(' ')}
+              >
+                {tab.label}
+                {tab.count != null && (
+                  <span
+                    className={`rounded-full px-2 py-0.5 text-xs font-medium ${
+                      selected ? 'bg-indigo-50 text-indigo-700' : 'bg-gray-100 text-gray-600'
+                    }`}
+                  >
+                    {tab.count}
+                  </span>
+                )}
+              </button>
+            )
+          })}
+        </div>
+
+        {activeTab === 'overview' && (
+          <div role="tabpanel" id="summary-panel-overview" aria-labelledby="summary-tab-overview">
+            {rows.length === 0 && !error ? (
+              <div className="bg-white shadow rounded-lg px-4 py-10 text-center text-sm text-gray-500">
+                No data available. Create some positions and applications to see the summary.
+              </div>
+            ) : (
+              <SummaryOverviewTab
+                rows={pageFilteredRows}
+                metric="headcount"
+                selection={crossFilter}
+                onSelect={setCrossFilter}
+                onViewDetail={() => switchTab('detail')}
+              />
+            )}
+          </div>
+        )}
+
+        {activeTab === 'detail' && (
+        <div role="tabpanel" id="summary-panel-detail" aria-labelledby="summary-tab-detail" className="space-y-6">
         {/* Position status (primary) then SLA buckets scoped to that selection */}
         <div className="space-y-4">
           <div className="space-y-2">
@@ -1488,6 +1611,8 @@ function SummaryByPositionContent() {
             )}
           </div>
         </div>
+        </div>
+        )}
       </div>
 
       <PositionEditOverlay
