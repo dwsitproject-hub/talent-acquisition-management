@@ -5,6 +5,8 @@ function iso(daysFromEpoch) {
   return new Date(Date.UTC(2025, 0, 1 + daysFromEpoch)).toISOString();
 }
 
+const FIXED_NOW = new Date(Date.UTC(2025, 0, 20));
+
 describe('buildCandidatePipelineSummary', () => {
   it('marks interview as pending with no SLA finalized while still in early screening', () => {
     const result = buildCandidatePipelineSummary(
@@ -26,25 +28,73 @@ describe('buildCandidatePipelineSummary', () => {
     expect(result.offer.slaDays).toBeNull();
   });
 
-  it('computes SLA to Interview once interview is reached, and leaves offer stage not_yet', () => {
-    const result = buildCandidatePipelineSummary({
-      appliedAt: iso(0),
-      interviewedAt: null,
-      rejectedAt: null,
-      withdrawnAt: null,
-      joinDate: null,
-      statusHistory: [
-        { toStatus: 'SUBMITTED', createdAt: iso(0) },
-        { toStatus: 'SCREENING', createdAt: iso(1) },
-        { toStatus: 'INTERVIEW_SCHEDULED', createdAt: iso(5) },
-      ],
-    });
+  it('stays pending after interview is scheduled until results exist and doc verification clears the gate', () => {
+    const result = buildCandidatePipelineSummary(
+      {
+        appliedAt: iso(0),
+        interviewedAt: null,
+        rejectedAt: null,
+        withdrawnAt: null,
+        joinDate: null,
+        statusHistory: [
+          { toStatus: 'SUBMITTED', createdAt: iso(0) },
+          { toStatus: 'SCREENING', createdAt: iso(1) },
+          { toStatus: 'INTERVIEW_SCHEDULED', createdAt: iso(5) },
+        ],
+      },
+      { now: FIXED_NOW }
+    );
+
+    expect(result.interview.outcome).toBe('pending');
+    expect(result.offer.outcome).toBe('not_applicable');
+    expect(result.offer.slaDays).toBeNull();
+  });
+
+  it('shows interviewed when interview date is in the past and edit-modal results exist', () => {
+    const result = buildCandidatePipelineSummary(
+      {
+        appliedAt: iso(0),
+        interviewedAt: null,
+        rejectedAt: null,
+        withdrawnAt: null,
+        joinDate: null,
+        statusHistory: [
+          { toStatus: 'SUBMITTED', createdAt: iso(0) },
+          { toStatus: 'INTERVIEW_SCHEDULED', createdAt: iso(5) },
+        ],
+        interviews: [{ scheduledAt: iso(5), notes: 'Strong communication skills' }],
+      },
+      { now: FIXED_NOW }
+    );
+
+    expect(result.interview.outcome).toBe('interviewed');
+    expect(result.interview.date).toBe(iso(5));
+    expect(result.interview.slaDays).toBeGreaterThan(0);
+    expect(result.interview.slaBasis).toBe('interview');
+    expect(result.offer.outcome).toBe('not_applicable');
+  });
+
+  it('shows passed once Document Verification is reached in history', () => {
+    const result = buildCandidatePipelineSummary(
+      {
+        appliedAt: iso(0),
+        interviewedAt: null,
+        rejectedAt: null,
+        withdrawnAt: null,
+        joinDate: null,
+        statusHistory: [
+          { toStatus: 'SUBMITTED', createdAt: iso(0) },
+          { toStatus: 'INTERVIEW_SCHEDULED', createdAt: iso(5) },
+          { toStatus: 'DOCUMENT_VERIFICATION', createdAt: iso(8) },
+        ],
+        interviews: [{ scheduledAt: iso(5), notes: 'Proceed to doc check' }],
+      },
+      { now: FIXED_NOW }
+    );
 
     expect(result.interview.outcome).toBe('passed');
     expect(result.interview.date).toBe(iso(5));
-    expect(result.interview.slaDays).toBeGreaterThan(0);
     expect(result.offer.outcome).toBe('not_yet');
-    expect(result.offer.slaDays).toBeNull();
   });
 
   it('keeps SLA to Interview (basis: interview) when rejected after the interview already happened', () => {
@@ -63,7 +113,6 @@ describe('buildCandidatePipelineSummary', () => {
 
     expect(result.interview.outcome).toBe('rejected');
     expect(result.interview.date).toBe(iso(7));
-    // Interview did happen before rejection — SLA still measures appliedAt → interview date.
     expect(result.interview.slaDays).not.toBeNull();
     expect(result.interview.slaBasis).toBe('interview');
     expect(result.interview.slaPending).toBe(false);
@@ -79,20 +128,17 @@ describe('buildCandidatePipelineSummary', () => {
       joinDate: null,
       statusHistory: [
         { toStatus: 'SUBMITTED', createdAt: iso(0) },
-        { toStatus: 'SCREENING', createdAt: iso(2) },
         { toStatus: 'REJECTED', createdAt: iso(4) },
       ],
     });
 
     expect(result.interview.outcome).toBe('rejected');
-    expect(result.interview.date).toBe(iso(4));
-    // No interview ever happened — SLA measures appliedAt → rejection date instead.
     expect(result.interview.slaDays).not.toBeNull();
     expect(result.interview.slaBasis).toBe('rejection');
     expect(result.offer.outcome).toBe('not_applicable');
   });
 
-  it('computes SLA to Offer Decision from interview date to offer acceptance, with join date', () => {
+  it('computes SLA to Offer Decision from interview date to offer acceptance, with join date from application', () => {
     const result = buildCandidatePipelineSummary({
       appliedAt: iso(0),
       interviewedAt: null,
@@ -102,6 +148,7 @@ describe('buildCandidatePipelineSummary', () => {
       statusHistory: [
         { toStatus: 'SUBMITTED', createdAt: iso(0) },
         { toStatus: 'INTERVIEW_SCHEDULED', createdAt: iso(5) },
+        { toStatus: 'DOCUMENT_VERIFICATION', createdAt: iso(6) },
         { toStatus: 'OFFER_SENT', createdAt: iso(12) },
         { toStatus: 'OFFER_ACCEPTED', createdAt: iso(15) },
       ],
@@ -115,15 +162,16 @@ describe('buildCandidatePipelineSummary', () => {
     expect(result.joinDate).toBe(iso(30));
   });
 
-  it('does not expose a join date when the offer was rejected', () => {
+  it('exposes join date from the application when set, even if offer was rejected', () => {
     const result = buildCandidatePipelineSummary({
       appliedAt: iso(0),
       interviewedAt: null,
       rejectedAt: null,
       withdrawnAt: null,
-      joinDate: null,
+      joinDate: iso(25),
       statusHistory: [
         { toStatus: 'INTERVIEW_SCHEDULED', createdAt: iso(5) },
+        { toStatus: 'DOCUMENT_VERIFICATION', createdAt: iso(6) },
         { toStatus: 'OFFER_SENT', createdAt: iso(12) },
         { toStatus: 'OFFER_REJECTED', createdAt: iso(14) },
       ],
@@ -131,10 +179,10 @@ describe('buildCandidatePipelineSummary', () => {
 
     expect(result.offer.outcome).toBe('rejected');
     expect(result.offer.date).toBe(iso(14));
-    expect(result.joinDate).toBeNull();
+    expect(result.joinDate).toBe(iso(25));
   });
 
-  it('attributes withdrawal to the offer stage when it happens after the interview', () => {
+  it('attributes withdrawal to the offer stage when it happens after the interview gate is cleared', () => {
     const result = buildCandidatePipelineSummary({
       appliedAt: iso(0),
       interviewedAt: null,
@@ -143,6 +191,7 @@ describe('buildCandidatePipelineSummary', () => {
       joinDate: null,
       statusHistory: [
         { toStatus: 'INTERVIEW_SCHEDULED', createdAt: iso(5) },
+        { toStatus: 'DOCUMENT_VERIFICATION', createdAt: iso(6) },
         { toStatus: 'OFFER_SENT', createdAt: iso(10) },
         { toStatus: 'WITHDRAWN', createdAt: iso(13) },
       ],
@@ -162,6 +211,7 @@ describe('buildCandidatePipelineSummary', () => {
       joinDate: iso(30),
       statusHistory: [
         { toStatus: 'INTERVIEW_SCHEDULED', createdAt: iso(5) },
+        { toStatus: 'DOCUMENT_VERIFICATION', createdAt: iso(6) },
         { toStatus: 'OFFER_SENT', createdAt: iso(12) },
         { toStatus: 'OFFER_ACCEPTED', createdAt: iso(15) },
         { toStatus: 'WITHDRAWN', createdAt: iso(20) },
@@ -171,7 +221,7 @@ describe('buildCandidatePipelineSummary', () => {
     expect(result.offer.outcome).toBe('withdrawn');
     expect(result.offer.date).toBe(iso(20));
     expect(result.offer.slaDays).toBeGreaterThan(0);
-    expect(result.joinDate).toBeNull();
+    expect(result.joinDate).toBe(iso(30));
   });
 
   it('attributes withdrawal to the interview stage when it happens before any interview', () => {

@@ -1,6 +1,7 @@
 "use client"
 
 import {
+  Fragment,
   Suspense,
   useCallback,
   useEffect,
@@ -32,6 +33,8 @@ import {
 import {
   ExclamationCircleIcon,
   AdjustmentsHorizontalIcon,
+  ChevronDownIcon,
+  ChevronRightIcon,
   InformationCircleIcon,
   PencilSquareIcon,
   XMarkIcon,
@@ -54,6 +57,7 @@ interface SummaryRow {
   id: string
   priority: string
   division: string
+  pt: string
   area: string
   location: string
   section: string
@@ -98,6 +102,91 @@ function formatAreaLocationLine(area: string, location: string): string | null {
   if (a) return a
   if (loc) return loc
   return null
+}
+
+
+// ---------- Site (PT) → Division grouping ----------
+const UNASSIGNED_SITE = 'Unassigned Site'
+const UNASSIGNED_DIVISION = 'Unassigned Division'
+const OVERDUE_SLA_BUCKET = 'Above 91 Days'
+
+/** "Karawaci (CRC)" = Area Detail + PT. Falls back gracefully when either is missing. */
+function formatSiteLabel(location: string, pt: string): string {
+  const site = location && location !== '-' ? location.trim() : ''
+  const company = pt && pt !== '-' ? pt.trim() : ''
+  if (site && company) return `${site} (${company})`
+  if (site) return site
+  if (company) return company
+  return UNASSIGNED_SITE
+}
+
+interface GroupStats {
+  key: string
+  name: string
+  positionCount: number
+  openCount: number
+  overdueCount: number
+  totals: SummaryPipelineCounts
+}
+
+interface DivisionGroup extends GroupStats {
+  rows: SummaryRow[]
+}
+
+interface SiteGroup extends GroupStats {
+  divisions: DivisionGroup[]
+}
+
+function computeGroupStats(key: string, name: string, rows: SummaryRow[]): GroupStats {
+  const totals = emptySummaryPipelineCounts()
+  let openCount = 0
+  let overdueCount = 0
+  rows.forEach((r) => {
+    ;(Object.keys(totals) as SummaryPipelineColumnKey[]).forEach((k) => {
+      totals[k] = (totals[k] ?? 0) + (r.summaryCounts[k] ?? 0)
+    })
+    if (isFptkOpenByCurrentStatus(r.currentStatus)) openCount += 1
+    if (r.sla === OVERDUE_SLA_BUCKET) overdueCount += 1
+  })
+  return { key, name, positionCount: rows.length, openCount, overdueCount, totals }
+}
+
+/** Sorts names alphabetically, keeping the "Unassigned …" bucket last. */
+function compareGroupNames(a: string, b: string): number {
+  const au = a === UNASSIGNED_SITE || a === UNASSIGNED_DIVISION
+  const bu = b === UNASSIGNED_SITE || b === UNASSIGNED_DIVISION
+  if (au !== bu) return au ? 1 : -1
+  return a.localeCompare(b, undefined, { sensitivity: 'base' })
+}
+
+/** Groups already-sorted rows; row order inside each division follows the table sort. */
+function buildSiteGroups(rows: SummaryRow[]): SiteGroup[] {
+  const bySite = new Map<string, Map<string, SummaryRow[]>>()
+  rows.forEach((r) => {
+    const siteName = formatSiteLabel(r.location, r.pt)
+    const divName = r.division && r.division !== '-' ? r.division.trim() : UNASSIGNED_DIVISION
+    if (!bySite.has(siteName)) bySite.set(siteName, new Map())
+    const divMap = bySite.get(siteName)!
+    if (!divMap.has(divName)) divMap.set(divName, [])
+    divMap.get(divName)!.push(r)
+  })
+  return Array.from(bySite.keys())
+    .sort(compareGroupNames)
+    .map((siteName) => {
+      const siteKey = `site:${siteName}`
+      const divMap = bySite.get(siteName)!
+      const divisions: DivisionGroup[] = Array.from(divMap.keys())
+        .sort(compareGroupNames)
+        .map((divName) => {
+          const divRows = divMap.get(divName)!
+          return {
+            ...computeGroupStats(`${siteKey}::div:${divName}`, divName, divRows),
+            rows: divRows,
+          }
+        })
+      const siteRows = divisions.flatMap((d) => d.rows)
+      return { ...computeGroupStats(siteKey, siteName, siteRows), divisions }
+    })
 }
 
 type StatusCardKey = 'open' | 'closed'
@@ -434,6 +523,8 @@ function SummaryByPositionContent() {
   const [areaToLocations, setAreaToLocations] = useState<Record<string, string[]>>({})
   const [hiddenPipelineColumns, setHiddenPipelineColumns] = useState<Set<SummaryPipelineColumnKey>>(new Set())
   const [showColumnToggle, setShowColumnToggle] = useState(false)
+  const [groupBySite, setGroupBySite] = useState(true)
+  const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set())
 
   const columnToggleRef = useRef<HTMLDivElement | null>(null)
   const tableScrollRef = useRef<HTMLDivElement>(null)
@@ -511,6 +602,7 @@ function SummaryByPositionContent() {
           id: job.id,
           priority: job.priority || job.urgentNormal || '—',
           division: job.department || job.division || '-',
+          pt: (job.pt || '').trim() || '-',
           area: job.area || '-',
           location: job.areaDetail || job.location || '-',
           section: job.section || '-',
@@ -792,6 +884,190 @@ function SummaryByPositionContent() {
     )
   }
 
+  const totalColSpan = 4 + visiblePipelineColumns.length
+  const siteGroups = useMemo(() => buildSiteGroups(sortedRows), [sortedRows])
+
+  const toggleGroup = (key: string) => {
+    setExpandedGroups((prev) => {
+      const next = new Set(prev)
+      if (next.has(key)) next.delete(key)
+      else next.add(key)
+      return next
+    })
+  }
+
+  const expandAllGroups = () => {
+    const keys = new Set<string>()
+    siteGroups.forEach((site) => {
+      keys.add(site.key)
+      site.divisions.forEach((d) => keys.add(d.key))
+    })
+    setExpandedGroups(keys)
+  }
+
+  const collapseAllGroups = () => setExpandedGroups(new Set())
+
+  const renderGroupRow = (group: GroupStats, level: 0 | 1, childCount: number) => {
+    const expanded = expandedGroups.has(group.key)
+    const Icon = expanded ? ChevronDownIcon : ChevronRightIcon
+    const isSite = level === 0
+    const rowBg = isSite ? 'bg-indigo-50 group-hover:bg-indigo-100' : 'bg-slate-50 group-hover:bg-slate-100'
+    return (
+      <tr
+        key={group.key}
+        className={`group cursor-pointer ${isSite ? 'border-t-2 border-indigo-100' : ''}`}
+        onClick={() => toggleGroup(group.key)}
+      >
+        <td
+          className={`${isSite ? 'px-3' : 'pl-7 pr-3'} py-1.5 max-w-[18rem] sticky left-0 z-10 border-r-2 border-indigo-100 shadow-[2px_0_4px_-2px_rgba(0,0,0,0.08)] ${rowBg} transition-colors`}
+          title={group.name}
+        >
+          <button
+            type="button"
+            aria-expanded={expanded}
+            className="flex items-center gap-1.5 min-w-0 w-full text-left"
+          >
+            <Icon className={`h-4 w-4 shrink-0 ${isSite ? 'text-indigo-600' : 'text-gray-500'}`} />
+            <span
+              className={`truncate ${isSite ? 'text-sm font-semibold text-indigo-900' : 'text-sm font-medium text-gray-800'}`}
+            >
+              {group.name}
+            </span>
+            <span className="shrink-0 rounded-full bg-white border border-gray-200 px-1.5 text-xs font-medium text-gray-600">
+              {group.positionCount}
+            </span>
+          </button>
+          {isSite && (
+            <div className="pl-6 text-xs text-gray-500">
+              {childCount} {childCount === 1 ? 'division' : 'divisions'}
+            </div>
+          )}
+        </td>
+        <td className={`px-3 py-1.5 ${rowBg} transition-colors`} />
+        <td colSpan={2} className={`px-3 py-1.5 whitespace-nowrap text-xs text-gray-600 ${rowBg} transition-colors`}>
+          <span>{group.openCount} open</span>
+          {group.overdueCount > 0 && (
+            <span
+              className="ml-2 inline-flex items-center rounded-full bg-red-50 border border-red-200 px-2 py-0.5 font-medium text-red-700"
+              title="Positions in the Above 91 Days SLA bucket"
+            >
+              {group.overdueCount} &gt; 90d
+            </span>
+          )}
+        </td>
+        {visiblePipelineColumns.map((col) => {
+          const count = group.totals[col.key] ?? 0
+          return (
+            <td key={col.key} className={`px-3 py-1.5 whitespace-nowrap text-sm ${rowBg} transition-colors`}>
+              {count === 0 ? (
+                <span className="text-gray-300 text-xs">—</span>
+              ) : (
+                <span
+                  className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold ${getSummaryPipelineColumnBadgeClass(col.key)}`}
+                >
+                  {count}
+                </span>
+              )}
+            </td>
+          )
+        })}
+      </tr>
+    )
+  }
+
+  const renderPositionRow = (row: SummaryRow, grouped: boolean) => {
+      const divisionSectionLine = formatDivisionSectionLine(row.division, row.section)
+      const areaLocationLine = formatAreaLocationLine(row.area, row.location)
+      const positionTitle = [row.position, divisionSectionLine, areaLocationLine]
+        .filter(Boolean)
+        .join('\n')
+
+      return (
+      <tr key={row.id} className="group hover:bg-gray-50 transition-colors">
+        <td
+          className={`${grouped ? 'pl-12 pr-3' : 'px-3'} py-1.5 text-sm text-gray-900 max-w-[18rem] sticky left-0 z-10 bg-white group-hover:bg-gray-50 border-r-2 border-indigo-100 shadow-[2px_0_4px_-2px_rgba(0,0,0,0.08)] transition-colors`}
+          title={positionTitle}
+        >
+          {row.id ? (
+            <div className="flex items-center gap-1 min-w-0">
+              <button
+                type="button"
+                onClick={() =>
+                  setCandidatePipelineTarget({ fptkId: row.id, positionLabel: row.position })
+                }
+                className="text-indigo-600 hover:text-indigo-800 hover:underline font-medium text-left truncate min-w-0"
+                title="View candidate pipeline for this position"
+              >
+                {row.position}
+              </button>
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation()
+                  void positionEdit.open(row.id, 'Summary')
+                }}
+                className="shrink-0 text-gray-300 hover:text-indigo-600 transition-colors"
+                title="Edit position"
+                aria-label="Edit position"
+              >
+                <PencilSquareIcon className="h-3.5 w-3.5" />
+              </button>
+            </div>
+          ) : (
+            <span className="truncate block font-medium">{row.position}</span>
+          )}
+          {divisionSectionLine && (
+            <div className="text-xs text-gray-500 truncate mt-0.5">{divisionSectionLine}</div>
+          )}
+          {areaLocationLine && (
+            <div className="text-xs text-gray-400 truncate">{areaLocationLine}</div>
+          )}
+        </td>
+        <td className="px-3 py-1 whitespace-nowrap text-sm text-gray-900">{row.priority}</td>
+        <td className="px-3 py-1 whitespace-nowrap">
+          <SlaHeroBadge sla={row.sla} slaDays={row.slaDays} />
+        </td>
+        <td className="px-3 py-1 max-w-[18rem]">
+          <StatusCell
+            currentStatus={row.currentStatus}
+            statusFktk={row.statusFktk}
+            remark={row.remark}
+            latestPipeline={row.latestPipeline}
+          />
+        </td>
+        {visiblePipelineColumns.map((col) => {
+          const count = row.summaryCounts[col.key] ?? 0
+
+          if (col.key === 'joinDates') {
+            return (
+              <td key={col.key} className="px-3 py-1 whitespace-nowrap text-sm">
+                <JoinDatesCell
+                  count={count}
+                  summaryCounts={row.summaryCounts}
+                  onboardingCandidates={row.onboardingCandidates}
+                />
+              </td>
+            )
+          }
+
+          return (
+            <td key={col.key} className="px-3 py-1 whitespace-nowrap text-sm">
+              {count === 0 ? (
+                <span className="text-gray-300 text-xs">—</span>
+              ) : (
+                <span
+                  className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${getSummaryPipelineColumnBadgeClass(col.key)}`}
+                >
+                  {count}
+                </span>
+              )}
+            </td>
+          )
+        })}
+      </tr>
+      )
+  }
+
   const hideEmptyColumns = () => {
     const empty = SUMMARY_PIPELINE_COLUMNS.filter((col) =>
       dropdownFilteredRows.every((r) => (r.summaryCounts[col.key] ?? 0) === 0)
@@ -980,6 +1256,46 @@ function SummaryByPositionContent() {
               )}
             </div>
 
+            {/* Grouping controls */}
+            <div className="ml-auto flex items-center gap-2">
+              <div className="inline-flex rounded-md border border-gray-200 bg-white shadow-sm overflow-hidden text-xs font-medium">
+                <button
+                  type="button"
+                  onClick={() => setGroupBySite(true)}
+                  className={`px-3 py-1.5 transition-colors ${groupBySite ? 'bg-indigo-50 text-indigo-700' : 'text-gray-600 hover:bg-gray-50'}`}
+                  aria-pressed={groupBySite}
+                >
+                  By Site
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setGroupBySite(false)}
+                  className={`px-3 py-1.5 border-l border-gray-200 transition-colors ${!groupBySite ? 'bg-indigo-50 text-indigo-700' : 'text-gray-600 hover:bg-gray-50'}`}
+                  aria-pressed={!groupBySite}
+                >
+                  Flat list
+                </button>
+              </div>
+              {groupBySite && (
+                <>
+                  <button
+                    type="button"
+                    onClick={expandAllGroups}
+                    className="text-xs text-indigo-600 hover:underline"
+                  >
+                    Expand all
+                  </button>
+                  <button
+                    type="button"
+                    onClick={collapseAllGroups}
+                    className="text-xs text-gray-500 hover:text-gray-700 hover:underline"
+                  >
+                    Collapse all
+                  </button>
+                </>
+              )}
+            </div>
+
             {/* Column visibility toggle */}
             <div className="relative" ref={columnToggleRef}>
               <button
@@ -1071,8 +1387,8 @@ function SummaryByPositionContent() {
                 <tr>
                   {(
                     [
-                      { key: 'priority', label: 'Priority' },
                       { key: 'position', label: 'Position', stickyLeft: true },
+                      { key: 'priority', label: 'Priority' },
                       { key: 'sla', label: 'SLA' },
                       { key: 'currentStatus', label: 'Status' },
                     ] as { key: string; label: string; stickyLeft?: boolean }[]
@@ -1112,103 +1428,26 @@ function SummaryByPositionContent() {
                 </tr>
               </thead>
               <tbody className="bg-white divide-y divide-gray-200">
-                {sortedRows.map((row) => {
-                  const divisionSectionLine = formatDivisionSectionLine(row.division, row.section)
-                  const areaLocationLine = formatAreaLocationLine(row.area, row.location)
-                  const positionTitle = [row.position, divisionSectionLine, areaLocationLine]
-                    .filter(Boolean)
-                    .join('\n')
-
-                  return (
-                  <tr key={row.id} className="group hover:bg-gray-50 transition-colors">
-                    <td className="px-3 py-1 whitespace-nowrap text-sm text-gray-900">{row.priority}</td>
-                    <td
-                      className="px-3 py-1.5 text-sm text-gray-900 max-w-[18rem] sticky left-0 z-10 bg-white group-hover:bg-gray-50 border-r-2 border-indigo-100 shadow-[2px_0_4px_-2px_rgba(0,0,0,0.08)] transition-colors"
-                      title={positionTitle}
-                    >
-                      {row.id ? (
-                        <div className="flex items-center gap-1 min-w-0">
-                          <button
-                            type="button"
-                            onClick={() =>
-                              setCandidatePipelineTarget({ fptkId: row.id, positionLabel: row.position })
-                            }
-                            className="text-indigo-600 hover:text-indigo-800 hover:underline font-medium text-left truncate min-w-0"
-                            title="View candidate pipeline for this position"
-                          >
-                            {row.position}
-                          </button>
-                          <button
-                            type="button"
-                            onClick={(e) => {
-                              e.stopPropagation()
-                              void positionEdit.open(row.id, 'Summary')
-                            }}
-                            className="shrink-0 text-gray-300 hover:text-indigo-600 transition-colors"
-                            title="Edit position"
-                            aria-label="Edit position"
-                          >
-                            <PencilSquareIcon className="h-3.5 w-3.5" />
-                          </button>
-                        </div>
-                      ) : (
-                        <span className="truncate block font-medium">{row.position}</span>
-                      )}
-                      {divisionSectionLine && (
-                        <div className="text-xs text-gray-500 truncate mt-0.5">{divisionSectionLine}</div>
-                      )}
-                      {areaLocationLine && (
-                        <div className="text-xs text-gray-400 truncate">{areaLocationLine}</div>
-                      )}
-                    </td>
-                    <td className="px-3 py-1 whitespace-nowrap">
-                      <SlaHeroBadge sla={row.sla} slaDays={row.slaDays} />
-                    </td>
-                    <td className="px-3 py-1 max-w-[18rem]">
-                      <StatusCell
-                        currentStatus={row.currentStatus}
-                        statusFktk={row.statusFktk}
-                        remark={row.remark}
-                        latestPipeline={row.latestPipeline}
-                      />
-                    </td>
-                    {visiblePipelineColumns.map((col) => {
-                      const count = row.summaryCounts[col.key] ?? 0
-
-                      if (col.key === 'joinDates') {
-                        return (
-                          <td key={col.key} className="px-3 py-1 whitespace-nowrap text-sm">
-                            <JoinDatesCell
-                              count={count}
-                              summaryCounts={row.summaryCounts}
-                              onboardingCandidates={row.onboardingCandidates}
-                            />
-                          </td>
-                        )
-                      }
-
-                      return (
-                        <td key={col.key} className="px-3 py-1 whitespace-nowrap text-sm">
-                          {count === 0 ? (
-                            <span className="text-gray-300 text-xs">—</span>
-                          ) : (
-                            <span
-                              className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${getSummaryPipelineColumnBadgeClass(col.key)}`}
-                            >
-                              {count}
-                            </span>
-                          )}
-                        </td>
-                      )
-                    })}
-                  </tr>
-                  )
-                })}
+                {groupBySite
+                  ? siteGroups.map((site) => (
+                      <Fragment key={site.key}>
+                        {renderGroupRow(site, 0, site.divisions.length)}
+                        {expandedGroups.has(site.key) &&
+                          site.divisions.map((div) => (
+                            <Fragment key={div.key}>
+                              {renderGroupRow(div, 1, div.rows.length)}
+                              {expandedGroups.has(div.key) &&
+                                div.rows.map((row) => renderPositionRow(row, true))}
+                            </Fragment>
+                          ))}
+                      </Fragment>
+                    ))
+                  : sortedRows.map((row) => renderPositionRow(row, false))}
 
                 {rows.length === 0 && !error && (
                   <tr>
                     <td
-                      colSpan={4 + visiblePipelineColumns.length}
+                      colSpan={totalColSpan}
                       className="px-4 py-10 text-center text-sm text-gray-500"
                     >
                       No data available. Create some positions and applications to see the summary.
@@ -1218,7 +1457,7 @@ function SummaryByPositionContent() {
                 {rows.length > 0 && sortedRows.length === 0 && (
                   <tr>
                     <td
-                      colSpan={4 + visiblePipelineColumns.length}
+                      colSpan={totalColSpan}
                       className="px-4 py-10 text-center text-sm text-gray-500"
                     >
                       No rows match the selected filter.{' '}

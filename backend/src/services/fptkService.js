@@ -1112,6 +1112,10 @@ async function getPositionCandidatePipeline(fptkId) {
         orderBy: { createdAt: 'asc' },
         select: { toStatus: true, createdAt: true },
       },
+      interviews: {
+        orderBy: { scheduledAt: 'asc' },
+        select: { scheduledAt: true, notes: true },
+      },
     },
     orderBy: { updatedAt: 'desc' },
   });
@@ -1421,6 +1425,7 @@ async function getSummaryByPosition(user = null) {
     location: true,
     area: true,
     areaDetail: true,
+    pt: true,
     hiringManager: true,
     requestDate: true,
     fptkReceiveDate: true,
