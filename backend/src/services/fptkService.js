@@ -9,6 +9,11 @@ const masterOfficeLocationService = require('./masterOfficeLocationService');
 const masterDivisionService = require('./masterDivisionService');
 const { assertCandidateCanApplyToPosition } = require('../utils/candidateApplicationLock');
 const {
+  isEnteringOnboarding,
+  lockPositionForOnboardingTx,
+  assertPositionOnboardingLimitAfterSyncTx,
+} = require('../utils/positionOnboardingLimit');
+const {
   PRISMA_APP_STATUS_STRINGS,
   mapUiStatusToApplicationStatus,
   mapApplicationStatusToUi,
@@ -545,6 +550,9 @@ async function syncFptkApplicationsTx(tx, fptkId, appliedCandidates, options = {
     return;
   }
 
+  // Serialize with other writers that may move a candidate into ONBOARDING here.
+  await lockPositionForOnboardingTx(tx, fptkId);
+
   const existingApplications = await tx.application.findMany({
     where: { fptkId },
   });
@@ -552,6 +560,7 @@ async function syncFptkApplicationsTx(tx, fptkId, appliedCandidates, options = {
   const existingByCandidate = new Map(existingApplications.map((app) => [app.candidateId, app]));
   const incomingIds = new Set(normalized.map((item) => item.candidateId));
   let leftOnboardingByWithdraw = false;
+  const enteredOnboardingIds = [];
 
   const toDelete = existingApplications
     .filter((app) => !incomingIds.has(app.candidateId))
@@ -637,6 +646,9 @@ async function syncFptkApplicationsTx(tx, fptkId, appliedCandidates, options = {
         },
       });
       applicationId = existing.id;
+      if (isEnteringOnboarding(existing.status, status)) {
+        enteredOnboardingIds.push(existing.id);
+      }
 
       // Record status history only when the status actually changed
       if (existing.status !== status) {
@@ -671,6 +683,9 @@ async function syncFptkApplicationsTx(tx, fptkId, appliedCandidates, options = {
           },
         });
         applicationId = newApplication.id;
+        if (status === 'ONBOARDING') {
+          enteredOnboardingIds.push(newApplication.id);
+        }
 
         // Record the initial submission in status history
         await tx.applicationStatusHistory.create({
@@ -771,6 +786,9 @@ async function syncFptkApplicationsTx(tx, fptkId, appliedCandidates, options = {
       }
     }
   }
+
+  // One On Boarding candidate per position; throwing rolls back the whole sync.
+  await assertPositionOnboardingLimitAfterSyncTx(tx, fptkId, enteredOnboardingIds);
 
   await ensureFptkCloseIfAnyOnBoardingTx(tx, fptkId);
   if (leftOnboardingByWithdraw) {
