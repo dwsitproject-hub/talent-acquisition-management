@@ -225,66 +225,161 @@ function OverviewChart({
   )
 }
 
+/*
+ * The plot is split into two bands so the cumulative line's labels never sit
+ * on the monthly bars or their numbers:
+ *   - bars (plus their value labels) grow from the bottom, up to TREND_BAR_SCALE % of the height;
+ *   - the line lives between TREND_LINE_TOP % and TREND_LINE_BOTTOM % from the top.
+ * The gap between the two bands absorbs the bar labels and the line's dots.
+ */
+const TREND_BAR_SCALE = 48
+const TREND_LINE_TOP = 12
+const TREND_LINE_BOTTOM = 38
+
 function VacancyTrend({
   rows,
   metric,
   selection,
+  monthCount,
 }: {
   rows: OverviewSourceRow[]
   metric: OverviewMetric
   selection: OverviewSelection | null
+  monthCount: number
 }) {
   const months = useMemo(
-    () => buildVacancyTrend(rows.filter((r) => matchesOverviewSelection(r, selection)), metric),
-    [rows, metric, selection]
+    () =>
+      buildVacancyTrend(
+        rows.filter((r) => matchesOverviewSelection(r, selection)),
+        metric,
+        new Date(),
+        monthCount
+      ),
+    [rows, metric, selection, monthCount]
   )
-  const max = Math.max(1, ...months.flatMap((m) => [m.opened, m.filled]))
+  const n = months.length
+  const barMax = Math.max(1, ...months.flatMap((m) => [m.opened, m.filled]))
+  // Bars and the cumulative line use separate scales: the running total
+  // quickly outgrows any single month.
+  const cumMax = Math.max(1, months[n - 1]?.cumulativeOpened ?? 0)
+  const point = (i: number) => ({
+    x: ((i + 0.5) / n) * 100,
+    y: TREND_LINE_BOTTOM - (months[i].cumulativeOpened / cumMax) * (TREND_LINE_BOTTOM - TREND_LINE_TOP),
+  })
+  const columns = { gridTemplateColumns: `repeat(${n}, minmax(0, 1fr))` }
   const unit = metric === 'headcount' ? 'headcount' : 'positions'
   const filledHint =
     metric === 'headcount' ? 'filled = hires by offer-acceptance month' : 'filled = positions by first offer acceptance'
+  const period = n > 0 ? `${months[0].fullLabel} – ${months[n - 1].fullLabel}` : ''
 
   return (
     <section className="bg-white shadow rounded-lg p-4 sm:p-5 flex flex-col gap-3">
       <div className="flex flex-wrap items-baseline justify-between gap-2">
         <h2 className="text-base font-semibold text-gray-900">Vacancy trend (opened vs filled per month)</h2>
         <span className="text-xs text-gray-500">
-          {unit} · last 12 months · {filledHint}
+          {unit} · {period} · {filledHint}
         </span>
       </div>
-      <div className="flex items-center gap-4 text-xs text-gray-600">
+      <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-gray-600">
         <span className="inline-flex items-center gap-1.5">
           <span className="h-3 w-3 rounded-sm bg-gray-400" /> Opened
         </span>
         <span className="inline-flex items-center gap-1.5">
           <span className="h-3 w-3 rounded-sm bg-indigo-500" /> Filled
         </span>
+        <span className="inline-flex items-center gap-1.5">
+          <span className="relative h-3 w-5">
+            <span className="absolute inset-x-0 top-1/2 h-0.5 -translate-y-1/2 bg-teal-600" />
+            <span className="absolute left-1/2 top-1/2 h-2 w-2 -translate-x-1/2 -translate-y-1/2 rounded-full bg-teal-600" />
+          </span>
+          Cumulative opened
+        </span>
       </div>
       <div className="overflow-x-auto">
-        <div className="min-w-[40rem]">
-          <div className="grid grid-cols-12 gap-2 items-end h-44 px-1 border-b border-gray-300">
-            {months.map((m) => (
-              <div
-                key={m.key}
-                className="flex items-end justify-center gap-1 h-full"
-                title={`${m.label}: opened ${m.opened}, filled ${m.filled}`}
-              >
-                {(['opened', 'filled'] as const).map((field) => (
-                  <div key={field} className="flex flex-col items-center justify-end h-full flex-1 max-w-[1.5rem]">
-                    <span className="text-[10px] tabular-nums text-gray-500">{m[field] || ''}</span>
-                    <span
-                      className={`block w-full rounded-t-sm ${field === 'opened' ? 'bg-gray-400' : 'bg-indigo-500'}`}
-                      style={{ height: `${(m[field] / max) * 85}%` }}
-                    />
-                  </div>
-                ))}
-              </div>
-            ))}
+        <div className="min-w-[40rem] pt-4">
+          <div className="relative h-64 border-b border-gray-300">
+            {/* Monthly bars */}
+            <div className="absolute inset-0 grid" style={columns}>
+              {months.map((m) => (
+                <div
+                  key={m.key}
+                  className="flex items-end justify-center gap-1 h-full px-1"
+                  title={`${m.fullLabel}: opened ${m.opened}, filled ${m.filled}, cumulative opened ${m.cumulativeOpened}`}
+                >
+                  {(['opened', 'filled'] as const).map((field) => (
+                    <div key={field} className="flex flex-col items-center justify-end h-full flex-1 max-w-[1.5rem]">
+                      <span className="text-[10px] tabular-nums text-gray-500">{m[field] || ''}</span>
+                      <span
+                        className={`block w-full rounded-t-sm ${field === 'opened' ? 'bg-gray-400' : 'bg-indigo-500'}`}
+                        style={{ height: `${(m[field] / barMax) * TREND_BAR_SCALE}%` }}
+                      />
+                    </div>
+                  ))}
+                </div>
+              ))}
+            </div>
+
+            {/* Cumulative opened line */}
+            <svg
+              className="absolute inset-0 h-full w-full overflow-visible pointer-events-none text-teal-600"
+              viewBox="0 0 100 100"
+              preserveAspectRatio="none"
+              aria-hidden="true"
+            >
+              <polyline
+                points={months.map((_, i) => `${point(i).x},${point(i).y}`).join(' ')}
+                fill="none"
+                stroke="currentColor"
+                strokeWidth={2}
+                strokeLinejoin="round"
+                vectorEffect="non-scaling-stroke"
+              />
+            </svg>
+            {months.map((m, i) => {
+              const { x, y } = point(i)
+              return (
+                <span key={m.key} className="pointer-events-none" aria-hidden="true">
+                  <span
+                    className="absolute h-2.5 w-2.5 -translate-x-1/2 -translate-y-1/2 rounded-full bg-teal-600 ring-2 ring-white"
+                    style={{ left: `${x}%`, top: `${y}%` }}
+                  />
+                  <span
+                    className="absolute -translate-x-1/2 -translate-y-[calc(100%+7px)] rounded bg-white/85 px-1 text-[11px] font-semibold leading-tight tabular-nums text-teal-700"
+                    style={{ left: `${x}%`, top: `${y}%` }}
+                  >
+                    {m.cumulativeOpened}
+                  </span>
+                </span>
+              )
+            })}
           </div>
-          <div className="grid grid-cols-12 gap-2 pt-1 text-center text-[11px] text-gray-500">
+          <div className="grid pt-1 text-center text-[11px] text-gray-500" style={columns}>
             {months.map((m) => (
               <span key={m.key}>{m.label}</span>
             ))}
           </div>
+          {/* Screen-reader table of the same numbers */}
+          <table className="sr-only">
+            <caption>Vacancy trend per month</caption>
+            <thead>
+              <tr>
+                <th>Month</th>
+                <th>Opened</th>
+                <th>Filled</th>
+                <th>Cumulative opened</th>
+              </tr>
+            </thead>
+            <tbody>
+              {months.map((m) => (
+                <tr key={m.key}>
+                  <td>{m.fullLabel}</td>
+                  <td>{m.opened}</td>
+                  <td>{m.filled}</td>
+                  <td>{m.cumulativeOpened}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
         </div>
       </div>
     </section>
@@ -297,10 +392,13 @@ export default function SummaryOverviewTab({
   selection,
   onSelect,
   onViewDetail,
+  trendMonths,
 }: {
   /** Rows after the page filters, before the cross-filter selection. */
   rows: OverviewSourceRow[]
   metric: OverviewMetric
+  /** Months shown in the vacancy trend (follows the Request date filter). */
+  trendMonths: number
   selection: OverviewSelection | null
   onSelect: (sel: OverviewSelection | null) => void
   onViewDetail: () => void
@@ -335,7 +433,7 @@ export default function SummaryOverviewTab({
         />
       ))}
 
-      <VacancyTrend rows={rows} metric={metric} selection={selection} />
+      <VacancyTrend rows={rows} metric={metric} selection={selection} monthCount={trendMonths} />
     </div>
   )
 }

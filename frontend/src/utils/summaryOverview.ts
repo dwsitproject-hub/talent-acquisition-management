@@ -203,10 +203,10 @@ export function buildOverviewGroups(
 export type RequestDateRange = 'all' | '3m' | '6m' | '12m' | 'ytd'
 
 export const REQUEST_DATE_RANGE_OPTIONS: { id: RequestDateRange; label: string }[] = [
-  { id: '12m', label: 'Last 12 months' },
-  { id: '6m', label: 'Last 6 months' },
-  { id: '3m', label: 'Last 3 months' },
   { id: 'ytd', label: 'This year' },
+  { id: '3m', label: 'Last 3 months' },
+  { id: '6m', label: 'Last 6 months' },
+  { id: '12m', label: 'Last 12 months' },
   { id: 'all', label: 'All time' },
 ]
 
@@ -228,13 +228,32 @@ export function matchesRequestDateRange(referenceDate: string | null, cutoff: Da
 
 export interface TrendMonth {
   key: string
+  /** Axis label, e.g. "Mar"; the first month and every January carry the year ("Jan '26"). */
   label: string
+  /** e.g. "Mar 2026" */
+  fullLabel: string
   opened: number
   filled: number
+  /** Running total of `opened` from the first month in the window. */
+  cumulativeOpened: number
 }
+
+const MAX_TREND_MONTHS = 12
 
 function monthKey(d: Date): string {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
+}
+
+/**
+ * Months the trend shows for a Request date range: from the range's start
+ * month through the current month (e.g. This year → Jan…now), capped at 12;
+ * All time shows the last 12.
+ */
+export function trendMonthCount(range: RequestDateRange, now: Date = new Date()): number {
+  const cutoff = requestDateCutoff(range, now)
+  if (!cutoff) return MAX_TREND_MONTHS
+  const span = (now.getFullYear() - cutoff.getFullYear()) * 12 + (now.getMonth() - cutoff.getMonth()) + 1
+  return Math.min(MAX_TREND_MONTHS, Math.max(1, span))
 }
 
 /**
@@ -247,17 +266,21 @@ export function buildVacancyTrend(
   rows: OverviewSourceRow[],
   metric: OverviewMetric,
   now: Date = new Date(),
-  months = 12
+  months = MAX_TREND_MONTHS
 ): TrendMonth[] {
   const out: TrendMonth[] = []
   const index = new Map<string, TrendMonth>()
   for (let i = months - 1; i >= 0; i--) {
     const d = new Date(now.getFullYear(), now.getMonth() - i, 1)
+    const short = d.toLocaleDateString('en-US', { month: 'short' })
+    const withYear = out.length === 0 || d.getMonth() === 0
     const m: TrendMonth = {
       key: monthKey(d),
-      label: d.toLocaleDateString('en-US', { month: 'short' }),
+      label: withYear ? `${short} '${String(d.getFullYear()).slice(2)}` : short,
+      fullLabel: `${short} ${d.getFullYear()}`,
       opened: 0,
       filled: 0,
+      cumulativeOpened: 0,
     }
     out.push(m)
     index.set(m.key, m)
@@ -273,6 +296,11 @@ export function buildVacancyTrend(
     bump(row.referenceDate, 'opened', metricWeight(row, metric))
     if (metric === 'positions') bump(row.offerAcceptedAt, 'filled', 1)
     else row.timeToOffer?.acceptedAt.forEach((iso) => bump(iso, 'filled', 1))
+  })
+  let running = 0
+  out.forEach((m) => {
+    running += m.opened
+    m.cumulativeOpened = running
   })
   return out
 }
