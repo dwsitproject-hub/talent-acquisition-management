@@ -58,6 +58,7 @@ import {
   matchesOverviewSelection,
   matchesRequestDateRange,
   requestDateCutoff,
+  trendMonthCount,
   type OverviewSelection,
   type RequestDateRange,
   type TimeToOfferStats,
@@ -501,7 +502,7 @@ function SummaryByPositionContent() {
   const [activeTab, setActiveTab] = useState<SummaryTab>(
     _tabParam === 'detail' || _tabParam === 'overview' ? _tabParam : isDeepLink ? 'detail' : 'overview'
   )
-  const [requestDateRange, setRequestDateRange] = useState<RequestDateRange>(isDeepLink ? 'all' : '12m')
+  const [requestDateRange, setRequestDateRange] = useState<RequestDateRange>(isDeepLink ? 'all' : 'ytd')
   const [crossFilter, setCrossFilter] = useState<OverviewSelection | null>(null)
 
   const [rows, setRows] = useState<SummaryRow[]>([])
@@ -1294,6 +1295,7 @@ function SummaryByPositionContent() {
               <SummaryOverviewTab
                 rows={pageFilteredRows}
                 metric="headcount"
+                trendMonths={trendMonthCount(requestDateRange)}
                 selection={crossFilter}
                 onSelect={setCrossFilter}
                 onViewDetail={() => switchTab('detail')}

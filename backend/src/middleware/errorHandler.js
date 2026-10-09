@@ -68,8 +68,8 @@ function errorHandler(err, req, res, next) {
     user: req.user?.id,
   });
 
-  // Prisma errors
-  if (err.code && err.code.startsWith('P')) {
+  // Prisma errors (P + 4 digits; app codes like POSITION_* must not match)
+  if (typeof err.code === 'string' && /^P\d{4}$/.test(err.code)) {
     return handlePrismaError(err, res);
   }
 

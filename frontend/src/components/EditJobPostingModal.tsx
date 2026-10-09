@@ -1030,8 +1030,26 @@ export default function EditJobPostingModal({
     }
   }
 
+  /** Another candidate on this position already On Boarding (max one per position). */
+  const findOtherOnBoardingCandidate = (candidateId: string) =>
+    appliedCandidates.find(
+      (c) =>
+        c.id !== candidateId &&
+        c.candidateId !== candidateId &&
+        mapUiStatusToApplicationStatus(c.status, '') === 'ONBOARDING'
+    )
+
   const handleCandidateStatusChange = async (candidateId: string, newStatus: string) => {
     if (statusSaving) return
+    if (mapUiStatusToApplicationStatus(newStatus, '') === 'ONBOARDING') {
+      const holder = findOtherOnBoardingCandidate(candidateId)
+      if (holder) {
+        alert(
+          `"${holder.name || 'Another candidate'}" is already On Boarding for this position. Only one candidate can be On Boarding per position. Withdraw that candidate first.`
+        )
+        return
+      }
+    }
     const normalized = (newStatus || '').toString().trim().toLowerCase()
     const needsReason =
       normalized.startsWith('rejected') ||
@@ -2352,9 +2370,17 @@ export default function EditJobPostingModal({
                               backgroundColor: 'white'
                             }}
                           >
-                            {(getAllowedNextStatuses(candidate.status) || ALL_APPLICATION_UI_STATUSES).map((statusOption) => (
-                              <option key={statusOption} value={statusOption}>{statusOption}</option>
-                            ))}
+                            {(getAllowedNextStatuses(candidate.status) || ALL_APPLICATION_UI_STATUSES).map((statusOption) => {
+                              const onBoardingTaken =
+                                mapUiStatusToApplicationStatus(statusOption, '') === 'ONBOARDING' &&
+                                statusOption !== candidate.status &&
+                                !!findOtherOnBoardingCandidate(candidate.id || candidate.candidateId)
+                              return (
+                                <option key={statusOption} value={statusOption} disabled={onBoardingTaken}>
+                                  {onBoardingTaken ? `${statusOption} (filled)` : statusOption}
+                                </option>
+                              )
+                            })}
                           </select>
                           {candidate.applicationId && (
                             <button

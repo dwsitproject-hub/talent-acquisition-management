@@ -3,6 +3,11 @@ const logger = require('../utils/logger');
 const { buildTokenizedSearch } = require('../utils/search');
 const { withActiveCandidateOnApplication } = require('../utils/candidateVisibility');
 const { assertCandidateCanApplyToPosition } = require('../utils/candidateApplicationLock');
+const {
+  isEnteringOnboarding,
+  lockPositionForOnboardingTx,
+  assertPositionCanAcceptOnboarding,
+} = require('../utils/positionOnboardingLimit');
 const { buildHrbpApplicationFptkFilterFromUser } = require('../utils/hrbpScope');
 const { isDepartmentHeadRole, buildHodApplicationScopeFromUser } = require('../utils/hodScope');
 const { mapUiStatusToApplicationStatus, assertAllowedStatusTransition } = require('../utils/applicationStatus');
@@ -536,11 +541,21 @@ async function updateApplicationStatus(applicationId, newStatus, userId, reason 
     updateData.withdrawnAt = null;
   }
 
-  // Update application
-  const updatedApplication = await prisma.application.update({
-    where: { id: applicationId },
-    data: updateData,
-  });
+  // Update application. Entering ONBOARDING locks the position so only one
+  // candidate per position can be On Boarding, even under concurrent requests.
+  const updatedApplication = isEnteringOnboarding(oldStatus, newStatus) && application.fptkId
+    ? await prisma.$transaction(async (tx) => {
+      await lockPositionForOnboardingTx(tx, application.fptkId);
+      await assertPositionCanAcceptOnboarding(tx, application.fptkId, applicationId);
+      return tx.application.update({
+        where: { id: applicationId },
+        data: updateData,
+      });
+    })
+    : await prisma.application.update({
+      where: { id: applicationId },
+      data: updateData,
+    });
 
   if (newStatus === 'ONBOARDING' && application.fptkId) {
     await prisma.fPTK.update({

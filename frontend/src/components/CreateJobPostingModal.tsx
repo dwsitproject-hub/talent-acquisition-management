@@ -25,6 +25,10 @@ interface CreateJobPostingModalProps {
   editingJobPosting?: any | null
 }
 
+/** A new position starts in one of these; Re-Open / Cancel / Close are set later via Edit. */
+const CREATE_CURRENT_STATUS_OPTIONS = ['Open', 'Pending FKTK', 'Internal Movement']
+const ALL_CURRENT_STATUS_OPTIONS = ['Open', 'Pending FKTK', 'Re-Open', 'Cancel', 'Internal Movement', 'Close']
+
 export default function CreateJobPostingModal({ isOpen, onClose, onSave, editingJobPosting }: CreateJobPostingModalProps) {
   const [formData, setFormData] = useState({
     pt: '',
@@ -1413,12 +1417,9 @@ export default function CreateJobPostingModal({ isOpen, onClose, onSave, editing
                   backgroundColor: 'white'
                 }}
               >
-                <option value="Open">Open</option>
-                <option value="Pending FKTK">Pending FKTK</option>
-                <option value="Re-Open">Re-Open</option>
-                <option value="Cancel">Cancel</option>
-                <option value="Internal Movement">Internal Movement</option>
-                <option value="Close">Close</option>
+                {(editingJobPosting ? ALL_CURRENT_STATUS_OPTIONS : CREATE_CURRENT_STATUS_OPTIONS).map((status) => (
+                  <option key={status} value={status}>{status}</option>
+                ))}
               </select>
             </div>
           </div>

@@ -9,6 +9,7 @@ export function isCandidateLockSaveError(error: unknown): boolean {
   return (
     status === 409 &&
     (data?.code === 'CANDIDATE_LOCKED_FOR_OTHER_POSITION' ||
+      data?.code === 'POSITION_ONBOARDING_LIMIT_REACHED' ||
       message.includes('cannot be applied') ||
       message.includes('onboarding') ||
       message.includes('hired'))
