@@ -99,6 +99,20 @@ export function overviewGroupName(row: OverviewSourceRow, dimension: OverviewDim
   return hiringManagerLabel(row.hiringManager)
 }
 
+/** Overview "Position status" filter; Closed/Open use the canonical rule above. */
+export type OverviewStatusFilter = 'all' | 'open' | 'closed'
+
+export const OVERVIEW_STATUS_OPTIONS: { id: OverviewStatusFilter; label: string }[] = [
+  { id: 'all', label: 'All' },
+  { id: 'open', label: 'Open' },
+  { id: 'closed', label: 'Closed' },
+]
+
+export function matchesOverviewStatus(currentStatus: string, status: OverviewStatusFilter): boolean {
+  if (status === 'all') return true
+  return isFptkClosedByCurrentStatus(currentStatus) === (status === 'closed')
+}
+
 export function matchesOverviewSelection(row: OverviewSourceRow, selection: OverviewSelection | null): boolean {
   if (!selection) return true
   return overviewGroupName(row, selection.dimension) === selection.value
@@ -234,8 +248,12 @@ export interface TrendMonth {
   fullLabel: string
   opened: number
   filled: number
-  /** Running total of `opened` from the first month in the window. */
-  cumulativeOpened: number
+  /**
+   * Running net open vacancies from the first month in the window:
+   * Σ (opened − filled). Can dip below 0 when hires in the window fill
+   * vacancies opened before it.
+   */
+  cumulativeNet: number
 }
 
 const MAX_TREND_MONTHS = 12
@@ -280,7 +298,7 @@ export function buildVacancyTrend(
       fullLabel: `${short} ${d.getFullYear()}`,
       opened: 0,
       filled: 0,
-      cumulativeOpened: 0,
+      cumulativeNet: 0,
     }
     out.push(m)
     index.set(m.key, m)
@@ -299,8 +317,8 @@ export function buildVacancyTrend(
   })
   let running = 0
   out.forEach((m) => {
-    running += m.opened
-    m.cumulativeOpened = running
+    running += m.opened - m.filled
+    m.cumulativeNet = running
   })
   return out
 }
