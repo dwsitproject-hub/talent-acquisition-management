@@ -11,6 +11,7 @@ import {
   type OverviewDimension,
   type OverviewGroup,
   type OverviewMetric,
+  type OverviewSegment,
   type OverviewSelection,
   type OverviewStatusFilter,
   type OverviewSourceRow,
@@ -50,10 +51,19 @@ function formatDays(days: number | null): string {
  * The bar's overall length is proportional to the group total; inside it,
  * segments share space by value but never shrink below MIN_SEGMENT_REM, so
  * small counts stay legible (proportions bend slightly for tiny segments).
+ * Each segment is its own button: it opens Detail for that group and segment.
  */
-function SegmentedBar({ group, max }: { group: OverviewGroup; max: number }) {
-  const segments = [
-    ...(group.closed > 0 ? [{ key: 'closed', value: group.closed, ...CLOSED_SEGMENT }] : []),
+function SegmentedBar({
+  group,
+  max,
+  onSegmentClick,
+}: {
+  group: OverviewGroup
+  max: number
+  onSegmentClick: (segment: OverviewSegment) => void
+}) {
+  const segments: { key: OverviewSegment; value: number; label: string; bar: string; text: string }[] = [
+    ...(group.closed > 0 ? [{ key: 'closed' as const, value: group.closed, ...CLOSED_SEGMENT }] : []),
     ...OPEN_SLA_BUCKETS.filter((b) => group.openByBucket[b] > 0).map((b) => ({
       key: b,
       value: group.openByBucket[b],
@@ -62,7 +72,7 @@ function SegmentedBar({ group, max }: { group: OverviewGroup; max: number }) {
   ]
   const total = group.closed + group.open
   return (
-    <span className="flex h-5 rounded-sm bg-gray-100 overflow-hidden" aria-hidden="true">
+    <span className="flex h-6 rounded-sm bg-gray-100 overflow-hidden">
       <span
         className="flex h-full"
         style={{
@@ -71,15 +81,27 @@ function SegmentedBar({ group, max }: { group: OverviewGroup; max: number }) {
         }}
       >
         {segments.map((s) => (
-          <span
+          <button
             key={s.key}
-            className={`flex h-full items-center justify-center text-[11px] font-semibold leading-none tabular-nums ${s.bar} ${s.text} ${
-              s.key === 'closed' && group.open > 0 ? 'mr-0.5' : ''
-            }`}
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation()
+              onSegmentClick(s.key)
+            }}
+            title={`${s.label}: ${s.value} — click to see these positions in Detail`}
+            aria-label={`${group.name}, ${s.label}: ${s.value}. View these positions in Detail`}
+            className={[
+              'flex h-full items-center justify-center text-[11px] font-semibold leading-none tabular-nums',
+              'cursor-pointer transition hover:brightness-90 hover:ring-2 hover:ring-inset hover:ring-gray-900/40',
+              'focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-indigo-700',
+              s.bar,
+              s.text,
+              s.key === 'closed' && group.open > 0 ? 'mr-0.5' : '',
+            ].join(' ')}
             style={{ flex: `${s.value} 1 0`, minWidth: `${MIN_SEGMENT_REM}rem` }}
           >
             {s.value}
-          </span>
+          </button>
         ))}
       </span>
     </span>
@@ -107,7 +129,7 @@ function OverviewChart({
   noun: [string, string]
   rows: OverviewSourceRow[]
   metric: OverviewMetric
-  onDrillDown: (sel: OverviewSelection) => void
+  onDrillDown: (sel: OverviewSelection, segment?: OverviewSegment) => void
   onViewDetail: () => void
 }) {
   const [showAll, setShowAll] = useState(false)
@@ -147,40 +169,50 @@ function OverviewChart({
               <span className="text-right">Open</span>
               <span className="text-right">Total vacancies</span>
             </div>
-            {visible.map((g) => {
-              return (
+            {visible.map((g) => (
+              // Mouse users can click anywhere on the row; keyboard users get
+              // the name button (whole group) and one button per bar segment.
+              <div
+                key={g.name}
+                onClick={() => onDrillDown({ dimension, value: g.name })}
+                title={describeGroup(g, unit)}
+                className={[
+                  ROW_GRID,
+                  'w-full min-h-[36px] px-1.5 py-1 rounded-md border border-transparent cursor-pointer transition',
+                  'hover:bg-indigo-50 hover:border-indigo-200',
+                ].join(' ')}
+              >
                 <button
-                  key={g.name}
                   type="button"
-                  title={`${describeGroup(g, unit)}
-Click to see these positions in Detail`}
-                  aria-label={`${g.name}: view positions in Detail`}
-                  onClick={() => onDrillDown({ dimension, value: g.name })}
-                  className={[
-                    ROW_GRID,
-                    'w-full min-h-[36px] px-1.5 py-1 rounded-md border border-transparent text-left transition',
-                    'hover:bg-indigo-50 hover:border-indigo-200',
-                    'focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500',
-                  ].join(' ')}
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    onDrillDown({ dimension, value: g.name })
+                  }}
+                  aria-label={`${g.name}: view all positions in Detail`}
+                  className="truncate text-left text-sm text-gray-900 hover:text-indigo-700 hover:underline focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 rounded-sm"
                 >
-                  <span className="truncate text-sm text-gray-900">{g.name}</span>
-                  <SegmentedBar group={g} max={max} />
-                  <span className="text-right text-sm tabular-nums text-slate-700">{g.closed}</span>
-                  <span className="text-right text-sm tabular-nums text-slate-700">
-                    {formatDays(g.avgTimeToOfferDays)}
-                    {g.hires > 0 && (
-                      <span className="ml-1 text-xs text-gray-500">
-                        ({g.hires} {g.hires === 1 ? 'hire' : 'hires'})
-                      </span>
-                    )}
-                  </span>
-                  <span className="text-right text-sm font-semibold tabular-nums text-gray-900">{g.open}</span>
-                  <span className="text-right text-sm font-semibold tabular-nums text-gray-900">
-                    {g.closed + g.open}
-                  </span>
+                  {g.name}
                 </button>
-              )
-            })}
+                <SegmentedBar
+                  group={g}
+                  max={max}
+                  onSegmentClick={(segment) => onDrillDown({ dimension, value: g.name }, segment)}
+                />
+                <span className="text-right text-sm tabular-nums text-slate-700">{g.closed}</span>
+                <span className="text-right text-sm tabular-nums text-slate-700">
+                  {formatDays(g.avgTimeToOfferDays)}
+                  {g.hires > 0 && (
+                    <span className="ml-1 text-xs text-gray-500">
+                      ({g.hires} {g.hires === 1 ? 'hire' : 'hires'})
+                    </span>
+                  )}
+                </span>
+                <span className="text-right text-sm font-semibold tabular-nums text-gray-900">{g.open}</span>
+                <span className="text-right text-sm font-semibold tabular-nums text-gray-900">
+                  {g.closed + g.open}
+                </span>
+              </div>
+            ))}
           </div>
         </div>
       )}
@@ -379,8 +411,8 @@ export default function SummaryOverviewTab({
   metric: OverviewMetric
   status: OverviewStatusFilter
   onStatusChange: (status: OverviewStatusFilter) => void
-  /** Row click: open Detail scoped to that Site / Division / Hiring Manager. */
-  onDrillDown: (sel: OverviewSelection) => void
+  /** Row / bar-segment click: open Detail scoped to that group (and segment). */
+  onDrillDown: (sel: OverviewSelection, segment?: OverviewSegment) => void
   onViewDetail: () => void
   /** Months shown in the vacancy trend (follows the Request date filter). */
   trendMonths: number
@@ -431,7 +463,7 @@ export default function SummaryOverviewTab({
             <span className={`h-3 w-3 rounded-sm ${OPEN_SEGMENTS[b].bar}`} /> {OPEN_SEGMENTS[b].label}
           </span>
         ))}
-        <span className="sm:ml-auto text-gray-400">Click a row to open its positions in Detail</span>
+        <span className="sm:ml-auto text-gray-400">Click a row, or a bar segment, to open those positions in Detail</span>
       </div>
 
       {CHARTS.map((c) => (

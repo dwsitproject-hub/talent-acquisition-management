@@ -60,6 +60,7 @@ import {
   matchesRequestDateRange,
   requestDateCutoff,
   trendMonthCount,
+  type OverviewSegment,
   type OverviewSelection,
   type OverviewStatusFilter,
   type RequestDateRange,
@@ -1115,18 +1116,36 @@ function SummaryByPositionContent() {
   }
 
   /**
-   * Overview → Detail. Carries the Overview's Position status over to the
-   * Open/Closed card (All = no card) and clears the SLA card so nothing the
-   * user just looked at is hidden. With a selection (a clicked chart row) the
-   * table is scoped to it and every Site/Division group under it is expanded.
+   * Overview → Detail.
+   * - Row click: scope to that Site / Division / HM; the Overview's Position
+   *   status carries over to the Open/Closed card (All = no card).
+   * - Bar-segment click: same scope, plus the segment — Closed selects the
+   *   Closed card; an SLA bucket selects Open + that SLA card. ("No start date"
+   *   has no SLA card, so it lands on Open.)
+   * Other SLA filters are cleared so nothing on the chart is hidden, and with a
+   * selection every Site/Division group holding a matching position is expanded.
    */
-  const openDetailFromOverview = (selection: OverviewSelection | null) => {
+  const openDetailFromOverview = (selection: OverviewSelection | null, segment?: OverviewSegment) => {
+    let statusCard: StatusCardKey | null = overviewStatus === 'all' ? null : overviewStatus
+    let slaCard: SlaCardKey | null = null
+    if (segment === 'closed') {
+      statusCard = 'closed'
+    } else if (segment) {
+      statusCard = 'open'
+      slaCard = SLA_BUCKET_TO_CARD_KEY[segment] ?? null
+    }
     setCrossFilter(selection)
-    setActiveStatusCard(overviewStatus === 'all' ? null : overviewStatus)
-    setActiveSlaCard(null)
+    setActiveStatusCard(statusCard)
+    setActiveSlaCard(slaCard)
     if (selection) {
       setGroupBySite(true)
-      const scoped = overviewRows.filter((r) => matchesOverviewSelection(r, selection))
+      const scoped = overviewRows.filter((r) => {
+        if (!matchesOverviewSelection(r, selection)) return false
+        if (statusCard === 'open' && !isFptkOpenByCurrentStatus(r.currentStatus)) return false
+        if (statusCard === 'closed' && !isFptkClosedByCurrentStatus(r.currentStatus)) return false
+        if (segment && segment !== 'closed' && segment !== 'none' && r.sla !== segment) return false
+        return true
+      })
       const keys = new Set<string>()
       buildSiteGroups(scoped).forEach((site) => {
         keys.add(site.key)

@@ -59,6 +59,9 @@ export interface OverviewSelection {
   value: string
 }
 
+/** One bar segment: the Closed part, or one Open SLA bucket. */
+export type OverviewSegment = 'closed' | OpenSlaBucket
+
 export interface OverviewGroup {
   name: string
   positionCount: number
