@@ -1345,6 +1345,7 @@ function SummaryByPositionContent() {
             ) : (
               <SummaryOverviewTab
                 rows={overviewRows}
+                trendRows={pageFilteredRows}
                 metric="headcount"
                 trendMonths={trendMonthCount(requestDateRange)}
                 status={overviewStatus}

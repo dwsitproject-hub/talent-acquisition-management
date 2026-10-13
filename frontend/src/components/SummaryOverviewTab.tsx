@@ -266,8 +266,8 @@ function VacancyTrend({
   const n = months.length
   const barMax = Math.max(1, ...months.flatMap((m) => [m.opened, m.filled]))
   // Bars and the cumulative line use separate scales: the running total
-  // quickly outgrows any single month. The net can go negative (hires filling
-  // vacancies opened before the window), so the line scale spans min…max.
+  // quickly outgrows any single month. The net can go slightly negative (more
+  // offer acceptances than a position's Total Request), so the scale spans min…max.
   const netValues = months.map((m) => m.cumulativeNet)
   const netMin = Math.min(0, ...netValues)
   const netMax = Math.max(netMin + 1, ...netValues)
@@ -288,7 +288,7 @@ function VacancyTrend({
       <div className="flex flex-wrap items-baseline justify-between gap-2">
         <h2 className="text-base font-semibold text-gray-900">Vacancy trend (opened vs filled per month)</h2>
         <span className="text-xs text-gray-500">
-          {unit} · {period} · {filledHint}
+          {unit} · {period} · {filledHint} · not affected by Position status
         </span>
       </div>
       <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-gray-600">
@@ -399,6 +399,7 @@ function VacancyTrend({
 
 export default function SummaryOverviewTab({
   rows,
+  trendRows,
   metric,
   status,
   onStatusChange,
@@ -406,8 +407,14 @@ export default function SummaryOverviewTab({
   onViewDetail,
   trendMonths,
 }: {
-  /** Rows after the page filters and the Position status filter. */
+  /** Rows after the page filters and the Position status filter (charts). */
   rows: OverviewSourceRow[]
+  /**
+   * Rows after the page filters only. The vacancy trend is a flow over time
+   * (raised → filled), so it ignores the Position status filter, which is
+   * about today's status and would cut that flow in half.
+   */
+  trendRows: OverviewSourceRow[]
   metric: OverviewMetric
   status: OverviewStatusFilter
   onStatusChange: (status: OverviewStatusFilter) => void
@@ -477,7 +484,7 @@ export default function SummaryOverviewTab({
         />
       ))}
 
-      <VacancyTrend rows={rows} metric={metric} monthCount={trendMonths} />
+      <VacancyTrend rows={trendRows} metric={metric} monthCount={trendMonths} />
     </div>
   )
 }

@@ -253,8 +253,10 @@ export interface TrendMonth {
   filled: number
   /**
    * Running net open vacancies from the first month in the window:
-   * Σ (opened − filled). Can dip below 0 when hires in the window fill
-   * vacancies opened before it.
+   * Σ (opened − filled). Both sides come from the same positions (those whose
+   * SLA start date is in the Request date range), so it only dips below 0 when
+   * a position records more offer acceptances than its Total Request
+   * (e.g. a candidate accepted, then withdrew and was replaced).
    */
   cumulativeNet: number
 }
