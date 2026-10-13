@@ -59,6 +59,9 @@ export interface OverviewSelection {
   value: string
 }
 
+/** One bar segment: the Closed part, or one Open SLA bucket. */
+export type OverviewSegment = 'closed' | OpenSlaBucket
+
 export interface OverviewGroup {
   name: string
   positionCount: number
@@ -97,6 +100,20 @@ export function overviewGroupName(row: OverviewSourceRow, dimension: OverviewDim
   if (dimension === 'site') return formatSiteLabel(row.location, row.pt)
   if (dimension === 'division') return divisionLabel(row.division)
   return hiringManagerLabel(row.hiringManager)
+}
+
+/** Overview "Position status" filter; Closed/Open use the canonical rule above. */
+export type OverviewStatusFilter = 'all' | 'open' | 'closed'
+
+export const OVERVIEW_STATUS_OPTIONS: { id: OverviewStatusFilter; label: string }[] = [
+  { id: 'all', label: 'All' },
+  { id: 'open', label: 'Open' },
+  { id: 'closed', label: 'Closed' },
+]
+
+export function matchesOverviewStatus(currentStatus: string, status: OverviewStatusFilter): boolean {
+  if (status === 'all') return true
+  return isFptkClosedByCurrentStatus(currentStatus) === (status === 'closed')
 }
 
 export function matchesOverviewSelection(row: OverviewSourceRow, selection: OverviewSelection | null): boolean {
@@ -234,8 +251,14 @@ export interface TrendMonth {
   fullLabel: string
   opened: number
   filled: number
-  /** Running total of `opened` from the first month in the window. */
-  cumulativeOpened: number
+  /**
+   * Running net open vacancies from the first month in the window:
+   * Σ (opened − filled). Both sides come from the same positions (those whose
+   * SLA start date is in the Request date range), so it only dips below 0 when
+   * a position records more offer acceptances than its Total Request
+   * (e.g. a candidate accepted, then withdrew and was replaced).
+   */
+  cumulativeNet: number
 }
 
 const MAX_TREND_MONTHS = 12
@@ -280,7 +303,7 @@ export function buildVacancyTrend(
       fullLabel: `${short} ${d.getFullYear()}`,
       opened: 0,
       filled: 0,
-      cumulativeOpened: 0,
+      cumulativeNet: 0,
     }
     out.push(m)
     index.set(m.key, m)
@@ -299,8 +322,8 @@ export function buildVacancyTrend(
   })
   let running = 0
   out.forEach((m) => {
-    running += m.opened
-    m.cumulativeOpened = running
+    running += m.opened - m.filled
+    m.cumulativeNet = running
   })
   return out
 }

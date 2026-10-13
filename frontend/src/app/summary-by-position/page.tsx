@@ -56,10 +56,13 @@ import {
   divisionLabel,
   formatSiteLabel,
   matchesOverviewSelection,
+  matchesOverviewStatus,
   matchesRequestDateRange,
   requestDateCutoff,
   trendMonthCount,
+  type OverviewSegment,
   type OverviewSelection,
+  type OverviewStatusFilter,
   type RequestDateRange,
   type TimeToOfferStats,
 } from '@/utils/summaryOverview'
@@ -503,7 +506,9 @@ function SummaryByPositionContent() {
     _tabParam === 'detail' || _tabParam === 'overview' ? _tabParam : isDeepLink ? 'detail' : 'overview'
   )
   const [requestDateRange, setRequestDateRange] = useState<RequestDateRange>(isDeepLink ? 'all' : 'ytd')
+  // Set by clicking a row in an Overview chart; scopes the Detail table.
   const [crossFilter, setCrossFilter] = useState<OverviewSelection | null>(null)
+  const [overviewStatus, setOverviewStatus] = useState<OverviewStatusFilter>('all')
 
   const [rows, setRows] = useState<SummaryRow[]>([])
   const [loading, setLoading] = useState(true)
@@ -708,7 +713,12 @@ function SummaryByPositionContent() {
     })
   }, [rows, priorityFilter, areaFilter, locationFilter, divisionFilter, statusFktkFilter, hiringManagerFilter, requestDateRange])
 
-  // Detail tab: page filters + the Overview cross-filter selection.
+  const overviewRows = useMemo(
+    () => pageFilteredRows.filter((r) => matchesOverviewStatus(r.currentStatus, overviewStatus)),
+    [pageFilteredRows, overviewStatus]
+  )
+
+  // Detail tab: page filters + the Site / Division / HM picked in Overview.
   const dropdownFilteredRows = useMemo(
     () => pageFilteredRows.filter((r) => matchesOverviewSelection(r, crossFilter)),
     [pageFilteredRows, crossFilter]
@@ -1105,6 +1115,47 @@ function SummaryByPositionContent() {
     setHorizontalScrollLeft(0)
   }
 
+  /**
+   * Overview → Detail.
+   * - Row click: scope to that Site / Division / HM; the Overview's Position
+   *   status carries over to the Open/Closed card (All = no card).
+   * - Bar-segment click: same scope, plus the segment — Closed selects the
+   *   Closed card; an SLA bucket selects Open + that SLA card. ("No start date"
+   *   has no SLA card, so it lands on Open.)
+   * Other SLA filters are cleared so nothing on the chart is hidden, and with a
+   * selection every Site/Division group holding a matching position is expanded.
+   */
+  const openDetailFromOverview = (selection: OverviewSelection | null, segment?: OverviewSegment) => {
+    let statusCard: StatusCardKey | null = overviewStatus === 'all' ? null : overviewStatus
+    let slaCard: SlaCardKey | null = null
+    if (segment === 'closed') {
+      statusCard = 'closed'
+    } else if (segment) {
+      statusCard = 'open'
+      slaCard = SLA_BUCKET_TO_CARD_KEY[segment] ?? null
+    }
+    setCrossFilter(selection)
+    setActiveStatusCard(statusCard)
+    setActiveSlaCard(slaCard)
+    if (selection) {
+      setGroupBySite(true)
+      const scoped = overviewRows.filter((r) => {
+        if (!matchesOverviewSelection(r, selection)) return false
+        if (statusCard === 'open' && !isFptkOpenByCurrentStatus(r.currentStatus)) return false
+        if (statusCard === 'closed' && !isFptkClosedByCurrentStatus(r.currentStatus)) return false
+        if (segment && segment !== 'closed' && segment !== 'none' && r.sla !== segment) return false
+        return true
+      })
+      const keys = new Set<string>()
+      buildSiteGroups(scoped).forEach((site) => {
+        keys.add(site.key)
+        site.divisions.forEach((d) => keys.add(d.key))
+      })
+      setExpandedGroups(keys)
+    }
+    switchTab('detail')
+  }
+
   if (loading) return <LoadingSkeleton />
 
   return (
@@ -1227,17 +1278,17 @@ function SummaryByPositionContent() {
           </div>
         </div>
 
-        {/* Cross-filter chip (set by clicking a row in an Overview chart) */}
-        {crossFilter && (
+        {/* Drill-down chip (set by clicking a row in an Overview chart) */}
+        {crossFilter && activeTab === 'detail' && (
           <div className="flex flex-wrap items-center gap-2 text-sm text-gray-600">
-            <span>Cross-filter:</span>
+            <span>Showing positions for</span>
             <span className="inline-flex items-center gap-1 rounded-full bg-indigo-50 border border-indigo-200 px-2.5 py-0.5 text-xs font-medium text-indigo-700">
               {OVERVIEW_DIMENSION_LABEL[crossFilter.dimension]}: {crossFilter.value}
               <button
                 type="button"
                 onClick={() => setCrossFilter(null)}
                 className="ml-0.5 text-indigo-400 hover:text-indigo-700"
-                aria-label="Clear cross-filter"
+                aria-label="Show all positions"
               >
                 <XMarkIcon className="h-3.5 w-3.5" />
               </button>
@@ -1293,12 +1344,14 @@ function SummaryByPositionContent() {
               </div>
             ) : (
               <SummaryOverviewTab
-                rows={pageFilteredRows}
+                rows={overviewRows}
+                trendRows={pageFilteredRows}
                 metric="headcount"
                 trendMonths={trendMonthCount(requestDateRange)}
-                selection={crossFilter}
-                onSelect={setCrossFilter}
-                onViewDetail={() => switchTab('detail')}
+                status={overviewStatus}
+                onStatusChange={setOverviewStatus}
+                onDrillDown={openDetailFromOverview}
+                onViewDetail={() => openDetailFromOverview(null)}
               />
             )}
           </div>
