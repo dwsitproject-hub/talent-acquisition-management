@@ -3,6 +3,7 @@ import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import { AuthProvider } from "@/contexts/AuthContext";
 import { SystemStatusProvider } from "@/contexts/SystemStatusProvider";
+import HubIdentify from "@/components/HubIdentify";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -39,11 +40,23 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en">
+      <head>
+        {process.env.NEXT_PUBLIC_HUB_SDK_URL && (
+          <script
+            src={process.env.NEXT_PUBLIC_HUB_SDK_URL}
+            data-app-key={process.env.NEXT_PUBLIC_HUB_SDK_KEY}
+            data-release={process.env.NEXT_PUBLIC_GIT_SHA || undefined}
+            data-bug-button="false"
+            defer
+          />
+        )}
+      </head>
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}
       >
         <SystemStatusProvider>
           <AuthProvider>
+            <HubIdentify />
             {children}
           </AuthProvider>
         </SystemStatusProvider>

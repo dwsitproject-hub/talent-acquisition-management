@@ -117,6 +117,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const logout = () => {
     try {
+      // Start a clean Hub SDK session for the next person on this browser
+      if (typeof window !== 'undefined') window.DwsHub?.reset?.()
+
       // Clear state first to prevent any useEffect hooks from running
       setUser(null)
       

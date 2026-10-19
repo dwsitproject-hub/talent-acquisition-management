@@ -32,6 +32,7 @@ async function authenticate(req, res, next) {
         firstName: true,
         lastName: true,
         phoneNumber: true,
+        oidcSub: true,
         role: true,
         department: true,
         division: true,
