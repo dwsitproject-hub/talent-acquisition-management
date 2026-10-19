@@ -30,6 +30,7 @@ function toPublicUser(user) {
   return {
     id: user.id,
     email: user.email,
+    oidcSub: user.oidcSub || null,
     firstName: user.firstName,
     lastName: user.lastName,
     role: mapEnumToRole(user.role),

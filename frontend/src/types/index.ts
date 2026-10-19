@@ -2,6 +2,7 @@
 export interface User {
   id: string
   email: string
+  oidcSub?: string | null
   firstName: string
   lastName: string
   role: UserRole
