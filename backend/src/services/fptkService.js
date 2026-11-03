@@ -21,6 +21,7 @@ const {
   createEmptySummaryByPositionCounts,
   addApplicationToSummaryByPositionCounts,
 } = require('../utils/applicationStatus');
+const { getPositionLastStage } = require('../utils/positionLastStage');
 const {
   buildEarliestOfferAcceptanceAtByFptkId,
   buildTimeToOfferByFptkId,
@@ -1259,8 +1260,43 @@ function buildInternalFptkListWhere(filters = {}, user = null) {
   applyCsvInField('pt', filters.pt);
   applyCsvInField('area', filters.area);
   applyCsvInField('areaDetail', filters.areaDetail);
+  applyCsvInField('typeGrade', filters.grade);
 
   return where;
+}
+
+/**
+ * Restrict `where` to positions whose last stage (furthest active candidate) is one of the
+ * requested stages. Derived from applications, so it is resolved to an id list first.
+ */
+async function applyLastStageFilter(where, lastStageParam) {
+  const wanted = String(lastStageParam || '')
+    .split(',')
+    .map((s) => s.trim())
+    .filter(Boolean);
+  if (wanted.length === 0) return where;
+
+  const rows = await prisma.fPTK.findMany({
+    where,
+    select: { id: true, applications: { select: { status: true } } },
+  });
+  const wantedSet = new Set(wanted);
+  const ids = rows
+    .filter((r) => wantedSet.has(getPositionLastStage(r.applications.map((a) => a.status))))
+    .map((r) => r.id);
+  return { AND: [where, { id: { in: ids } }] };
+}
+
+/** Distinct Grade values available to the user (scoped like the list). */
+async function getFptkGradeOptions(user = null) {
+  const where = buildInternalFptkListWhere({}, user);
+  const rows = await prisma.fPTK.findMany({
+    where: { AND: [where, { typeGrade: { not: null } }] },
+    select: { typeGrade: true },
+    distinct: ['typeGrade'],
+    orderBy: { typeGrade: 'asc' },
+  });
+  return rows.map((r) => (r.typeGrade || '').trim()).filter(Boolean);
 }
 
 /**
@@ -1269,7 +1305,10 @@ function buildInternalFptkListWhere(filters = {}, user = null) {
 async function getFptkCurrentStatusCounts(filters, user = null) {
   const countFilters = { ...filters };
   delete countFilters.currentStatus;
-  const where = buildInternalFptkListWhere(countFilters, user);
+  const where = await applyLastStageFilter(
+    buildInternalFptkListWhere(countFilters, user),
+    filters.lastStage
+  );
   const rows = await prisma.fPTK.groupBy({
     by: ['currentStatus'],
     where,
@@ -1317,7 +1356,10 @@ async function getAllFPTKs(filters, pagination, user = null) {
   const { page = 1, limit = 20 } = pagination;
   const skip = (page - 1) * limit;
 
-  const where = buildInternalFptkListWhere(filters, user);
+  const where = await applyLastStageFilter(
+    buildInternalFptkListWhere(filters, user),
+    filters.lastStage
+  );
 
   const [sortRows, total] = await Promise.all([
     prisma.fPTK.findMany({
@@ -2224,6 +2266,7 @@ module.exports = {
   getAllFPTKs,
   getFptkPositionOptions,
   getFptkCurrentStatusCounts,
+  getFptkGradeOptions,
   getSummaryByPosition,
   loadEarliestOfferAcceptanceByFptkIds,
   updateFPTK,

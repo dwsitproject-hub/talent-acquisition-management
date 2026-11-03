@@ -41,7 +41,7 @@ export default function RootLayout({
   return (
     <html lang="en">
       <head>
-        {process.env.NEXT_PUBLIC_HUB_SDK_URL && (
+        {process.env.NEXT_PUBLIC_HUB_SDK_URL ? (
           <script
             src={process.env.NEXT_PUBLIC_HUB_SDK_URL}
             data-app-key={process.env.NEXT_PUBLIC_HUB_SDK_KEY}
@@ -49,7 +49,7 @@ export default function RootLayout({
             data-bug-button="false"
             defer
           />
-        )}
+        ) : null}
       </head>
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}

@@ -113,8 +113,10 @@ router.get(
       pt: req.query.pt,
       area: req.query.area,
       areaDetail: req.query.areaDetail,
+      grade: req.query.grade,
+      lastStage: req.query.lastStage,
     };
-    
+
     const pagination = {
       page: parseInt(req.query.page) || 1,
       limit: parseInt(req.query.limit) || 20,
@@ -236,12 +238,29 @@ router.get(
       pt: req.query.pt,
       area: req.query.area,
       areaDetail: req.query.areaDetail,
+      grade: req.query.grade,
+      lastStage: req.query.lastStage,
     };
     const data = await fptkService.getFptkCurrentStatusCounts(filters, req.user);
     res.json({
       success: true,
       data,
     });
+  })
+);
+
+/**
+ * @route   GET /api/fptk/grade-options
+ * @desc    Distinct Grade values for the Position list filter (scoped like the list)
+ * @access  Private
+ */
+router.get(
+  '/grade-options',
+  authenticate,
+  authorize('TA_HO', 'HRBP', 'TA_SITE', 'SUPER_ADMIN', 'HIRING_MANAGER', 'CHRO', 'DEPARTMENT_HEAD'),
+  asyncHandler(async (req, res) => {
+    const data = await fptkService.getFptkGradeOptions(req.user);
+    res.json({ success: true, data });
   })
 );
 
