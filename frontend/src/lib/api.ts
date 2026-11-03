@@ -528,11 +528,17 @@ export const FPTKAPI = {
       pt?: string
       area?: string
       areaDetail?: string
+      grade?: string
+      lastStage?: string
     },
     pagination?: { page?: number; limit?: number }
   ) {
     const res = await api.get('/fptk', { params: { ...filters, ...pagination } })
     return res.data
+  },
+  async getGradeOptions() {
+    const res = await api.get('/fptk/grade-options')
+    return (res.data.data || []) as string[]
   },
   async getPositionOptions(
     filters?: {
@@ -548,9 +554,18 @@ export const FPTKAPI = {
     return res.data
   },
   async getCountsByCurrentStatus(
-    params?: { search?: string; pt?: string; area?: string; areaDetail?: string }
+    params?: {
+      search?: string
+      pt?: string
+      area?: string
+      areaDetail?: string
+      grade?: string
+      lastStage?: string
+    }
   ) {
     const q: Record<string, string> = {}
+    if (params?.grade) q.grade = params.grade
+    if (params?.lastStage) q.lastStage = params.lastStage
     if (params?.search) q.search = params.search
     if (params?.pt) q.pt = params.pt
     if (params?.area) q.area = params.area

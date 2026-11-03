@@ -30,6 +30,7 @@ import MultiSelectDropdown from '@/components/MultiSelectDropdown'
 import {
   getApplicationStatusPillClass,
   getLatestPipelineProgress,
+  PIPELINE_STATUS_RANK,
   mapUiStatusToApplicationStatus,
 } from '@/utils/applicationStatusUi'
 import { mapInterviewToUiFields } from '@/utils/mapFptkApplication'
@@ -361,6 +362,9 @@ function FPTKPageContent() {
   const [ptFilter, setPtFilter] = useState<string[]>([])
   const [areaFilter, setAreaFilter] = useState<string[]>([])
   const [areaDetailFilter, setAreaDetailFilter] = useState<string[]>([])
+  const [gradeFilter, setGradeFilter] = useState('')
+  const [lastStageFilter, setLastStageFilter] = useState('')
+  const [gradeOptions, setGradeOptions] = useState<string[]>([])
   const [officeLocations, setOfficeLocations] = useState<any[]>([])
   const [sortBy, setSortBy] = useState<'location' | 'areaDetail' | 'requestDate' | ''>('')
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc')
@@ -389,9 +393,15 @@ function FPTKPageContent() {
         [...ptFilter].sort().join('|'),
         [...areaFilter].sort().join('|'),
         [...areaDetailFilter].sort().join('|'),
+        gradeFilter,
+        lastStageFilter,
       ].join('~'),
-    [ptFilter, areaFilter, areaDetailFilter]
+    [ptFilter, areaFilter, areaDetailFilter, gradeFilter, lastStageFilter]
   )
+  const gradeStageParams = {
+    ...(gradeFilter ? { grade: gradeFilter } : {}),
+    ...(lastStageFilter ? { lastStage: lastStageFilter } : {}),
+  }
 
   useModalEscape(isUploadModalOpen && !!uploadResult, () => setIsUploadModalOpen(false))
 
@@ -409,6 +419,18 @@ function FPTKPageContent() {
       }
     }
     load()
+    return () => {
+      isMounted = false
+    }
+  }, [])
+
+  useEffect(() => {
+    let isMounted = true
+    FPTKAPI.getGradeOptions()
+      .then((grades) => {
+        if (isMounted) setGradeOptions(grades)
+      })
+      .catch((e) => console.error('Error loading grade options:', e))
     return () => {
       isMounted = false
     }
@@ -447,6 +469,7 @@ function FPTKPageContent() {
   const refreshStatusCounts = async () => {
     try {
       const counts = await FPTKAPI.getCountsByCurrentStatus({
+        ...gradeStageParams,
         ...(searchTerm?.trim() ? { search: searchTerm } : {}),
         ...(ptFilter.length
           ? { pt: ptFilter.map((s) => s.trim()).filter(Boolean).join(',') }
@@ -492,6 +515,7 @@ function FPTKPageContent() {
         statusFilters.length > 0 ? statusFilters.map((s) => s.trim()).join(',') : undefined
       const listParams: Parameters<typeof FPTKAPI.getAll>[0] = {
         search: searchTerm,
+        ...gradeStageParams,
         ...(currentStatusParam ? { currentStatus: currentStatusParam } : {}),
         ...(ptFilter.length
           ? { pt: ptFilter.map((s) => s.trim()).filter(Boolean).join(',') }
@@ -506,6 +530,7 @@ function FPTKPageContent() {
       const [response, counts] = await Promise.all([
         FPTKAPI.getAll(listParams, { page, limit: pageSize }),
         FPTKAPI.getCountsByCurrentStatus({
+          ...gradeStageParams,
           ...(searchTerm?.trim() ? { search: searchTerm } : {}),
           ...(ptFilter.length
             ? { pt: ptFilter.map((s) => s.trim()).filter(Boolean).join(',') }
@@ -1308,6 +1333,37 @@ function FPTKPageContent() {
                 searchPlaceholder="Search status..."
               />
             </div>
+            <div className="min-w-[180px]">
+              <label className="block text-sm font-medium text-gray-700 mb-1">Grade</label>
+              <select
+                value={gradeFilter}
+                onChange={(e) => setGradeFilter(e.target.value)}
+                className="block w-full pl-3 pr-8 py-2 border border-gray-300 rounded-md leading-5 bg-white text-sm focus:outline-none focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500"
+              >
+                <option value="">All grades</option>
+                {gradeOptions.map((g) => (
+                  <option key={g} value={g}>
+                    {g}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div className="min-w-[200px]">
+              <label className="block text-sm font-medium text-gray-700 mb-1">Status Position</label>
+              <select
+                value={lastStageFilter}
+                onChange={(e) => setLastStageFilter(e.target.value)}
+                className="block w-full pl-3 pr-8 py-2 border border-gray-300 rounded-md leading-5 bg-white text-sm focus:outline-none focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500"
+              >
+                <option value="">All stages</option>
+                {[...PIPELINE_STATUS_RANK, 'Keep In View'].map((stage) => (
+                  <option key={stage} value={stage}>
+                    {stage}
+                  </option>
+                ))}
+                <option value="__none__">No active candidate</option>
+              </select>
+            </div>
             {/* Sort by Location */}
             <div className="flex items-center gap-2">
               <label className="text-sm font-medium text-gray-700">Sort by:</label>
@@ -1357,7 +1413,7 @@ function FPTKPageContent() {
         <div className="mb-6">
           <h3 className="text-sm font-medium text-gray-900 mb-2">By Current Status</h3>
           <p className="text-xs text-gray-500 mb-3">
-            Counts reflect the current search and PT/Area/Area detail filters. Click a status to filter the list
+            Counts reflect the current search and PT/Area/Area detail/Grade/Status Position filters. Click a status to filter the list
             below; click again to clear that filter.
           </p>
           <div className="flex flex-wrap gap-2">
