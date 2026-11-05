@@ -42,6 +42,10 @@ export default function RootLayout({
     <html lang="en">
       <head>
         {process.env.NEXT_PUBLIC_HUB_SDK_URL ? (
+          // Queue stub: lets app code push commands before the deferred SDK loads.
+          <script dangerouslySetInnerHTML={{ __html: 'window.DwsHub = window.DwsHub || [];' }} />
+        ) : null}
+        {process.env.NEXT_PUBLIC_HUB_SDK_URL ? (
           <script
             src={process.env.NEXT_PUBLIC_HUB_SDK_URL}
             data-app-key={process.env.NEXT_PUBLIC_HUB_SDK_KEY}

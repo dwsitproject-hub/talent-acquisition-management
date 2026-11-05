@@ -10,8 +10,14 @@ declare global {
 }
 
 /**
- * Tells the DWS Hub SDK who is signed in (Hub `sub` + email). The SDK loads with
- * `defer`, so the call is queued on `window.DwsHub` when it is not ready yet.
+ * Tells the DWS Hub SDK who is signed in (Hub `sub` + email).
+ *
+ * Always uses the `push` form from the SDK integration guide: it is queued and replayed
+ * in order if the SDK (loaded with `defer`) is not ready yet, and runs at once otherwise.
+ * Never call `DwsHub.identify(...)` / `DwsHub?.identify(...)` directly — that is silently
+ * skipped before the SDK loads, leaving the user anonymous in Sentinel.
+ * `identify` is idempotent in the SDK, so running on every restored session is fine.
+ * Sign-out is handled by `reset` in AuthContext.logout.
  */
 export default function HubIdentify() {
   const { user } = useAuth()
@@ -21,9 +27,7 @@ export default function HubIdentify() {
   useEffect(() => {
     if (!hubUserId && !email) return
     const identity = { id: hubUserId ?? undefined, email: email ?? undefined }
-    const hub = (window.DwsHub = window.DwsHub || [])
-    if (typeof hub.identify === 'function') hub.identify(identity)
-    else hub.push(['identify', identity])
+    ;(window.DwsHub = window.DwsHub || []).push(['identify', identity])
   }, [hubUserId, email])
 
   return null
