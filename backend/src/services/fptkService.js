@@ -1262,6 +1262,22 @@ function buildInternalFptkListWhere(filters = {}, user = null) {
   applyCsvInField('areaDetail', filters.areaDetail);
   applyCsvInField('typeGrade', filters.grade);
 
+  // Additional / Replacement (case-insensitive, supports CSV)
+  const addRepParts = String(filters.additionalOrReplacement || '')
+    .split(',')
+    .map((s) => s.trim())
+    .filter(Boolean);
+  if (addRepParts.length) {
+    where.AND = [
+      ...(Array.isArray(where.AND) ? where.AND : where.AND ? [where.AND] : []),
+      {
+        OR: addRepParts.map((v) => ({
+          additionalOrReplacement: { equals: v, mode: 'insensitive' },
+        })),
+      },
+    ];
+  }
+
   return where;
 }
 

@@ -1,7 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const { authenticate, authorize, optionalAuth } = require('../middleware/auth');
-const { requireMenuCreate } = require('../middleware/menuAccessAuth');
+const { requireMenuCreate, requireMenuEdit } = require('../middleware/menuAccessAuth');
 const { asyncHandler } = require('../middleware/errorHandler');
 const fptkService = require('../services/fptkService');
 const { validationRules, validate } = require('../middleware/validator');
@@ -114,6 +114,7 @@ router.get(
       area: req.query.area,
       areaDetail: req.query.areaDetail,
       grade: req.query.grade,
+      additionalOrReplacement: req.query.additionalOrReplacement,
       lastStage: req.query.lastStage,
     };
 
@@ -239,6 +240,7 @@ router.get(
       area: req.query.area,
       areaDetail: req.query.areaDetail,
       grade: req.query.grade,
+      additionalOrReplacement: req.query.additionalOrReplacement,
       lastStage: req.query.lastStage,
     };
     const data = await fptkService.getFptkCurrentStatusCounts(filters, req.user);
@@ -389,7 +391,8 @@ router.put(
 router.put(
   '/:id',
   authenticate,
-  authorize('HIRING_MANAGER', 'TA_HO', 'SUPER_ADMIN'),
+  // Fully RBAC-driven (Menu Access -> Open Position -> Edit); falls back to these roles when unconfigured.
+  requireMenuEdit('/fptk', ['HIRING_MANAGER', 'TA_HO', 'SUPER_ADMIN']),
   validationRules.uuidParam('id'),
   validate,
   asyncHandler(async (req, res) => {
