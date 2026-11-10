@@ -529,6 +529,7 @@ export const FPTKAPI = {
       area?: string
       areaDetail?: string
       grade?: string
+      additionalOrReplacement?: string
       lastStage?: string
     },
     pagination?: { page?: number; limit?: number }
@@ -560,11 +561,13 @@ export const FPTKAPI = {
       area?: string
       areaDetail?: string
       grade?: string
+      additionalOrReplacement?: string
       lastStage?: string
     }
   ) {
     const q: Record<string, string> = {}
     if (params?.grade) q.grade = params.grade
+    if (params?.additionalOrReplacement) q.additionalOrReplacement = params.additionalOrReplacement
     if (params?.lastStage) q.lastStage = params.lastStage
     if (params?.search) q.search = params.search
     if (params?.pt) q.pt = params.pt

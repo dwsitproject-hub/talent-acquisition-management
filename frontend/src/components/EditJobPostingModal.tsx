@@ -15,6 +15,7 @@ import { compressFile, formatFileSize } from '@/utils/fileCompression'
 import {
   fptkRequiredFieldHighlightStyle,
   getMissingFptkRequiredKeys,
+  fptkRequiredFieldsErrorMessage,
   type FptkRequiredKey,
 } from '@/utils/fptkFormRequired'
 import {
@@ -101,6 +102,7 @@ export default function EditJobPostingModal({
   const [statusChangeBlacklist, setStatusChangeBlacklist] = useState(false)
   const [statusSaving, setStatusSaving] = useState(false)
   const [candidatesSaving, setCandidatesSaving] = useState(false)
+  const [saveError, setSaveError] = useState<string | null>(null)
   const [suggestedCandidates, setSuggestedCandidates] = useState<any[]>([])
   const [allCandidates, setAllCandidates] = useState<any[]>([])
   const [showCandidatePicker, setShowCandidatePicker] = useState(false)
@@ -1287,7 +1289,9 @@ export default function EditJobPostingModal({
 
   const handleAppliedCandidatesSaveError = async (error: unknown) => {
     console.error('Failed to save applied candidates:', error)
-    alert(getCandidateSaveErrorMessage(error))
+    const message = getCandidateSaveErrorMessage(error)
+    setSaveError(message)
+    alert(message)
     if (isCandidateLockSaveError(error)) {
       await refreshAppliedCandidatesFromServer()
     }
@@ -1295,6 +1299,7 @@ export default function EditJobPostingModal({
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
+    setSaveError(null)
 
     if (candidateStatusOnly) {
       if (!canManagePositionCandidates) return
@@ -1318,6 +1323,7 @@ export default function EditJobPostingModal({
     const missing = getMissingFptkRequiredKeys(formData as unknown as Record<string, unknown>)
     if (missing.length > 0) {
       setShowRequiredFieldHighlights(true)
+      setSaveError(fptkRequiredFieldsErrorMessage(missing))
       return
     }
     setShowRequiredFieldHighlights(false)
@@ -3105,6 +3111,23 @@ export default function EditJobPostingModal({
               )}
 
             </div>
+
+            {saveError && (
+              <div
+                role="alert"
+                style={{
+                  marginBottom: '12px',
+                  padding: '10px 14px',
+                  border: '1px solid #fca5a5',
+                  backgroundColor: '#fef2f2',
+                  color: '#b91c1c',
+                  borderRadius: '6px',
+                  fontSize: '14px'
+                }}
+              >
+                <span style={{ whiteSpace: 'pre-line' }}>{saveError}</span>
+              </div>
+            )}
 
             {/* Footer */}
             <div style={{

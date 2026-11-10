@@ -18,7 +18,7 @@ const bulkImportService = require('../services/bulkImportService');
 router.get(
   '/divisions',
   authenticate,
-  authorize('TA_HO', 'HRBP', 'TA_SITE', 'SUPER_ADMIN', 'HIRING_MANAGER'),
+  authorize('TA_HO', 'HRBP', 'TA_SITE', 'SUPER_ADMIN', 'HIRING_MANAGER', 'CHRO', 'DEPARTMENT_HEAD'),
   asyncHandler(async (req, res) => {
     const filters = {
       search: req.query.search,
@@ -175,7 +175,7 @@ router.delete(
 router.get(
   '/office-locations',
   authenticate,
-  authorize('TA_HO', 'HRBP', 'TA_SITE', 'SUPER_ADMIN', 'HIRING_MANAGER'),
+  authorize('TA_HO', 'HRBP', 'TA_SITE', 'SUPER_ADMIN', 'HIRING_MANAGER', 'CHRO', 'DEPARTMENT_HEAD'),
   asyncHandler(async (req, res) => {
     const filters = {
       search: req.query.search,

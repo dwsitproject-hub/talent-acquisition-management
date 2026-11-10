@@ -17,7 +17,11 @@ export function isCandidateLockSaveError(error: unknown): boolean {
 }
 
 export function getCandidateSaveErrorMessage(error: unknown): string {
-  const err = error as { response?: { data?: { message?: string } }; message?: string }
+  const err = error as { response?: { status?: number; data?: { message?: string } }; message?: string }
+  if (err.response?.status === 403) {
+    const detail = err.response?.data?.message
+    return `You do not have permission to perform this action (403${detail ? `: ${detail}` : ''}). Please contact your administrator.`
+  }
   return (
     err.response?.data?.message ||
     err.message ||

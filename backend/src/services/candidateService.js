@@ -2,6 +2,43 @@ const prisma = require('../config/database');
 const bcrypt = require('bcryptjs');
 const { encrypt, decrypt } = require('../utils/encryption');
 const logger = require('../utils/logger');
+
+const UNIQUE_FIELD_MESSAGES = {
+  npwpNumber: 'This NPWP number is already registered to another candidate. Please check the number you entered or contact the TA team.',
+  nationalId: 'This National ID (KTP) number is already registered to another candidate. Please check the number you entered or contact the TA team.',
+  email: 'This email address is already registered. Please use a different email.',
+};
+
+/**
+ * Normalize NPWP to digits only (strips dots, dashes, spaces) so the same number
+ * in different formats is treated as one value. Empty input becomes null.
+ */
+function normalizeNpwp(value) {
+  if (value === undefined || value === null) return null;
+  const digits = String(value).replace(/\D/g, '');
+  return digits.length > 0 ? digits : null;
+}
+
+/**
+ * Convert Prisma unique-constraint errors (P2002) into user-friendly 409 errors.
+ * Any other error is re-thrown unchanged.
+ */
+function toFriendlyUniqueError(error) {
+  if (error && error.code === 'P2002') {
+    const target = Array.isArray(error.meta?.target)
+      ? error.meta.target
+      : [String(error.meta?.target || '')];
+    const field = Object.keys(UNIQUE_FIELD_MESSAGES).find((key) => target.includes(key));
+    const friendly = new Error(
+      field ? UNIQUE_FIELD_MESSAGES[field] : 'Some of the data you entered is already registered to another record.'
+    );
+    friendly.statusCode = 409;
+    friendly.code = 'DUPLICATE_VALUE';
+    friendly.field = field;
+    return friendly;
+  }
+  return error;
+}
 const { buildTokenizedSearch } = require('../utils/search');
 const {
   ACTIVE_CANDIDATE_WHERE,
@@ -367,7 +404,7 @@ async function createCandidate(data, actorUser = null) {
       drivingLicense: drivingLicenseArray,
       height: height && height !== '' ? (typeof height === 'string' ? parseInt(height) : height) : null,
       weight: weight && weight !== '' ? (typeof weight === 'string' ? parseInt(weight) : weight) : null,
-      npwpNumber: taxNumber && String(taxNumber).trim() ? String(taxNumber).trim() : null,
+      npwpNumber: normalizeNpwp(taxNumber),
       bpjsHealthNumber: bpjsNumber && String(bpjsNumber).trim() ? String(bpjsNumber).trim() : null,
       bloodType: bloodType && String(bloodType).trim() ? String(bloodType).trim() : null,
       // Always save languages if any of the fields were provided
@@ -404,6 +441,8 @@ async function createCandidate(data, actorUser = null) {
     });
 
     return { user, candidate };
+  }).catch((error) => {
+    throw toFriendlyUniqueError(error);
   });
 
   logger.info(`New candidate created by TA/HR: ${email}`);
@@ -595,15 +634,24 @@ async function updateCandidateProfile(candidateId, data) {
     throw new Error('Candidate not found');
   }
 
+  if (data.npwpNumber !== undefined) {
+    data.npwpNumber = normalizeNpwp(data.npwpNumber);
+  }
+
   // Encrypt sensitive fields
   if (data.nationalId) {
     data.nationalId = encrypt(data.nationalId);
   }
 
-  const candidate = await prisma.candidate.update({
-    where: { id: candidateId },
-    data,
-  });
+  let candidate;
+  try {
+    candidate = await prisma.candidate.update({
+      where: { id: candidateId },
+      data,
+    });
+  } catch (error) {
+    throw toFriendlyUniqueError(error);
+  }
 
   logger.info(`Candidate profile updated: ${candidateId}`);
 
@@ -835,7 +883,7 @@ async function updateCandidate(candidateId, data, actorUser = null) {
     updateData.weight = null;
   }
   
-  updateData.npwpNumber = taxNumber && String(taxNumber).trim() ? String(taxNumber).trim() : null;
+  updateData.npwpNumber = normalizeNpwp(taxNumber);
   updateData.bpjsHealthNumber = bpjsNumber && String(bpjsNumber).trim() ? String(bpjsNumber).trim() : null;
   updateData.bloodType = bloodType && String(bloodType).trim() ? String(bloodType).trim() : null;
   
@@ -903,22 +951,27 @@ async function updateCandidate(candidateId, data, actorUser = null) {
   logger.info(`Ethnicity being updated:`, ethnicity);
   logger.info(`HealthStatus being updated:`, healthStatus);
 
-  const updated = await prisma.candidate.update({ 
-    where: { id: candidateId }, 
-    data: updateData,
-    include: {
-      user: {
-        select: {
-          id: true,
-          email: true,
-          firstName: true,
-          lastName: true,
-          phoneNumber: true,
-          division: true,
+  let updated;
+  try {
+    updated = await prisma.candidate.update({
+      where: { id: candidateId },
+      data: updateData,
+      include: {
+        user: {
+          select: {
+            id: true,
+            email: true,
+            firstName: true,
+            lastName: true,
+            phoneNumber: true,
+            division: true,
+          },
         },
       },
-    },
-  });
+    });
+  } catch (error) {
+    throw toFriendlyUniqueError(error);
+  }
 
   // Decrypt nationalId for response
   if (updated.nationalId) {
