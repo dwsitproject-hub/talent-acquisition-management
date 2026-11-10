@@ -30,7 +30,9 @@ router.patch('/users/:id/status', authorize('SUPER_ADMIN', 'TA_HO'), adminUserCo
 router.post('/users/:id/reset-password', authorize('SUPER_ADMIN'), adminUserController.resetPassword);
 
 // Menu Access Management (SUPER_ADMIN only)
-router.get('/menu-access', authorize('SUPER_ADMIN', 'TA_HO'), menuAccessController.getMenuAccess);
+// Read is open to every authenticated user: the frontend needs it to resolve its own menu/RBAC
+// (visibility, create/edit buttons). Only the update below is restricted.
+router.get('/menu-access', menuAccessController.getMenuAccess);
 router.put('/menu-access', authorize('SUPER_ADMIN'), menuAccessController.updateMenuAccess);
 
 // Audit Trail (SUPER_ADMIN only)
