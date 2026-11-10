@@ -218,7 +218,7 @@ model Candidate {
   weight            Int?      // in kg
   
   // Tax & Social Security
-  npwpNumber        String?   @unique // Tax ID
+  npwpNumber        String?   // Tax ID (not unique: placeholder values like 000 may repeat)
   bpjsJhtNumber     String?   // Employment social security
   bpjsHealthNumber  String?   // Health insurance
   bpjsPensionNumber String?   // Pension
@@ -283,6 +283,7 @@ model Candidate {
   onboarding        Onboarding?
 
   @@index([nationalId])
+  @@index([npwpNumber])
   @@index([userId])
   @@index([isDeleted])
   @@map("candidates")
